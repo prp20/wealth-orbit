@@ -18,8 +18,7 @@ def _query(sql: str, params=()) -> pd.DataFrame:
 def mutual_funds(search: str = "", amc: str = "All", category: str = "All", subcategory: str = "All", plan_type: str = "All", option_type: str = "All") -> pd.DataFrame:
     return _query("""
         SELECT m.scheme_code, m.scheme_name, a.amc_name, c.category_name,
-               s.subcategory_name, m.plan_type, m.option_type,
-               m.is_active
+               s.subcategory_name, m.plan_type, m.option_type
         FROM market_data.mutual_fund_reference m
         JOIN market_data.amc_reference a ON a.amc_id = m.amc_id
         JOIN market_data.mutual_fund_subcategories s ON s.subcategory_id = m.subcategory_id
