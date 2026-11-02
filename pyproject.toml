@@ -16,6 +16,10 @@ dependencies = [
     "python-dotenv>=1.2.4",
     "sqlalchemy>=2.0.0",
     "streamlit>=1.40.0",
+    "psycopg-binary>=3.3.6",
+    "mftool>=2.0.0",
+    "pandas>=2.2.0",
+    "requests>=2.31.0",
 ]
 
 [dependency-groups]

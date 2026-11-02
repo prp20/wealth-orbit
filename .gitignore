@@ -16,6 +16,8 @@ portfolio-service/portfolio.db
 *.db
 *.xlsx
 *.xls
+logs.json
+*.log
 data/
 frontend-react/node_modules/
 frontend-react/dist/*

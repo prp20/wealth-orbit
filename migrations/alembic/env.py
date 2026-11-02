@@ -15,9 +15,11 @@ load_dotenv(PROJECT_ROOT / ".env")
 from backend.models import Base
 
 config = context.config
-database_url = os.getenv("PORTFOLIO_SQLITE_URL", "sqlite:///./portfolio-service/portfolio.db")
+database_url = os.getenv("ALEMBIC_DATABASE_URL") or os.getenv("PORTFOLIO_SQLITE_URL", "sqlite:///./portfolio-service/portfolio.db")
 if database_url:
     database_url = database_url.replace("+aiosqlite", "")
+    if database_url.startswith("postgresql://"):
+        database_url = database_url.replace("postgresql://", "postgresql+psycopg2://", 1)
     config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 else:
     config.set_main_option("sqlalchemy.url", config.get_main_option("sqlalchemy.url").replace("+asyncpg", "+psycopg2"))
