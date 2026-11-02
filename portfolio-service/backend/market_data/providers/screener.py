@@ -12,7 +12,7 @@ from typing import Any
 from uuid import UUID
 
 
-BASE_URL = "https://www.screener.in/company/{slug}/"
+BASE_URL = "https://www.screener.in/company/{slug}/{suffix}"
 CONSOLIDATED = "CONSOLIDATED"
 STANDALONE = "STANDALONE"
 
@@ -100,7 +100,8 @@ class ScreenerParseResult:
 def build_company_url(symbol: str, screener_slug: str | None, reporting_basis: str = CONSOLIDATED) -> str:
     """Return a safe Screener URL using the explicit slug before symbol fallback."""
     slug = (screener_slug or symbol).removesuffix(".NS")
-    return BASE_URL.format(slug=slug)
+    suffix = "consolidated/" if reporting_basis == CONSOLIDATED else ""
+    return BASE_URL.format(slug=slug, suffix=suffix)
 
 
 def normalize_number(value: str | None) -> float | None:

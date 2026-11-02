@@ -4,6 +4,7 @@ import pandas as pd
 import psycopg2
 from psycopg2.extras import register_uuid
 from dotenv import load_dotenv
+from .market_data.index_history import quote_identifier, resolve_index_history_columns
 
 load_dotenv()
 register_uuid()
@@ -79,6 +80,54 @@ def stock_history(symbol: str, from_date=None, to_date=None) -> pd.DataFrame:
 
 def mutual_fund_history(scheme_code: str, from_date=None, to_date=None) -> pd.DataFrame:
     return _query("SELECT h.nav_date AS date,h.nav FROM market_data.mutual_fund_nav_history h JOIN market_data.mutual_fund_reference m ON m.scheme_id=h.scheme_id WHERE m.scheme_code=%s AND (%s IS NULL OR h.nav_date >= %s) AND (%s IS NULL OR h.nav_date <= %s) ORDER BY h.nav_date", (scheme_code, from_date, from_date, to_date, to_date))
+
+def mutual_fund_metric_snapshots(scheme_code: str) -> list[dict]:
+    frame = _query("""SELECT x.as_of_date,x.metric_period,x.current_nav,x.trailing_return,x.cagr,
+        x.standard_deviation,x.sharpe,x.sortino,x.maximum_drawdown,x.alpha,x.beta,
+        x.observations,x.aligned_observations,x.available,x.reason,x.calculation_version
+        FROM market_data.mutual_fund_metric_snapshots x
+        JOIN market_data.mutual_fund_reference m ON m.scheme_id=x.scheme_id
+        WHERE m.scheme_code=%s ORDER BY x.as_of_date DESC,x.metric_period""", (scheme_code,))
+    return frame.to_dict(orient="records")
+
+def mutual_fund_enrichment(scheme_code: str) -> list[dict]:
+    frame = _query("""SELECT e.as_of_date,e.aum,e.expense_ratio,e.exit_load,e.yield_to_maturity,
+        e.yield_to_maturity_unit,e.fund_manager,e.rating,e.provider_status,e.warnings
+        FROM market_data.mutual_fund_enrichment e
+        JOIN market_data.mutual_fund_reference m ON m.scheme_id=e.scheme_id
+        WHERE m.scheme_code=%s ORDER BY e.as_of_date DESC""", (scheme_code,))
+    return frame.to_dict(orient="records")
+
+def mutual_fund_benchmark(scheme_code: str):
+    frame = _query("""SELECT i.index_id,i.index_code,i.index_name,m.benchmark_index_id
+        FROM market_data.mutual_fund_reference m
+        LEFT JOIN market_data.index_reference i ON i.index_id=m.benchmark_index_id
+        WHERE m.scheme_code=%s""", (scheme_code,))
+    return None if frame.empty else frame.iloc[0].to_dict()
+
+def mutual_fund_benchmark_history(scheme_code: str) -> list[dict]:
+    return _index_history_query(lambda d, c: f'''SELECT h.{quote_identifier(d)} AS date,h.open,h.high,h.low,h.{quote_identifier(c)} AS close,h.volume
+        FROM market_data.index_daily_history h
+        JOIN market_data.mutual_fund_reference m ON m.benchmark_index_id=h.index_id
+        WHERE m.scheme_code=%s ORDER BY h.{quote_identifier(d)}''', (scheme_code,)).to_dict(orient="records")
+
+def benchmark_list() -> list[dict]:
+    return _query("SELECT index_id,index_code,index_name FROM market_data.index_reference ORDER BY index_name").to_dict(orient="records")
+
+def benchmark_history(index_code: str) -> list[dict]:
+    return _index_history_query(lambda d, c: f'''SELECT h.{quote_identifier(d)} AS date,h.open,h.high,h.low,h.{quote_identifier(c)} AS close,h.volume
+        FROM market_data.index_daily_history h JOIN market_data.index_reference i ON i.index_id=h.index_id
+        WHERE i.index_code=%s ORDER BY h.{quote_identifier(d)}''', (index_code,)).to_dict(orient="records")
+
+
+def _index_history_query(sql_builder, params=()) -> pd.DataFrame:
+    with psycopg2.connect(os.environ["DATABASE_URL"], connect_timeout=15) as connection:
+        with connection.cursor() as cursor:
+            date_column, close_column = resolve_index_history_columns(cursor)
+            cursor.execute(sql_builder(date_column, close_column), params)
+            columns = [item[0] for item in cursor.description]
+            frame = pd.DataFrame(cursor.fetchall(), columns=columns)
+            return frame.astype(object).where(pd.notnull(frame), None)
 
 def stock_daily_metrics(symbol: str, from_date=None, to_date=None) -> pd.DataFrame:
     return _query("""SELECT m.metric_date AS date, m.market_cap, m.stock_pe, m.price_to_book,

@@ -3,9 +3,12 @@ from datetime import date
 
 from .portfolio_backend import (filter_values, mutual_funds, mutual_fund_detail,
     mutual_fund_detail_by_name, mutual_fund_history, stock_categories, stock_detail,
+    mutual_fund_metric_snapshots, mutual_fund_enrichment,
+    mutual_fund_benchmark, mutual_fund_benchmark_history,
+    benchmark_list, benchmark_history,
     stock_history, stocks, stock_daily_metrics, stock_fundamentals,
     stock_shareholding, stock_technical_indicators, sync_stock_fundamentals, mutual_fund_similar,
-    compute_metrics, has_nav_history, sync_nav)
+    compute_metrics, has_nav_history, sync_nav, recompute_metrics, sync_benchmark, sync_enrichment)
 from .sync_queue import enqueue, get_job, list_jobs
 
 router = APIRouter(prefix="/market-data", tags=["market-data"])
@@ -56,7 +59,9 @@ def sync_mutual_fund_status(scheme_code: str, force: bool = Query(False)):
 def mutual_fund_metrics(scheme_code: str):
     if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
     try:
-        return compute_metrics(scheme_code)
+        from backend.reference_service import mutual_fund_metric_snapshots
+        rows = mutual_fund_metric_snapshots(scheme_code)
+        return rows if rows else compute_metrics(scheme_code)
     except RuntimeError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -64,6 +69,21 @@ def mutual_fund_metrics(scheme_code: str):
 def mutual_fund_similar_route(scheme_code: str):
     if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
     return mutual_fund_similar(scheme_code).to_dict(orient="records")
+
+@router.get("/mutual-funds/{scheme_code}/enrichment")
+def mutual_fund_enrichment_route(scheme_code: str):
+    if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
+    return mutual_fund_enrichment(scheme_code)
+
+@router.get("/mutual-funds/{scheme_code}/benchmark")
+def mutual_fund_benchmark_route(scheme_code: str):
+    if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
+    return mutual_fund_benchmark(scheme_code) or {"available": False, "reason": "No benchmark is mapped"}
+
+@router.get("/mutual-funds/{scheme_code}/benchmark/history")
+def mutual_fund_benchmark_history_route(scheme_code: str):
+    if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
+    return mutual_fund_benchmark_history(scheme_code)
 
 @router.post("/mutual-funds/{scheme_code}/sync/nav")
 def mutual_fund_nav_sync(scheme_code: str, force: bool = Query(False)):
@@ -79,12 +99,32 @@ def mutual_fund_metrics_sync(scheme_code: str, force: bool = Query(False)):
             status_code=409,
             detail="NAV history is not available. Complete a successful NAV sync before queuing metrics.",
         )
-    job, created = enqueue("MUTUAL_FUND", scheme_code, "MF_METRICS", force, lambda: compute_metrics(scheme_code))
+    job, created = enqueue("MUTUAL_FUND", scheme_code, "MF_METRICS", force, lambda: recompute_metrics(scheme_code, force))
+    return {**job, "duplicate": not created}
+
+@router.post("/mutual-funds/{scheme_code}/sync/benchmark")
+def mutual_fund_benchmark_sync(scheme_code: str, force: bool = Query(False)):
+    if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
+    job, created = enqueue("MUTUAL_FUND", scheme_code, "MF_BENCHMARK", force, lambda: sync_benchmark(scheme_code, force))
+    return {**job, "duplicate": not created}
+
+@router.post("/mutual-funds/{scheme_code}/sync/enrichment")
+def mutual_fund_enrichment_sync(scheme_code: str, force: bool = Query(False)):
+    if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
+    job, created = enqueue("MUTUAL_FUND", scheme_code, "MF_ENRICHMENT", force, lambda: sync_enrichment(scheme_code, force))
     return {**job, "duplicate": not created}
 
 @router.get("/mutual-funds")
 def mutual_fund_list(search: str = Query(""), amc: str = Query("All"), category: str = Query("All"), subcategory: str = Query("All"), plan_type: str = Query("All"), option_type: str = Query("All")):
     return mutual_funds(search, amc, category, subcategory, plan_type, option_type).to_dict(orient="records")
+
+@router.get("/benchmarks")
+def benchmark_list_route():
+    return benchmark_list()
+
+@router.get("/benchmarks/{index_code}/history")
+def benchmark_history_route(index_code: str):
+    return benchmark_history(index_code)
 
 @router.get("/stocks")
 def stock_list(search: str = Query(""), exchange: str = Query("All"), sector: str = Query("All"), industry: str = Query("All")):
