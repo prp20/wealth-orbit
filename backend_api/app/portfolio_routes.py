@@ -46,9 +46,13 @@ def holdings(portfolio_id: UUID, session: Session = Depends(portfolio_session)):
 
 
 @router.get("/{portfolio_id}/transactions")
-def transactions(portfolio_id: UUID, session: Session = Depends(portfolio_session)):
+def transactions(portfolio_id: UUID, from_date: date | None = None, to_date: date | None = None, transaction_type: TransactionType | None = None, session: Session = Depends(portfolio_session)):
     get_portfolio(session, portfolio_id)
-    rows = session.scalars(select(Transaction).options(joinedload(Transaction.asset)).where(Transaction.portfolio_id == portfolio_id).order_by(Transaction.transaction_date.desc())).all()
+    query = select(Transaction).options(joinedload(Transaction.asset)).where(Transaction.portfolio_id == portfolio_id)
+    if from_date: query = query.where(Transaction.transaction_date >= from_date)
+    if to_date: query = query.where(Transaction.transaction_date <= to_date)
+    if transaction_type: query = query.where(Transaction.transaction_type == transaction_type)
+    rows = session.scalars(query.order_by(Transaction.transaction_date.desc())).all()
     return [{"transaction_id": t.transaction_id, "asset_id": t.asset_id, "asset_name": t.asset.asset_name, "transaction_type": t.transaction_type, "quantity": t.quantity, "price_per_unit": t.price_per_unit, "transaction_amount": t.transaction_amount, "transaction_date": t.transaction_date} for t in rows]
 
 
