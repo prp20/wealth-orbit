@@ -1,7 +1,5 @@
-import sys
 from datetime import date
 from decimal import Decimal
-from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,10 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 from .dependencies import portfolio_session
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "portfolio-service"))
-from backend.models import Holding, Portfolio, Transaction, TransactionType  # noqa: E402
-from backend.services import InsufficientHoldingsError  # noqa: E402
+from .portfolio_backend import Holding, InsufficientHoldingsError, Portfolio, Transaction, TransactionType
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
@@ -59,12 +54,10 @@ def transactions(portfolio_id: UUID, from_date: date | None = None, to_date: dat
 @router.post("/{portfolio_id}/transactions", status_code=201)
 def create_transaction(portfolio_id: UUID, request: TransactionRequest, session: Session = Depends(portfolio_session)):
     get_portfolio(session, portfolio_id)
-    from backend.services import record_transaction
     try:
         transaction = session.execute  # keep the service boundary explicit
         # The async service is used by async application workers; this API currently
         # validates and applies the same weighted-average rules synchronously.
-        from backend.models import Holding, Transaction as Tx
         holding = session.scalar(select(Holding).where(Holding.portfolio_id == portfolio_id, Holding.asset_id == request.asset_id).with_for_update())
         amount = request.quantity * request.price_per_unit
         if request.transaction_type is TransactionType.SELL:
@@ -80,7 +73,7 @@ def create_transaction(portfolio_id: UUID, request: TransactionRequest, session:
             holding.current_quantity += request.quantity
             holding.invested_amount += amount
             holding.average_cost_per_unit = holding.invested_amount / holding.current_quantity
-        tx = Tx(portfolio_id=portfolio_id, asset_id=request.asset_id, transaction_type=request.transaction_type, quantity=request.quantity, price_per_unit=request.price_per_unit, transaction_amount=amount, transaction_date=request.transaction_date)
+        tx = Transaction(portfolio_id=portfolio_id, asset_id=request.asset_id, transaction_type=request.transaction_type, quantity=request.quantity, price_per_unit=request.price_per_unit, transaction_amount=amount, transaction_date=request.transaction_date)
         session.add(tx); session.commit(); session.refresh(tx)
         return {"transaction_id": tx.transaction_id, "transaction_amount": tx.transaction_amount}
     except InsufficientHoldingsError as exc:

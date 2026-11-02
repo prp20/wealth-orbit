@@ -85,6 +85,7 @@ def sync_nav(scheme_code: str, force: bool = False) -> dict:
         source_name = "mfapi"
     if not rows:
         raise RuntimeError(f"No parseable NAV history returned for {scheme_code}")
+    fetched_rows = rows
     with psycopg2.connect(os.environ["DATABASE_URL"],connect_timeout=15) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT scheme_id FROM market_data.mutual_fund_reference WHERE scheme_code=%s",(scheme_code,)); found=cur.fetchone()
@@ -105,18 +106,21 @@ def sync_nav(scheme_code: str, force: bool = False) -> dict:
             if not force:
                 cur.execute("SELECT max(h.nav_date) FROM market_data.mutual_fund_nav_history h WHERE h.scheme_id=%s",(found[0],)); watermark=cur.fetchone()[0]
                 rows=[r for r in rows if watermark is None or r[1]>watermark]
-            values = [(found[0], row[1], row[2], source_id) for row in rows]
-            execute_values(
-                cur,
-                "INSERT INTO market_data.mutual_fund_nav_history(scheme_id,nav_date,nav,source_id) "
-                "VALUES %s ON CONFLICT(scheme_id,nav_date) DO UPDATE SET "
-                "nav=EXCLUDED.nav,source_id=EXCLUDED.source_id,updated_at=NOW()",
-                values,
-                page_size=1000,
-            )
+            if rows:
+                values = [(found[0], row[1], row[2], source_id) for row in rows]
+                execute_values(
+                    cur,
+                    "INSERT INTO market_data.mutual_fund_nav_history(scheme_id,nav_date,nav,source_id) "
+                    "VALUES %s ON CONFLICT(scheme_id,nav_date) DO UPDATE SET "
+                    "nav=EXCLUDED.nav,source_id=EXCLUDED.source_id,updated_at=NOW()",
+                    values,
+                    page_size=1000,
+                )
         conn.commit()
     return {"scheme_code":scheme_code,"records_processed":len(rows),"force":force,
-            "latest_nav_date": max(row[1] for row in rows).isoformat()}
+            "records_fetched":len(fetched_rows),
+            "latest_nav_date":max(row[1] for row in fetched_rows).isoformat(),
+            "up_to_date":not rows}
 
 
 def has_nav_history(scheme_code: str) -> bool:

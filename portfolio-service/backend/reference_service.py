@@ -89,7 +89,7 @@ def stock_daily_metrics(symbol: str, from_date=None, to_date=None) -> pd.DataFra
           AND (%s IS NULL OR m.metric_date <= %s) ORDER BY m.metric_date""",
         (symbol, from_date, from_date, to_date, to_date))
 
-def stock_fundamentals(symbol: str, reporting_period: str = "", reporting_basis: str = "", metric_code: str = "") -> pd.DataFrame:
+def stock_fundamentals(symbol: str, reporting_period: str = "", reporting_basis: str = "", metric_code: str = "", statement_type: str = "") -> pd.DataFrame:
     return _query("""SELECT v.period_end_date, v.period_start_date, v.reporting_period,
         v.reporting_basis, r.metric_code, r.metric_name, r.statement_type, r.unit,
         v.metric_value, v.source_id
@@ -98,8 +98,9 @@ def stock_fundamentals(symbol: str, reporting_period: str = "", reporting_basis:
         JOIN market_data.fundamental_metric_reference r ON r.metric_id=v.metric_id
         WHERE s.trading_symbol=%s AND (%s='' OR v.reporting_period=%s)
           AND (%s='' OR v.reporting_basis=%s) AND (%s='' OR r.metric_code=%s)
+          AND (%s='' OR r.statement_type=%s)
         ORDER BY v.period_end_date DESC, r.metric_code""",
-        (symbol, reporting_period, reporting_period, reporting_basis, reporting_basis, metric_code, metric_code))
+        (symbol, reporting_period, reporting_period, reporting_basis, reporting_basis, metric_code, metric_code, statement_type, statement_type))
 
 def stock_shareholding(symbol: str, from_date=None, to_date=None) -> pd.DataFrame:
     return _query("""SELECT h.period_end_date, h.promoter_pct, h.fii_pct, h.dii_pct,

@@ -1,13 +1,11 @@
-import sys
-from pathlib import Path
 from fastapi import APIRouter, Query, HTTPException
 from datetime import date
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "portfolio-service"))
-from backend.reference_service import (filter_values, mutual_funds, mutual_fund_detail,
+from .portfolio_backend import (filter_values, mutual_funds, mutual_fund_detail,
     mutual_fund_detail_by_name, mutual_fund_history, stock_categories, stock_detail,
     stock_history, stocks, stock_daily_metrics, stock_fundamentals,
-    stock_shareholding, stock_technical_indicators, sync_stock_fundamentals, mutual_fund_similar)  # noqa: E402
+    stock_shareholding, stock_technical_indicators, sync_stock_fundamentals, mutual_fund_similar,
+    compute_metrics, has_nav_history, sync_nav)
 from .sync_queue import enqueue, get_job, list_jobs
 
 router = APIRouter(prefix="/market-data", tags=["market-data"])
@@ -43,7 +41,6 @@ def sync_stock_status(symbol: str, kind: str = Query("fundamentals"), force: boo
 def sync_mutual_fund(scheme_code: str, force: bool = Query(False)):
     if mutual_fund_detail(scheme_code) is None:
         raise HTTPException(status_code=404, detail="Mutual fund not found")
-    from backend.mutual_fund_service import sync_nav
     job, created = enqueue("MUTUAL_FUND", scheme_code, "NAV", force, lambda: sync_nav(scheme_code, force))
     return {**job, "duplicate": not created}
 
@@ -53,7 +50,6 @@ def sync_mutual_fund_status(scheme_code: str, force: bool = Query(False)):
 
 @router.get("/mutual-funds/{scheme_code}/metrics")
 def mutual_fund_metrics(scheme_code: str):
-    from backend.mutual_fund_service import compute_metrics
     if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
     try:
         return compute_metrics(scheme_code)
@@ -68,14 +64,12 @@ def mutual_fund_similar_route(scheme_code: str):
 @router.post("/mutual-funds/{scheme_code}/sync/nav")
 def mutual_fund_nav_sync(scheme_code: str, force: bool = Query(False)):
     if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
-    from backend.mutual_fund_service import sync_nav
     job, created = enqueue("MUTUAL_FUND", scheme_code, "MF_NAV", force, lambda: sync_nav(scheme_code, force))
     return {**job, "duplicate": not created}
 
 @router.post("/mutual-funds/{scheme_code}/sync/metrics")
 def mutual_fund_metrics_sync(scheme_code: str, force: bool = Query(False)):
     if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
-    from backend.mutual_fund_service import compute_metrics, has_nav_history
     if not has_nav_history(scheme_code):
         raise HTTPException(
             status_code=409,
@@ -130,12 +124,14 @@ def stock_daily_metrics_route(symbol: str, from_date: date | None = None, to_dat
     return stock_daily_metrics(symbol, from_date, to_date).to_dict(orient="records")
 
 @router.get("/stocks/{symbol}/fundamentals")
-def stock_fundamentals_route(symbol: str, reporting_period: str = Query(""), reporting_basis: str = Query(""), metric_code: str = Query("")):
+def stock_fundamentals_route(symbol: str, reporting_period: str = Query(""), reporting_basis: str = Query(""), metric_code: str = Query(""), statement_type: str = Query("")):
     if reporting_period and reporting_period not in {"QUARTERLY", "ANNUAL"}:
         raise HTTPException(status_code=422, detail="reporting_period must be QUARTERLY or ANNUAL")
     if reporting_basis and reporting_basis not in {"CONSOLIDATED", "STANDALONE"}:
         raise HTTPException(status_code=422, detail="reporting_basis must be CONSOLIDATED or STANDALONE")
-    return stock_fundamentals(symbol, reporting_period, reporting_basis, metric_code).to_dict(orient="records")
+    if statement_type and statement_type not in {"PL", "BS", "CF", "RATIOS"}:
+        raise HTTPException(status_code=422, detail="statement_type must be PL, BS, CF, or RATIOS")
+    return stock_fundamentals(symbol, reporting_period, reporting_basis, metric_code, statement_type).to_dict(orient="records")
 
 @router.get("/stocks/{symbol}/shareholding")
 def stock_shareholding_route(symbol: str, from_date: date | None = None, to_date: date | None = None):
