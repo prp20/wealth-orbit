@@ -1,9 +1,10 @@
 import sys
 from pathlib import Path
 from fastapi import APIRouter, Query
+from datetime import date
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "portfolio-service"))
-from backend.reference_service import filter_values, mutual_funds, mutual_fund_detail, mutual_fund_detail_by_name, stock_categories, stock_detail, stocks  # noqa: E402
+from backend.reference_service import filter_values, mutual_funds, mutual_fund_detail, mutual_fund_detail_by_name, mutual_fund_history, stock_categories, stock_detail, stock_history, stocks  # noqa: E402
 
 router = APIRouter(prefix="/market-data", tags=["market-data"])
 
@@ -39,3 +40,11 @@ def mutual_fund_by_name(scheme_name: str):
     result = mutual_fund_detail_by_name(scheme_name)
     if result is None: return {"detail": "Mutual fund not found"}
     return result
+
+@router.get("/stocks/{symbol}/history")
+def stock_history_route(symbol: str, from_date: date | None = None, to_date: date | None = None):
+    return stock_history(symbol, from_date, to_date).to_dict(orient="records")
+
+@router.get("/mutual-funds/{scheme_code}/history")
+def mutual_fund_history_route(scheme_code: str, from_date: date | None = None, to_date: date | None = None):
+    return mutual_fund_history(scheme_code, from_date, to_date).to_dict(orient="records")
