@@ -1,0 +1,93 @@
+"""Database writers for derived stock market-data synchronizations."""
+from __future__ import annotations
+
+import os
+import uuid
+from datetime import date
+
+import pandas as pd
+import psycopg2
+from psycopg2.extras import execute_values
+
+from backend_api.app.technical_indicators import calculate_indicators
+
+
+DEFAULT_INDICATORS = [
+    {"code": "SMA", "parameters": {"period": 20}},
+    {"code": "EMA", "parameters": {"period": 20}},
+    {"code": "RSI", "parameters": {"period": 14}},
+    {"code": "MACD", "parameters": {"fast": 12, "slow": 26, "signal": 9}},
+    {"code": "BB", "parameters": {"period": 20, "std_dev": 2}},
+]
+
+
+def _source_id(cur, name: str) -> uuid.UUID:
+    cur.execute("SELECT source_id FROM market_data.data_sources WHERE source_name=%s", (name,))
+    row = cur.fetchone()
+    if row:
+        return row[0]
+    value = uuid.uuid4()
+    cur.execute("INSERT INTO market_data.data_sources(source_id,source_name) VALUES(%s,%s)", (value, name))
+    return value
+
+
+def _prices(cur, symbol: str) -> tuple[uuid.UUID, pd.DataFrame]:
+    cur.execute("SELECT stock_id FROM market_data.stock_reference WHERE trading_symbol=%s AND is_active=TRUE", (symbol,))
+    stock = cur.fetchone()
+    if not stock:
+        raise ValueError(f"Active stock not found: {symbol}")
+    cur.execute("""SELECT p.trading_date AS date,p.open,p.high,p.low,p.close,p.volume
+        FROM market_data.stock_daily_prices p WHERE p.stock_id=%s ORDER BY p.trading_date""", (stock[0],))
+    rows = cur.fetchall()
+    return stock[0], pd.DataFrame(rows, columns=["date", "open", "high", "low", "close", "volume"])
+
+
+def sync_technical_indicators(symbol: str, force: bool = False) -> dict:
+    with psycopg2.connect(os.environ["DATABASE_URL"], connect_timeout=15) as conn:
+        with conn.cursor() as cur:
+            stock_id, frame = _prices(cur, symbol)
+            if frame.empty:
+                raise RuntimeError(f"No OHLC history for {symbol}; sync prices before technical indicators")
+            calculated = calculate_indicators(frame, DEFAULT_INDICATORS)
+            calculated = calculated.dropna(subset=["value"])
+            if force:
+                cur.execute("DELETE FROM market_data.stock_technical_indicators WHERE stock_id=%s", (stock_id,))
+            rows = [(stock_id, row.date, row.indicator_code, int(row.indicator_period), row.component, row.parameters, row.value) for row in calculated.itertuples()]
+            execute_values(cur, """INSERT INTO market_data.stock_technical_indicators
+                (stock_id,trading_date,indicator_code,indicator_period,component,parameters,indicator_value,calculation_status,calculated_at)
+                VALUES %s ON CONFLICT(stock_id,trading_date,indicator_code,indicator_period,component,parameters)
+                DO UPDATE SET indicator_value=EXCLUDED.indicator_value,calculation_status='CURRENT',calculated_at=NOW(),updated_at=NOW()""",
+                rows, template="(%s,%s,%s,%s,%s,%s::jsonb,%s,'CURRENT',NOW())", page_size=1000)
+        conn.commit()
+    return {"symbol": symbol, "kind": "technical", "status": "completed", "records_processed": len(rows), "force": force}
+
+
+def sync_daily_metrics(symbol: str, force: bool = False) -> dict:
+    """Persist provider ratios for the latest available market date.
+
+    Ratios are point-in-time values; unavailable fields remain NULL rather than
+    being fabricated from prices.
+    """
+    try:
+        import yfinance as yf
+        info = yf.Ticker(f"{symbol}.NS").info
+    except Exception as exc:
+        raise RuntimeError(f"Unable to fetch daily metrics for {symbol}: {exc}") from exc
+    with psycopg2.connect(os.environ["DATABASE_URL"], connect_timeout=15) as conn:
+        with conn.cursor() as cur:
+            stock_id, frame = _prices(cur, symbol)
+            if frame.empty:
+                raise RuntimeError(f"No OHLC history for {symbol}; sync prices before daily metrics")
+            metric_date = frame.iloc[-1]["date"]
+            source_id = _source_id(cur, "yfinance")
+            values = (stock_id, metric_date, info.get("marketCap"), info.get("trailingPE"), info.get("priceToBook"),
+                      (float(info["dividendYield"]) * 100 if info.get("dividendYield") is not None else None),
+                      info.get("bookValue"), info.get("returnOnCapitalEmployed"), info.get("returnOnEquity"), source_id)
+            cur.execute("""INSERT INTO market_data.stock_daily_metrics
+                (stock_id,metric_date,market_cap,stock_pe,price_to_book,dividend_yield,book_value,roce,roe,calculation_method,source_id)
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,'PROVIDER',%s)
+                ON CONFLICT(stock_id,metric_date) DO UPDATE SET market_cap=EXCLUDED.market_cap,stock_pe=EXCLUDED.stock_pe,
+                price_to_book=EXCLUDED.price_to_book,dividend_yield=EXCLUDED.dividend_yield,book_value=EXCLUDED.book_value,
+                roce=EXCLUDED.roce,roe=EXCLUDED.roe,source_id=EXCLUDED.source_id,updated_at=NOW()""", values)
+        conn.commit()
+    return {"symbol": symbol, "kind": "daily_metrics", "status": "completed", "records_processed": 1, "force": force, "metric_date": str(metric_date)}

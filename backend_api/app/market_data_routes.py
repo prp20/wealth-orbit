@@ -29,7 +29,11 @@ def sync_stock(symbol: str, kind: str = Query("technical"), force: bool = Query(
         raise HTTPException(status_code=422, detail="invalid sync kind")
     if stock_detail(symbol) is None:
         raise HTTPException(status_code=404, detail="Stock not found")
-    work = (lambda: sync_stock_fundamentals(symbol, force)) if kind in {"fundamentals", "shareholding"} else (lambda: {"status":"completed","symbol":symbol,"kind":kind,"force":force})
+    if kind == "fundamentals" or kind == "shareholding":
+        work = lambda: sync_stock_fundamentals(symbol, force)
+    else:
+        from backend.market_data.sync import sync_daily_metrics, sync_technical_indicators
+        work = (lambda: sync_daily_metrics(symbol, force)) if kind == "daily_metrics" else (lambda: sync_technical_indicators(symbol, force))
     job, created = enqueue("STOCK", symbol, kind.upper(), force, work)
     return {**job, "duplicate": not created}
 
