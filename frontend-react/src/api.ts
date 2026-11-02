@@ -1,0 +1,3 @@
+const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+async function get<T>(path: string): Promise<T> { const response = await fetch(`${base}${path}`); if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail || 'Could not load data'); return response.json(); }
+export const api = { portfolios: () => get<any[]>('/portfolios'), holdings: (id:string) => get<any[]>(`/portfolios/${id}/holdings`), transactions: (id:string) => get<any[]>(`/portfolios/${id}/transactions`), funds: (q:string) => get<any[]>(`/market-data/mutual-funds?search=${encodeURIComponent(q)}`), stocks: (q:string) => get<any[]>(`/market-data/stocks?search=${encodeURIComponent(q)}`) };

@@ -16,3 +16,9 @@ portfolio-service/portfolio.db
 *.db
 *.xlsx
 *.xls
+frontend-react/node_modules/
+frontend-react/dist/*
+!frontend-react/dist/
+!frontend-react/dist/index.html
+!frontend-react/dist/assets/
+!frontend-react/dist/assets/*
