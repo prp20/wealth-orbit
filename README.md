@@ -1,0 +1,70 @@
+# Wealth Orbit
+
+Multi-user portfolio management platform for mutual funds, stocks, market data, broker integrations, strategies, and analytics.
+
+## Repository layout
+
+```text
+wealth-orbit/
+├── portfolio-service/
+│   ├── backend/
+│   └── scripts/
+├── frontend/
+├── market-data-service/
+├── mutual-fund-reference/
+├── broker-integrations/
+├── strategy-engine/
+├── analytics/
+├── migrations/
+├── docs/
+└── tests/
+```
+
+## Setup
+
+Portfolio data is stored locally in SQLite. The default is `sqlite+aiosqlite:///./portfolio-service/portfolio.db`; set `PORTFOLIO_SQLITE_URL` to change it.
+
+General mutual-fund reference data belongs in PostgreSQL. Set `REFERENCE_DB_CONN_STRING` to that database's connection string. The portfolio database keeps only a stable local `asset_id`; there are no cross-database foreign keys.
+
+Install dependencies with `uv sync`, then apply the schema:
+
+```bash
+uv run alembic -c migrations/alembic.ini upgrade head
+```
+
+Run tests with `pytest`.
+
+To import the mutual-fund order-history workbook into the local database:
+
+```bash
+python portfolio-service/scripts/import_transactions.py /path/to/Mutual_Funds_Order_History.xlsx
+```
+
+The importer processes rows chronologically and preserves duplicate source orders as separate transactions. Use `--mode append` for a newer export; already imported source rows are skipped. Use `--mode update` when the same export has corrections; it rebuilds that source file's transactions and holdings. If the export contains a redemption for units acquired before the report window, it seeds an opening balance transaction so the local holding never becomes negative.
+
+The dashboard shows invested debt and equity totals using the local `assets.investment_class` classification. The current importer classifies short-term, ultra-short-term, liquid, money-market, corporate-bond, and gilt funds as debt; other imported mutual funds are classified as equity and can be corrected later as reference data improves.
+
+Launch the dashboard with:
+
+```bash
+uv run streamlit run frontend/streamlit_app.py
+```
+
+The dashboard hides soft-deleted users, shows current holdings and full transaction history, and records buys or sells using the same weighted-average cost rules. It intentionally does not calculate market value because live pricing is outside the current scope.
+
+## Schema
+
+`users` have one `portfolio`. A portfolio owns immutable `transactions`; each transaction references a local `asset`. `holdings` is a current aggregate keyed by `(portfolio_id, asset_id)` and can be rebuilt from transactions. Mutual-fund descriptive records live in PostgreSQL and can be synchronized into local asset identity records.
+
+```mermaid
+erDiagram
+    USERS ||--|| PORTFOLIOS : owns
+    PORTFOLIOS ||--o{ TRANSACTIONS : contains
+    ASSETS ||--o{ TRANSACTIONS : referenced_by
+    PORTFOLIOS ||--o{ HOLDINGS : contains
+    ASSETS ||--o{ HOLDINGS : represented_by
+```
+
+The weighted-average cost service locks the holding row during a transaction. Buys add quantity and cost; sells remove quantity and the proportional remaining cost basis. A zero position removes the holding while retaining all transactions.
+
+Holdings can be reconstructed by replaying transactions per portfolio and asset in transaction-date/order sequence, applying the same weighted-average formulas used by `portfolio-service/backend/services.py`.
