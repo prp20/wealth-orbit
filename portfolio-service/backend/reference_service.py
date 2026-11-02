@@ -45,3 +45,13 @@ def stocks(search: str = "", sector: str = "All") -> pd.DataFrame:
           AND (%s = 'All' OR sr.sector_name = %s)
         ORDER BY s.trading_symbol
     """, (search, f"%{search}%", f"%{search}%", sector, sector))
+
+
+def stock_detail(symbol: str):
+    frame = _query("SELECT s.trading_symbol, s.company_name, s.exchange, sr.sector_name, ir.industry_name, s.is_active FROM market_data.stock_reference s LEFT JOIN market_data.sector_reference sr ON sr.sector_id=s.sector_id LEFT JOIN market_data.industry_reference ir ON ir.industry_id=s.industry_id WHERE s.trading_symbol=%s", (symbol,))
+    return None if frame.empty else frame.iloc[0].to_dict()
+
+
+def mutual_fund_detail(scheme_code: str):
+    frame = _query("""SELECT m.scheme_code, m.scheme_name, a.amc_name, c.category_name, s.subcategory_name, m.plan_type, m.option_type, m.is_active FROM market_data.mutual_fund_reference m JOIN market_data.amc_reference a ON a.amc_id=m.amc_id JOIN market_data.mutual_fund_subcategories s ON s.subcategory_id=m.subcategory_id JOIN market_data.mutual_fund_categories c ON c.category_id=s.category_id WHERE m.scheme_code=%s""", (scheme_code,))
+    return None if frame.empty else frame.iloc[0].to_dict()
