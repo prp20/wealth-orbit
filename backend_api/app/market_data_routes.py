@@ -25,18 +25,22 @@ def sync_job(job_id: str):
     return job
 
 @router.post("/stocks/{symbol}/sync")
-def sync_stock(symbol: str, kind: str = Query("technical"), force: bool = Query(False)):
+def sync_stock(symbol: str, kind: str = Query("technical"), force: bool = Query(False), from_date: date | None = None, to_date: date | None = None):
     """Return a sync request acknowledgement; ingestion workers can consume this request."""
     kind = kind.lower()
-    if kind not in {"technical", "fundamentals", "daily_metrics", "shareholding"}:
+    if kind not in {"prices", "technical", "fundamentals", "daily_metrics", "shareholding"}:
         raise HTTPException(status_code=422, detail="invalid sync kind")
     if stock_detail(symbol) is None:
         raise HTTPException(status_code=404, detail="Stock not found")
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(status_code=422, detail="from_date must be on or before to_date")
     if kind == "fundamentals" or kind == "shareholding":
         work = lambda: sync_stock_fundamentals(symbol, force)
     else:
-        from backend.market_data.sync import sync_daily_metrics, sync_technical_indicators
+        from backend.market_data.sync import sync_daily_metrics, sync_technical_indicators, sync_prices
         work = (lambda: sync_daily_metrics(symbol, force)) if kind == "daily_metrics" else (lambda: sync_technical_indicators(symbol, force))
+        if kind == "prices":
+            work = lambda: sync_prices(symbol, force, from_date, to_date)
     job, created = enqueue("STOCK", symbol, kind.upper(), force, work)
     return {**job, "duplicate": not created}
 
@@ -45,10 +49,10 @@ def sync_stock_status(symbol: str, kind: str = Query("fundamentals"), force: boo
     return {"status":"idle"}
 
 @router.post("/mutual-funds/{scheme_code}/sync")
-def sync_mutual_fund(scheme_code: str, force: bool = Query(False)):
+def sync_mutual_fund(scheme_code: str, force: bool = Query(False), from_date: date | None = None, to_date: date | None = None):
     if mutual_fund_detail(scheme_code) is None:
         raise HTTPException(status_code=404, detail="Mutual fund not found")
-    job, created = enqueue("MUTUAL_FUND", scheme_code, "NAV", force, lambda: sync_nav(scheme_code, force))
+    job, created = enqueue("MUTUAL_FUND", scheme_code, "NAV", force, lambda: sync_nav(scheme_code, force, from_date, to_date))
     return {**job, "duplicate": not created}
 
 @router.get("/mutual-funds/{scheme_code}/sync/status")
@@ -86,9 +90,11 @@ def mutual_fund_benchmark_history_route(scheme_code: str):
     return mutual_fund_benchmark_history(scheme_code)
 
 @router.post("/mutual-funds/{scheme_code}/sync/nav")
-def mutual_fund_nav_sync(scheme_code: str, force: bool = Query(False)):
+def mutual_fund_nav_sync(scheme_code: str, force: bool = Query(False), from_date: date | None = None, to_date: date | None = None):
     if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
-    job, created = enqueue("MUTUAL_FUND", scheme_code, "MF_NAV", force, lambda: sync_nav(scheme_code, force))
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(status_code=422, detail="from_date must be on or before to_date")
+    job, created = enqueue("MUTUAL_FUND", scheme_code, "MF_NAV", force, lambda: sync_nav(scheme_code, force, from_date, to_date))
     return {**job, "duplicate": not created}
 
 @router.post("/mutual-funds/{scheme_code}/sync/metrics")

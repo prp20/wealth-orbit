@@ -91,4 +91,75 @@ def sync_benchmark(scheme_code: str, force: bool = False) -> dict:
 
 
 def sync_enrichment(scheme_code: str, force: bool = False) -> dict:
-    raise RuntimeError("No mutual-fund enrichment provider is configured")
+    """Fetch and persist the provider's current scheme facts.
+
+    mftool exposes stable scheme metadata (fund house, category, launch date,
+    etc.). Optional fields such as AUM/expense ratio are stored when the
+    provider supplies them; missing fields remain NULL rather than fabricated.
+    """
+    from datetime import date
+    details = None
+    provider_errors = []
+    try:
+        from mftool import Mftool
+        details = Mftool().get_scheme_details(scheme_code, as_json=True)
+        if isinstance(details, str):
+            details = json.loads(details)
+    except Exception as exc:
+        provider_errors.append(f"mftool: {exc}")
+    # mftool deliberately swallows AMFI errors and returns None. MFAPI exposes
+    # the same canonical scheme metadata without requiring the library's full
+    # scheme-code catalogue to be downloaded first.
+    if not isinstance(details, dict):
+        try:
+            import requests
+            response = requests.get(f"https://api.mfapi.in/mf/{scheme_code}", timeout=30)
+            response.raise_for_status()
+            payload = response.json()
+            meta = payload.get("meta") if isinstance(payload, dict) else None
+            if isinstance(meta, dict):
+                details = meta
+        except Exception as exc:
+            provider_errors.append(f"mfapi: {exc}")
+    if not isinstance(details, dict):
+        raise RuntimeError(f"No fund facts returned for {scheme_code} ({'; '.join(provider_errors)})")
+    with _connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT scheme_id FROM market_data.mutual_fund_reference WHERE scheme_code=%s", (scheme_code,))
+            found = cur.fetchone()
+            if not found:
+                raise ValueError(f"Unknown mutual-fund scheme: {scheme_code}")
+            cur.execute("SELECT source_id FROM market_data.data_sources WHERE source_name='mftool'")
+            source = cur.fetchone()
+            if source:
+                source_id = source[0]
+            else:
+                import uuid
+                source_id = uuid.uuid4()
+                cur.execute("INSERT INTO market_data.data_sources(source_id,source_name) VALUES(%s,'mftool')", (source_id,))
+            def first(*keys):
+                return next((details.get(key) for key in keys if details.get(key) not in (None, "")), None)
+            as_of = date.today()
+            cur.execute("""INSERT INTO market_data.mutual_fund_enrichment
+                (scheme_id,as_of_date,aum,expense_ratio,exit_load,yield_to_maturity,
+                 yield_to_maturity_unit,fund_manager,rating,fund_house,scheme_type,scheme_category,scheme_start_date,source_id,provider_status,
+                 raw_payload_hash,warnings)
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'AVAILABLE',md5(%s),%s::jsonb)
+                ON CONFLICT(scheme_id,as_of_date,source_id) DO UPDATE SET
+                 aum=EXCLUDED.aum,expense_ratio=EXCLUDED.expense_ratio,
+                 exit_load=EXCLUDED.exit_load,yield_to_maturity=EXCLUDED.yield_to_maturity,
+                 yield_to_maturity_unit=EXCLUDED.yield_to_maturity_unit,
+                 fund_manager=EXCLUDED.fund_manager,rating=EXCLUDED.rating,
+                 fund_house=EXCLUDED.fund_house,scheme_type=EXCLUDED.scheme_type,
+                 scheme_category=EXCLUDED.scheme_category,scheme_start_date=EXCLUDED.scheme_start_date,
+                 provider_status='AVAILABLE',raw_payload_hash=EXCLUDED.raw_payload_hash,
+                 warnings=EXCLUDED.warnings,updated_at=NOW()""",
+                (found[0], as_of, first("aum", "fund_size", "AUM"), first("expense_ratio", "expenseRatio"),
+                 first("exit_load", "exitLoad"), first("yield_to_maturity", "yieldToMaturity"),
+                 first("yield_to_maturity_unit"), first("fund_manager", "fundManager", "manager"),
+                 first("rating", "star_rating"), first("fund_house", "fundHouse"),
+                 first("scheme_type", "schemeType"), first("scheme_category", "schemeCategory"),
+                 first("scheme_start_date", "schemeStartDate"), source_id, json.dumps(details, sort_keys=True, default=str),
+                 json.dumps([], separators=(",", ":"))))
+        conn.commit()
+    return {"scheme_code": scheme_code, "kind": "enrichment", "status": "completed", "records_processed": 1, "force": force, "as_of_date": as_of.isoformat()}

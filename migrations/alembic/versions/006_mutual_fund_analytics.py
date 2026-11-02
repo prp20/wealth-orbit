@@ -33,6 +33,7 @@ def upgrade():
       enrichment_id uuid PRIMARY KEY DEFAULT gen_random_uuid(), scheme_id uuid NOT NULL REFERENCES market_data.mutual_fund_reference(scheme_id),
       as_of_date date NOT NULL, aum numeric(30,8), expense_ratio numeric(18,10), exit_load text,
       yield_to_maturity numeric(18,10), yield_to_maturity_unit varchar(20), fund_manager text, rating text,
+      fund_house text, scheme_type text, scheme_category text, scheme_start_date date,
       source_id uuid REFERENCES market_data.data_sources(source_id), provider_status varchar(20) NOT NULL DEFAULT 'AVAILABLE',
       raw_payload_hash varchar(64), warnings jsonb NOT NULL DEFAULT '[]'::jsonb,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),

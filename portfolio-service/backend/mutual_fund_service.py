@@ -2,6 +2,7 @@
 import os
 import uuid
 import logging
+import json
 from datetime import date, datetime
 import psycopg2
 import pandas as pd
@@ -62,13 +63,15 @@ def _fetch_mfapi_nav(scheme_code: str):
     return payload["data"]
 
 
-def sync_nav(scheme_code: str, force: bool = False) -> dict:
+def sync_nav(scheme_code: str, force: bool = False, from_date: date | None = None, to_date: date | None = None) -> dict:
     try:
         from mftool import Mftool
         # mftool's second positional argument is ``as_json``.  The JSON
         # response wraps NAV rows under ``data``; requesting it explicitly
         # avoids treating metadata fields as NAV observations.
         payload = Mftool().get_scheme_historical_nav(scheme_code, as_json=True)
+        if isinstance(payload, str):
+            payload = json.loads(payload)
         fetched = payload.get("data", []) if isinstance(payload, dict) else payload
         source_name = "mftool"
     except Exception:
@@ -86,6 +89,10 @@ def sync_nav(scheme_code: str, force: bool = False) -> dict:
     if not rows:
         raise RuntimeError(f"No parseable NAV history returned for {scheme_code}")
     fetched_rows = rows
+    if from_date is not None:
+        rows = [row for row in rows if row[1] >= from_date]
+    if to_date is not None:
+        rows = [row for row in rows if row[1] <= to_date]
     with psycopg2.connect(os.environ["DATABASE_URL"],connect_timeout=15) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT scheme_id FROM market_data.mutual_fund_reference WHERE scheme_code=%s",(scheme_code,)); found=cur.fetchone()
@@ -120,6 +127,8 @@ def sync_nav(scheme_code: str, force: bool = False) -> dict:
     return {"scheme_code":scheme_code,"records_processed":len(rows),"force":force,
             "records_fetched":len(fetched_rows),
             "latest_nav_date":max(row[1] for row in fetched_rows).isoformat(),
+            "from_date": from_date.isoformat() if from_date else None,
+            "to_date": to_date.isoformat() if to_date else None,
             "up_to_date":not rows}
 
 

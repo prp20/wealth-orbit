@@ -92,11 +92,24 @@ def mutual_fund_metric_snapshots(scheme_code: str) -> list[dict]:
 
 def mutual_fund_enrichment(scheme_code: str) -> list[dict]:
     frame = _query("""SELECT e.as_of_date,e.aum,e.expense_ratio,e.exit_load,e.yield_to_maturity,
-        e.yield_to_maturity_unit,e.fund_manager,e.rating,e.provider_status,e.warnings
+        e.yield_to_maturity_unit,e.fund_manager,e.rating,e.fund_house,e.scheme_type,
+        e.scheme_category,e.scheme_start_date,e.provider_status,e.warnings
         FROM market_data.mutual_fund_enrichment e
         JOIN market_data.mutual_fund_reference m ON m.scheme_id=e.scheme_id
         WHERE m.scheme_code=%s ORDER BY e.as_of_date DESC""", (scheme_code,))
-    return frame.to_dict(orient="records")
+    if not frame.empty:
+        return frame.to_dict(orient="records")
+    # Reference metadata is still useful when optional enrichment has not been
+    # fetched yet, so the fund-facts panel never appears blank.
+    fallback = _query("""SELECT m.scheme_code,m.scheme_name,a.amc_name AS fund_house,
+        c.category_name AS scheme_category,s.subcategory_name,
+        m.plan_type,m.option_type,'REFERENCE' AS provider_status
+        FROM market_data.mutual_fund_reference m
+        JOIN market_data.amc_reference a ON a.amc_id=m.amc_id
+        JOIN market_data.mutual_fund_subcategories s ON s.subcategory_id=m.subcategory_id
+        JOIN market_data.mutual_fund_categories c ON c.category_id=s.category_id
+        WHERE m.scheme_code=%s""", (scheme_code,))
+    return fallback.to_dict(orient="records")
 
 def mutual_fund_benchmark(scheme_code: str):
     frame = _query("""SELECT i.index_id,i.index_code,i.index_name,m.benchmark_index_id
