@@ -49,6 +49,9 @@ load_dotenv()
 @st.cache_resource
 def get_engine():
     url = os.getenv("PORTFOLIO_SQLITE_URL", "sqlite:///./portfolio-service/portfolio.db")
+    # Streamlit uses synchronous SQLAlchemy sessions; convert the async URL
+    # used by the backend to its synchronous SQLite dialect.
+    url = url.replace("sqlite+aiosqlite://", "sqlite://")
     return create_engine(url, pool_pre_ping=True)
 
 
