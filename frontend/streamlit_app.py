@@ -19,6 +19,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, joinedload
 
 from backend.models import Asset, AssetType, Holding, Portfolio, Transaction, TransactionType, User
+from backend.reference_service import mutual_funds, stock_categories, stocks
 from scripts.import_transactions import import_file
 
 
@@ -167,7 +168,7 @@ try:
         c4.metric("Assets held", len(holdings))
         c5.metric("Total units", indian_number(total_units))
 
-        tab1, tab2, tab3 = st.tabs(["Current holdings", "Transaction history", "Record transaction"])
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["Current holdings", "Transaction history", "Record transaction", "Mutual funds", "Stocks"])
         with tab1:
             if holdings:
                 st.dataframe(holdings_frame(holdings), use_container_width=True, hide_index=True)
@@ -199,6 +200,28 @@ try:
                     except Exception as exc:
                         session.rollback()
                         st.error(str(exc))
+        with tab4:
+            st.subheader("Mutual-fund reference list")
+            fund_search = st.text_input("Search schemes", key="fund_search")
+            fund_categories = mutual_funds()["category_name"].dropna().unique().tolist()
+            fund_category = st.selectbox("Category", ["All", *sorted(fund_categories)], key="fund_category")
+            try:
+                funds = mutual_funds(fund_search, fund_category)
+                st.caption(f"{len(funds):,} schemes from Supabase")
+                st.dataframe(funds, use_container_width=True, hide_index=True)
+            except Exception as exc:
+                st.error(f"Could not load mutual-fund reference data: {exc}")
+        with tab5:
+            st.subheader("Stock reference list")
+            stock_search = st.text_input("Search symbols or companies", key="stock_search")
+            sectors = ["All", *stock_categories()]
+            stock_sector = st.selectbox("Sector", sectors, key="stock_sector")
+            try:
+                stock_rows = stocks(stock_search, stock_sector)
+                st.caption(f"{len(stock_rows):,} stocks from Supabase")
+                st.dataframe(stock_rows, use_container_width=True, hide_index=True)
+            except Exception as exc:
+                st.error(f"Could not load stock reference data: {exc}")
 except Exception as exc:
     st.error("Could not load the portfolio database.")
     st.exception(exc)
