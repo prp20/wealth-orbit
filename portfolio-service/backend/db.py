@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 load_dotenv()
 
 LOCAL_DATABASE_URL = os.getenv("PORTFOLIO_SQLITE_URL", "sqlite+aiosqlite:///./portfolio-service/portfolio.db")
-REFERENCE_DATABASE_URL = os.getenv("REFERENCE_DB_CONN_STRING", os.getenv("PORTFOLIO_DB_CONN_STRING", "postgresql+asyncpg://localhost/reference"))
+REFERENCE_DATABASE_URL = os.getenv("DATABASE_URL", os.getenv("REFERENCE_DB_CONN_STRING", os.getenv("PORTFOLIO_DB_CONN_STRING", "postgresql+asyncpg://localhost/reference")))
 if REFERENCE_DATABASE_URL.startswith("postgresql://"):
     REFERENCE_DATABASE_URL = REFERENCE_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
