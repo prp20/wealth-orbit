@@ -24,7 +24,7 @@ wealth-orbit/
 
 Portfolio data is stored locally in SQLite. The default is `sqlite+aiosqlite:///./portfolio-service/portfolio.db`; set `PORTFOLIO_SQLITE_URL` to change it.
 
-General mutual-fund reference data belongs in PostgreSQL. Set `REFERENCE_DB_CONN_STRING` to that database's connection string. The portfolio database keeps only a stable local `asset_id`; there are no cross-database foreign keys.
+General mutual-fund, stock, index, and ingestion data belongs in PostgreSQL. Set `DATABASE_URL` to the Supabase session-pooler connection string. The portfolio database keeps only a stable local `asset_id`; there are no cross-database foreign keys.
 
 Install dependencies with `uv sync`, then apply the schema:
 
