@@ -24,6 +24,10 @@ def _run(job_id,work):
     with _db() as c:
       with c.cursor() as q:q.execute("UPDATE market_data.sync_jobs SET status='RUNNING',started_at=now(),progress_percent=10,updated_at=now() WHERE job_id=%s",(job_id,))
     result=work()
+    soft_failed = isinstance(result, dict) and str(result.get("status", "")).lower() in {"failed", "error"}
+    if soft_failed:
+      reason = result.get("reason") or result.get("error") or "Sync reported failed status"
+      raise RuntimeError(reason)
     logger.info("sync succeeded job_id=%s", job_id)
     with _db() as c:
       with c.cursor() as q:q.execute("UPDATE market_data.sync_jobs SET status='SUCCEEDED',progress_percent=100,completed_at=now(),result=%s,updated_at=now() WHERE job_id=%s",(json.dumps(result,default=str),job_id))

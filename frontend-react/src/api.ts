@@ -21,11 +21,37 @@ export type SyncJob = {
   status: string;
   progress_percent?: number;
   last_error?: string | null;
+  result?: string | Record<string, unknown> | null;
   completed_at?: string | null;
   started_at?: string | null;
   queued_at?: string | null;
   duplicate?: boolean;
 };
+
+export function syncJobFailureMessage(job: SyncJob | null | undefined): string | null {
+  if (!job) return null;
+  if (String(job.status || '').toUpperCase() === 'FAILED') {
+    return job.last_error || 'Sync failed';
+  }
+  let result = job.result;
+  if (typeof result === 'string') {
+    try {
+      result = JSON.parse(result);
+    } catch {
+      result = null;
+    }
+  }
+  if (result && typeof result === 'object') {
+    const status = String((result as any).status || '').toLowerCase();
+    if (status === 'failed' || status === 'error') {
+      return String((result as any).reason || (result as any).error || 'Sync failed');
+    }
+    if ((result as any).fundamental_rows === 0 && (result as any).shareholding_rows === 0) {
+      return 'Sync completed with no fundamental rows';
+    }
+  }
+  return null;
+}
 
 export type InsightItem = {
   id: string;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { api, SyncJob } from '../api';
+import { api, SyncJob, syncJobFailureMessage } from '../api';
 
 const TERMINAL = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED']);
 
@@ -37,10 +37,9 @@ export default function SyncJobButton({
     api.syncStockStatus(symbol, kind)
       .then((payload) => {
         if (cancelled) return;
-        setStatus(payload.status || 'idle');
-        if (payload.job?.last_error && String(payload.job.status).toUpperCase() === 'FAILED') {
-          setError(payload.job.last_error);
-        }
+        const failure = syncJobFailureMessage(payload.job);
+        setStatus(failure ? 'failed' : payload.status || 'idle');
+        setError(failure || '');
       })
       .catch(() => undefined);
     return () => {
@@ -66,16 +65,16 @@ export default function SyncJobButton({
       const job = await api.syncStock(symbol, kind, force);
       setStatus(String(job.status || 'QUEUED').toLowerCase());
       const terminal = await pollJob(job.job_id, (current) => {
-        setStatus(String(current.status || '').toLowerCase());
-        if (current.last_error && String(current.status).toUpperCase() === 'FAILED') {
-          setError(current.last_error);
-        }
+        const failure = syncJobFailureMessage(current);
+        setStatus(failure ? 'failed' : String(current.status || '').toLowerCase());
+        if (failure) setError(failure);
       });
-      const terminalStatus = String(terminal.status || '').toLowerCase();
-      setStatus(terminalStatus);
-      if (terminalStatus === 'failed') {
-        setError(terminal.last_error || 'Sync failed');
+      const failure = syncJobFailureMessage(terminal);
+      if (failure) {
+        setStatus('failed');
+        setError(failure);
       } else {
+        setStatus(String(terminal.status || '').toLowerCase());
         setError('');
       }
       await Promise.all(invalidateKeys.map((key) => queryClient.invalidateQueries({ queryKey: key })));

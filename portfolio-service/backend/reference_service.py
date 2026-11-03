@@ -355,7 +355,11 @@ def stock_technical_indicators(symbol: str, indicator: str = "", from_date=None,
         (symbol, indicator, indicator, from_date, from_date, to_date, to_date))
 
 def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
-    """Fetch Screener consolidated data and upsert canonical fundamentals."""
+    """Fetch Screener consolidated data and upsert canonical fundamentals.
+
+    Soft provider failures raise so the sync queue marks the job FAILED instead of
+    SUCCEEDED with an empty/failed payload the UI cannot see.
+    """
     from backend.market_data.providers.screener import ScreenerParser, build_company_url, fetch_html
     with psycopg2.connect(os.environ["DATABASE_URL"], connect_timeout=15) as connection:
         with connection.cursor() as cur:
@@ -364,8 +368,22 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
             if not row: raise ValueError(f"Active stock not found: {symbol}")
             stock_id = row[0]
             html = fetch_html(build_company_url(symbol, None), "Mozilla/5.0 (compatible; WealthOrbit/1.0)")
-            if not html: return {"status":"failed", "symbol":symbol, "reason":"Screener returned no HTML"}
+            if not html:
+                raise RuntimeError(f"Screener returned no HTML for {symbol}")
             parsed = ScreenerParser().parse(html, stock_id)
+            if not parsed.fundamental_values and not parsed.shareholding:
+                raise RuntimeError(f"Screener parse returned no fundamentals or shareholding for {symbol}")
+            # Remove Dec year-ends previously mis-tagged as Oct–Dec quarters.
+            cur.execute(
+                """DELETE FROM market_data.stock_fundamental_values
+                   WHERE stock_id=%s AND reporting_period='QUARTERLY'
+                     AND EXTRACT(MONTH FROM period_end_date)=12
+                     AND EXTRACT(MONTH FROM period_start_date)=10""",
+                (stock_id,),
+            )
+            if force:
+                cur.execute("DELETE FROM market_data.stock_fundamental_values WHERE stock_id=%s", (stock_id,))
+                cur.execute("DELETE FROM market_data.stock_shareholding_history WHERE stock_id=%s", (stock_id,))
             source_id = None
             cur.execute("SELECT source_id FROM market_data.data_sources WHERE source_name='screener'")
             found = cur.fetchone()
