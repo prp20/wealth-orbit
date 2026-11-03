@@ -24,6 +24,10 @@ def _run(job_id,work):
     with _db() as c:
       with c.cursor() as q:q.execute("UPDATE market_data.sync_jobs SET status='RUNNING',started_at=now(),progress_percent=10,updated_at=now() WHERE job_id=%s",(job_id,))
     result=work()
+    soft_failed = isinstance(result, dict) and str(result.get("status", "")).lower() in {"failed", "error"}
+    if soft_failed:
+      reason = result.get("reason") or result.get("error") or "Sync reported failed status"
+      raise RuntimeError(reason)
     logger.info("sync succeeded job_id=%s", job_id)
     with _db() as c:
       with c.cursor() as q:q.execute("UPDATE market_data.sync_jobs SET status='SUCCEEDED',progress_percent=100,completed_at=now(),result=%s,updated_at=now() WHERE job_id=%s",(json.dumps(result,default=str),job_id))
@@ -37,6 +41,37 @@ def _run(job_id,work):
 def get_job(job_id):
   with _db() as c:
     with c.cursor(cursor_factory=RealDictCursor) as q:q.execute("SELECT * FROM market_data.sync_jobs WHERE job_id=%s",(job_id,)); return q.fetchone()
+
+def latest_job(entity_type, entity_key, sync_type=None):
+  """Return the most recent sync job for an entity, optionally filtered by sync_type."""
+  with _db() as c:
+    with c.cursor(cursor_factory=RealDictCursor) as q:
+      if sync_type:
+        q.execute(
+          "SELECT * FROM market_data.sync_jobs WHERE entity_type=%s AND entity_key=%s AND sync_type=%s ORDER BY queued_at DESC LIMIT 1",
+          (entity_type, entity_key, sync_type),
+        )
+      else:
+        q.execute(
+          "SELECT * FROM market_data.sync_jobs WHERE entity_type=%s AND entity_key=%s ORDER BY queued_at DESC LIMIT 1",
+          (entity_type, entity_key),
+        )
+      return q.fetchone()
+
+def latest_jobs_by_kind(entity_type, entity_key, sync_types):
+  """Map each sync_type to its latest job summary (or None)."""
+  result = {}
+  with _db() as c:
+    with c.cursor(cursor_factory=RealDictCursor) as q:
+      for sync_type in sync_types:
+        q.execute(
+          "SELECT job_id, status, completed_at, started_at, queued_at, last_error, progress_percent FROM market_data.sync_jobs WHERE entity_type=%s AND entity_key=%s AND sync_type=%s ORDER BY queued_at DESC LIMIT 1",
+          (entity_type, entity_key, sync_type),
+        )
+        row = q.fetchone()
+        result[sync_type.lower()] = dict(row) if row else None
+  return result
+
 def list_jobs(include_terminal: bool = False):
   with _db() as c:
     with c.cursor() as q:q.execute("UPDATE market_data.sync_jobs SET status='FAILED',completed_at=now(),last_error='Recovered stale queued/running job after worker restart',updated_at=now() WHERE (status='QUEUED' AND queued_at < now() - interval '10 minutes') OR (status='RUNNING' AND started_at < now() - interval '10 minutes')")

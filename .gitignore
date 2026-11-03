@@ -18,7 +18,10 @@ portfolio-service/portfolio.db
 *.xls
 logs.json
 *.log
-data/
+data/*
+!data/seed/
+!data/seed/**
+
 frontend-react/node_modules/
 frontend-react/dist/*
 !frontend-react/dist/

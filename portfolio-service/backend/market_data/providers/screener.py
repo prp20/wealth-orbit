@@ -123,7 +123,11 @@ def normalize_number(value: str | None) -> float | None:
 
 
 def parse_period(period: str) -> tuple[date, date, str] | None:
-    """Parse a Screener header into FY/quarter boundaries based on the header month."""
+    """Parse a Screener header into FY/quarter boundaries based on the header month.
+
+    Indian March year-ends and calendar December year-ends are treated as ANNUAL
+    (e.g. ABB). Other months stay QUARTERLY so mixed PL tables keep Jun/Sep quarters.
+    """
     match = re.fullmatch(r"([A-Za-z]{3})\s+(\d{4})", period.strip())
     if not match:
         return None
@@ -135,6 +139,8 @@ def parse_period(period: str) -> tuple[date, date, str] | None:
     end = date(year, month, calendar.monthrange(year, month)[1])
     if month == 3:
         return date(year - 1, 4, 1), end, "ANNUAL"
+    if month == 12:
+        return date(year, 1, 1), end, "ANNUAL"
     quarter_start_month = month - 2
     return date(year, quarter_start_month, 1), end, "QUARTERLY"
 

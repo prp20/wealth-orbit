@@ -9,6 +9,7 @@ from backend.market_data.providers.screener import (
     ScreenerParser,
     build_company_url,
     normalize_number,
+    parse_period,
 )
 
 
@@ -55,6 +56,31 @@ def test_parser_maps_annual_and_quarterly_values_and_reports_unknown_labels():
     assert parsed.warnings == [
         {"kind": "unmapped_fundamental_label", "section": "profit-loss", "label": "Odd Provider Label"}
     ]
+
+
+def test_parse_period_treats_march_and_december_as_annual():
+    assert parse_period("Mar 2024") == (date(2023, 4, 1), date(2024, 3, 31), "ANNUAL")
+    assert parse_period("Dec 2024") == (date(2024, 1, 1), date(2024, 12, 31), "ANNUAL")
+    assert parse_period("Jun 2024") == (date(2024, 4, 1), date(2024, 6, 30), "QUARTERLY")
+
+
+def test_parser_maps_december_year_end_statements_as_annual():
+    stock_id = uuid4()
+    parsed = ScreenerParser().parse(
+        """
+        <section id="profit-loss"><table class="data-table">
+          <thead><tr><th>Particulars</th><th>Dec 2023</th><th>Dec 2024</th></tr></thead>
+          <tbody>
+            <tr><td>Sales +</td><td>900</td><td>1,100</td></tr>
+            <tr><td>Net Profit</td><td>40</td><td>55</td></tr>
+          </tbody>
+        </table></section>
+        """,
+        stock_id=stock_id,
+    )
+    assert all(item.reporting_period == "ANNUAL" for item in parsed.fundamental_values)
+    assert parsed.fundamental_values[0].period_start == date(2023, 1, 1)
+    assert parsed.fundamental_values[0].period_end == date(2023, 12, 31)
 
 
 def test_parser_maps_shareholding_and_leaves_absent_categories_null():
