@@ -3,13 +3,16 @@ from datetime import date
 
 from .portfolio_backend import (filter_values, mutual_funds, mutual_fund_detail,
     mutual_fund_detail_by_name, mutual_fund_history, stock_categories, stock_detail,
+    stock_detail_enriched, stock_peers, stock_compare, stock_fundamentals_summary,
     mutual_fund_metric_snapshots, mutual_fund_enrichment,
     mutual_fund_benchmark, mutual_fund_benchmark_history,
     benchmark_list, benchmark_history,
     stock_history, stocks, stock_daily_metrics, stock_fundamentals,
     stock_shareholding, stock_technical_indicators, sync_stock_fundamentals, mutual_fund_similar,
     compute_metrics, has_nav_history, sync_nav, recompute_metrics, sync_benchmark, sync_enrichment)
-from .sync_queue import enqueue, get_job, list_jobs
+from .sync_queue import enqueue, get_job, list_jobs, latest_job, latest_jobs_by_kind
+
+STOCK_SYNC_KINDS = ("PRICES", "TECHNICAL", "FUNDAMENTALS", "DAILY_METRICS", "SHAREHOLDING")
 
 router = APIRouter(prefix="/market-data", tags=["market-data"])
 
@@ -46,7 +49,15 @@ def sync_stock(symbol: str, kind: str = Query("technical"), force: bool = Query(
 
 @router.get("/stocks/{symbol}/sync/status")
 def sync_stock_status(symbol: str, kind: str = Query("fundamentals"), force: bool = Query(False)):
-    return {"status":"idle"}
+    kind = kind.lower()
+    if kind not in {"prices", "technical", "fundamentals", "daily_metrics", "shareholding"}:
+        raise HTTPException(status_code=422, detail="invalid sync kind")
+    if stock_detail(symbol) is None:
+        raise HTTPException(status_code=404, detail="Stock not found")
+    job = latest_job("STOCK", symbol, kind.upper())
+    if not job:
+        return {"status": "idle", "kind": kind, "job": None}
+    return {"status": job.get("status", "idle").lower(), "kind": kind, "job": job}
 
 @router.post("/mutual-funds/{scheme_code}/sync")
 def sync_mutual_fund(scheme_code: str, force: bool = Query(False), from_date: date | None = None, to_date: date | None = None):
@@ -57,7 +68,12 @@ def sync_mutual_fund(scheme_code: str, force: bool = Query(False), from_date: da
 
 @router.get("/mutual-funds/{scheme_code}/sync/status")
 def sync_mutual_fund_status(scheme_code: str, force: bool = Query(False)):
-    return {"status":"idle"}
+    if mutual_fund_detail(scheme_code) is None:
+        raise HTTPException(status_code=404, detail="Mutual fund not found")
+    job = latest_job("MUTUAL_FUND", scheme_code, "NAV")
+    if not job:
+        return {"status": "idle", "kind": "nav", "job": None}
+    return {"status": job.get("status", "idle").lower(), "kind": "nav", "job": job}
 
 @router.get("/mutual-funds/{scheme_code}/metrics")
 def mutual_fund_metrics(scheme_code: str):
@@ -143,10 +159,43 @@ def filter_list(kind: str): return filter_values(kind)
 def sector_list():
     return stock_categories()
 
+@router.get("/stocks/compare")
+def stock_compare_route(symbols: str = Query(..., description="Comma-separated trading symbols")):
+    parts = [part.strip() for part in symbols.split(",") if part.strip()]
+    if not parts:
+        raise HTTPException(status_code=422, detail="symbols is required")
+    if len(parts) > 20:
+        raise HTTPException(status_code=422, detail="compare at most 20 symbols")
+    return stock_compare(parts)
+
 @router.get("/stocks/{symbol}")
 def stock_item(symbol: str):
-    result = stock_detail(symbol)
-    if result is None: return {"detail": "Stock not found"}
+    sync_map = latest_jobs_by_kind("STOCK", symbol, STOCK_SYNC_KINDS)
+    result = stock_detail_enriched(symbol, sync_map)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Stock not found")
+    return result
+
+@router.get("/stocks/{symbol}/peers")
+def stock_peers_route(symbol: str, by: str = Query("sector"), limit: int = Query(8, ge=1, le=20)):
+    result = stock_peers(symbol, by=by, limit=limit)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Stock not found")
+    return result
+
+@router.get("/stocks/{symbol}/fundamentals/summary")
+def stock_fundamentals_summary_route(
+    symbol: str,
+    reporting_period: str = Query("ANNUAL"),
+    reporting_basis: str = Query("CONSOLIDATED"),
+):
+    if reporting_period not in {"QUARTERLY", "ANNUAL"}:
+        raise HTTPException(status_code=422, detail="reporting_period must be QUARTERLY or ANNUAL")
+    if reporting_basis not in {"CONSOLIDATED", "STANDALONE"}:
+        raise HTTPException(status_code=422, detail="reporting_basis must be CONSOLIDATED or STANDALONE")
+    result = stock_fundamentals_summary(symbol, reporting_period, reporting_basis)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Stock not found")
     return result
 
 @router.get("/mutual-funds/{scheme_code}")

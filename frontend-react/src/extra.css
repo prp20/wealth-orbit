@@ -6,3 +6,34 @@
 .filters{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 18px}.filters select{padding:9px 11px;border:1px solid #dbe5e1;border-radius:8px;background:#fff;color:#39535a}
 .detail-panel{margin-top:18px}.detail-panel:first-of-type{margin-top:0}.volume-chart{height:42px;margin-top:8px;display:flex;align-items:flex-end;gap:2px;border-top:1px solid #edf1f0;padding-top:4px}.volume-chart span{flex:1;min-height:1px;background:#9bcdb7;border-radius:2px 2px 0 0}
 .daily-data{margin-top:18px;border-top:1px solid #edf1f0;padding-top:12px}.daily-data summary{cursor:pointer;color:#3c9d78;font-size:13px}
+.panel-subtitle{color:#718089;margin:-12px 0 18px;font-size:13px;line-height:1.45}
+.stock-header-main{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;flex-wrap:wrap}
+.stock-price-block{text-align:right}.stock-price-block strong{display:block;font-size:28px;margin:6px 0}
+.freshness-badges{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:18px}
+.freshness-badge{border:1px solid #e3e9e7;border-radius:10px;padding:12px;background:#f8fbf9}
+.freshness-badge.stale{background:#fff7f5;border-color:#f0d7d2}
+.freshness-badge small{display:block;color:#7b898e;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.freshness-badge strong{display:block;margin-top:8px;font-size:13px}
+.snapshot-metrics,.compact-metrics{grid-template-columns:repeat(6,minmax(0,1fr));margin:18px 0}
+.chart-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.chart-toolbar{display:flex;gap:6px;flex-wrap:wrap}
+.chart-toolbar button{border:1px solid #dbe5e1;background:#fff;border-radius:7px;padding:7px 10px;color:#39535a;cursor:pointer}
+.chart-toolbar button.active{background:#42a87c;border-color:#42a87c;color:#fff}
+.sync-chip{display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;background:#e8f4ee;color:#2f6b52}
+.sync-chip.status-failed,.sync-chip.status-cancelled{background:#fdeceb;color:#a33b35}
+.sync-chip.status-queued,.sync-chip.status-running{background:#eef3f8;color:#3d5a73}
+.sync-chip.status-succeeded{background:#e7f7ef;color:#2f6b52}
+.stock-list-filters .search{margin-bottom:0;max-width:280px}
+.result-count{color:#718089;font-size:13px;margin:0 0 12px}
+.peer-current{background:#f3faf6;font-weight:600}
+.fundamentals-group,.technical-family{margin-top:18px}
+.fundamentals-group h3,.technical-family h3{font-size:14px;margin:0 0 10px;color:#39535a}
+.text-button{border:0;background:transparent;color:#3c9d78;cursor:pointer;padding:0 4px}
+.insights-empty{padding:28px}
+.insights-list{display:grid;gap:12px}
+.insight-card{border:1px solid #e3e9e7;border-radius:12px;padding:16px;background:#f8fbf9}
+.insight-card h3{margin:6px 0;font-size:16px}
+.insight-card p{margin:0;color:#4d6168;line-height:1.45}
+.raw-block{margin-top:18px}
+@media(max-width:900px){.freshness-badges,.snapshot-metrics,.compact-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.freshness-badges,.snapshot-metrics,.compact-metrics{grid-template-columns:1fr 1fr}.stock-price-block{text-align:left}}

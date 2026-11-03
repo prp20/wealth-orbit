@@ -61,6 +61,176 @@ def stock_detail(symbol: str):
     return None if frame.empty else frame.iloc[0].to_dict()
 
 
+CURATED_FUNDAMENTAL_GROUPS = {
+    "profit_and_loss": ["REVENUE", "OPERATING_PROFIT", "OPERATING_MARGIN", "NET_PROFIT", "EPS"],
+    "balance_sheet": ["EQUITY_CAPITAL", "RESERVES", "BORROWINGS", "TOTAL_ASSETS"],
+    "cash_flow": ["CASH_FROM_OPERATING_ACTIVITIES", "NET_CASH_FLOW"],
+}
+
+
+def stock_detail_enriched(symbol: str, last_sync_by_kind: dict | None = None):
+    """Identity plus latest price, daily metrics, and freshness metadata."""
+    base = stock_detail(symbol)
+    if base is None:
+        return None
+
+    price_frame = _query(
+        """SELECT p.trading_date AS date, p.close, p.volume
+           FROM market_data.stock_daily_prices p
+           JOIN market_data.stock_reference s ON s.stock_id=p.stock_id
+           WHERE s.trading_symbol=%s ORDER BY p.trading_date DESC LIMIT 1""",
+        (symbol,),
+    )
+    metrics_frame = _query(
+        """SELECT m.metric_date AS date, m.market_cap, m.stock_pe, m.price_to_book,
+                  m.dividend_yield, m.book_value, m.roce, m.roe, m.calculation_method
+           FROM market_data.stock_daily_metrics m
+           JOIN market_data.stock_reference s ON s.stock_id=m.stock_id
+           WHERE s.trading_symbol=%s ORDER BY m.metric_date DESC LIMIT 1""",
+        (symbol,),
+    )
+    fund_frame = _query(
+        """SELECT MAX(v.period_end_date) AS latest_fundamental_period_end
+           FROM market_data.stock_fundamental_values v
+           JOIN market_data.stock_reference s ON s.stock_id=v.stock_id
+           WHERE s.trading_symbol=%s""",
+        (symbol,),
+    )
+    share_frame = _query(
+        """SELECT MAX(h.period_end_date) AS latest_shareholding_period_end
+           FROM market_data.stock_shareholding_history h
+           JOIN market_data.stock_reference s ON s.stock_id=h.stock_id
+           WHERE s.trading_symbol=%s""",
+        (symbol,),
+    )
+    tech_frame = _query(
+        """SELECT MAX(t.calculated_at) AS latest_technical_calculated_at
+           FROM market_data.stock_technical_indicators t
+           JOIN market_data.stock_reference s ON s.stock_id=t.stock_id
+           WHERE s.trading_symbol=%s""",
+        (symbol,),
+    )
+
+    latest_price = None if price_frame.empty else price_frame.iloc[0].to_dict()
+    latest_metrics = None if metrics_frame.empty else metrics_frame.iloc[0].to_dict()
+    latest_fund = None if fund_frame.empty else fund_frame.iloc[0].get("latest_fundamental_period_end")
+    latest_share = None if share_frame.empty else share_frame.iloc[0].get("latest_shareholding_period_end")
+    latest_tech = None if tech_frame.empty else tech_frame.iloc[0].get("latest_technical_calculated_at")
+
+    return {
+        **base,
+        "latest_price": latest_price,
+        "latest_daily_metrics": latest_metrics,
+        "freshness": {
+            "latest_price_date": None if latest_price is None else latest_price.get("date"),
+            "latest_fundamental_period_end": latest_fund,
+            "latest_shareholding_period_end": latest_share,
+            "latest_technical_calculated_at": latest_tech,
+            "last_sync_by_kind": last_sync_by_kind or {},
+        },
+    }
+
+
+def stock_peers(symbol: str, by: str = "sector", limit: int = 8) -> dict | None:
+    detail = stock_detail(symbol)
+    if detail is None:
+        return None
+    by = (by or "sector").lower()
+    if by not in {"sector", "industry"}:
+        by = "sector"
+    limit = max(1, min(int(limit or 8), 20))
+    group = detail.get("sector_name") if by == "sector" else detail.get("industry_name")
+    if not group:
+        return {"symbol": symbol, "by": by, "group": None, "peers": []}
+
+    if by == "sector":
+        peer_frame = stocks(sector=group)
+    else:
+        peer_frame = stocks(industry=group)
+    peer_frame = peer_frame[peer_frame["trading_symbol"] != symbol].head(limit)
+    peers = []
+    for _, row in peer_frame.iterrows():
+        peer_symbol = row["trading_symbol"]
+        price = _query(
+            """SELECT p.close FROM market_data.stock_daily_prices p
+               JOIN market_data.stock_reference s ON s.stock_id=p.stock_id
+               WHERE s.trading_symbol=%s ORDER BY p.trading_date DESC LIMIT 1""",
+            (peer_symbol,),
+        )
+        metrics = _query(
+            """SELECT m.market_cap, m.stock_pe, m.price_to_book, m.roe, m.roce
+               FROM market_data.stock_daily_metrics m
+               JOIN market_data.stock_reference s ON s.stock_id=m.stock_id
+               WHERE s.trading_symbol=%s ORDER BY m.metric_date DESC LIMIT 1""",
+            (peer_symbol,),
+        )
+        peers.append({
+            "trading_symbol": peer_symbol,
+            "company_name": row["company_name"],
+            "latest_close": None if price.empty else price.iloc[0]["close"],
+            "latest_metrics": None if metrics.empty else metrics.iloc[0].to_dict(),
+        })
+    return {"symbol": symbol, "by": by, "group": group, "peers": peers}
+
+
+def stock_compare(symbols: list[str]) -> list[dict]:
+    rows = []
+    for symbol in symbols:
+        detail = stock_detail(symbol)
+        if detail is None:
+            continue
+        price = _query(
+            """SELECT p.close, p.trading_date AS date FROM market_data.stock_daily_prices p
+               JOIN market_data.stock_reference s ON s.stock_id=p.stock_id
+               WHERE s.trading_symbol=%s ORDER BY p.trading_date DESC LIMIT 1""",
+            (symbol,),
+        )
+        metrics = _query(
+            """SELECT m.metric_date AS date, m.market_cap, m.stock_pe, m.price_to_book,
+                      m.dividend_yield, m.roe, m.roce
+               FROM market_data.stock_daily_metrics m
+               JOIN market_data.stock_reference s ON s.stock_id=m.stock_id
+               WHERE s.trading_symbol=%s ORDER BY m.metric_date DESC LIMIT 1""",
+            (symbol,),
+        )
+        rows.append({
+            "trading_symbol": symbol,
+            "company_name": detail.get("company_name"),
+            "sector_name": detail.get("sector_name"),
+            "latest_close": None if price.empty else price.iloc[0]["close"],
+            "latest_price_date": None if price.empty else price.iloc[0]["date"],
+            "latest_metrics": None if metrics.empty else metrics.iloc[0].to_dict(),
+        })
+    return rows
+
+
+def stock_fundamentals_summary(symbol: str, reporting_period: str = "ANNUAL", reporting_basis: str = "CONSOLIDATED") -> dict | None:
+    if stock_detail(symbol) is None:
+        return None
+    reporting_period = reporting_period or "ANNUAL"
+    reporting_basis = reporting_basis or "CONSOLIDATED"
+    curated_codes = [code for codes in CURATED_FUNDAMENTAL_GROUPS.values() for code in codes]
+    frame = stock_fundamentals(symbol, reporting_period, reporting_basis, "", "")
+    if not frame.empty:
+        frame = frame[frame["metric_code"].isin(curated_codes)]
+    periods = sorted({str(p) for p in frame["period_end_date"].tolist()}, reverse=True) if not frame.empty else []
+    groups: dict[str, dict] = {name: {code: {} for code in codes} for name, codes in CURATED_FUNDAMENTAL_GROUPS.items()}
+    if not frame.empty:
+        for _, row in frame.iterrows():
+            code = row["metric_code"]
+            period = str(row["period_end_date"])
+            for group_name, codes in CURATED_FUNDAMENTAL_GROUPS.items():
+                if code in codes:
+                    groups[group_name][code][period] = row["metric_value"]
+                    break
+    return {
+        "reporting_period": reporting_period,
+        "reporting_basis": reporting_basis,
+        "periods": periods,
+        "groups": groups,
+    }
+
+
 def mutual_fund_detail(scheme_code: str):
     frame = _query("""SELECT m.scheme_code, m.scheme_name, a.amc_name, c.category_name, s.subcategory_name, m.plan_type, m.option_type, m.is_active FROM market_data.mutual_fund_reference m JOIN market_data.amc_reference a ON a.amc_id=m.amc_id JOIN market_data.mutual_fund_subcategories s ON s.subcategory_id=m.subcategory_id JOIN market_data.mutual_fund_categories c ON c.category_id=s.category_id WHERE m.scheme_code=%s""", (scheme_code,))
     return None if frame.empty else frame.iloc[0].to_dict()
