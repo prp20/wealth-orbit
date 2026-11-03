@@ -34,6 +34,23 @@ uv run alembic -c migrations/alembic.ini upgrade head
 
 Run tests with `pytest`.
 
+### Seed market data (Postgres / Supabase)
+
+Reference CSVs live under `data/seed/` (`indices.csv`, `stocks.csv`, `new_equity_only_updated.csv`). With `DATABASE_URL` set, bootstrap masters plus historical prices, index history, fund NAV, and Screener fundamentals:
+
+```bash
+uv run python portfolio-service/scripts/seed/run_all_seeds.py --data-dir data/seed
+```
+
+Useful flags: `--dry-run`, `--limit N` (caps history/NAV/fundamentals phases), `--price-period 5y`, `--index-period max`, and `--skip-masters` / `--skip-index-history` / `--skip-prices` / `--skip-nav` / `--skip-fundamentals`.
+
+Masters-only and price-only wrappers still work:
+
+```bash
+uv run python portfolio-service/scripts/load_reference_data.py --data-dir data/seed
+uv run python portfolio-service/scripts/sync_yfinance.py --period 5y
+```
+
 To import the mutual-fund order-history workbook into the local database:
 
 ```bash

@@ -1,0 +1,284 @@
+,Unnamed: 0,scheme_code,scheme_name,amc_name,plan_type,risk_profile,created_at,inception_date,scheme_category,scheme_subcategory,benchmark_index_code
+0,14,151165,360 ONE ELSS Tax Saver Nifty 50 Index Fund - Direct Plan - Growth,360 ONE Mutual Fund,Direct,Very High,2026-02-09 09:27:06.361836+00:00,02-01-2023,Equity Scheme,ELSS,NIFTY50
+1,15,119544,Aditya Birla Sun Life ELSS Tax Saver Fund - Growth - Direct Plan,Aditya Birla Sun Life Mutual Fund,Direct,Very High,2026-02-09 09:27:06.831551+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+2,16,120503,Axis ELSS Tax Saver Fund - Direct Plan - Growth Option,Axis Mutual Fund,Direct,Very High,2026-02-09 09:27:07.395516+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+3,17,153201,BAJAJ FINSERV ELSS TAX SAVER FUND - DIRECT - GROWTH,Bajaj Finserv Mutual Fund,Direct,Very High,2026-02-09 09:27:07.742957+00:00,03-02-2025,Equity Scheme,ELSS,NIFTY500
+4,18,118473,BANDHAN ELSS Tax Saver Fund - Direct Plan - Growth,Bandhan Mutual Fund,Direct,Very High,2026-02-09 09:27:08.253275+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+5,19,119351,BANK OF INDIA ELSS Tax Saver -Direct Plan- Growth,Bank of India Mutual Fund,Direct,Very High,2026-02-09 09:27:08.778941+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+6,20,150159,BARODA BNP PARIBAS ELSS Tax Saver Fund - Direct Plan - Growth Option,Baroda BNP Paribas Mutual Fund,Direct,Very High,2026-02-09 09:27:09.148478+00:00,14-03-2022,Equity Scheme,ELSS,NIFTY500
+7,21,118285,CANARA ROBECO ELSS TAX SAVER - DIRECT PLAN - GROWTH OPTION,Canara Robeco Mutual Fund,Direct,Very High,2026-02-09 09:27:09.621451+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+8,22,119242,DSP ELSS Tax Saver Fund - Direct Plan - Growth,DSP Mutual Fund,Direct,Very High,2026-02-09 09:27:10.455651+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+9,23,118620,Edelweiss ELSS Tax Saver Fund - Direct Plan-Growth Option,Edelweiss Mutual Fund,Direct,Very High,2026-02-09 09:27:11.067027+00:00,24-01-2013,Equity Scheme,ELSS,NIFTY500
+10,24,118540,Franklin India ELSS Tax Saver Fund - Direct - Growth,Franklin Templeton Mutual Fund,Direct,Very High,2026-02-09 09:27:11.587120+00:00,01-01-2013,Equity Scheme,ELSS,NIFTY500
+11,25,141808,Groww ELSS Tax Saver Fund (formerly known as Indiabulls Tax Savings Fund)- Direct Plan- Growth Option,Groww Mutual Fund,Direct,Very High,2026-02-09 09:27:12.080177+00:00,29-12-2017,Equity Scheme,ELSS,NIFTY500
+12,26,119060,HDFC ELSS Tax saver - Growth Option - Direct Plan,HDFC Mutual Fund,Direct,Very High,2026-02-09 09:27:12.618319+00:00,01-01-2013,Equity Scheme,ELSS,NIFTY500
+13,27,118929,HDFC Long Term Advantage Plan - Growth Option - Direct Plan,HDFC Mutual Fund,Direct,Very High,2026-02-09 09:27:13.105304+00:00,01-01-2013,Equity Scheme,ELSS,NIFTY500
+14,28,151078,HSBC ELSS Tax saver Fund - Direct Growth,HSBC Mutual Fund,Direct,Very High,2026-02-09 09:27:13.477379+00:00,28-11-2022,Equity Scheme,ELSS,NIFTY500
+15,29,120079,HSBC Tax Saver Equity Fund - Growth Direct,HSBC Mutual Fund,Direct,Very High,2026-02-09 09:27:13.983683+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+16,30,120592,ICICI Prudential ELSS Tax Saver Fund - Direct Plan - Growth,ICICI Prudential Mutual Fund,Direct,Very High,2026-02-09 09:27:14.442112+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+17,31,120416,Invesco India ELSS Tax Saver Fund - Direct Plan - Growth,Invesco Mutual Fund,Direct,Very High,2026-02-09 09:27:14.923462+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+18,32,147541,ITI ELSS Tax Saver Fund - Direct Plan - Growth Option,ITI Mutual Fund,Direct,Very High,2026-02-09 09:27:15.367252+00:00,25-10-2019,Equity Scheme,ELSS,NIFTY500
+19,33,120494,JM ELSS Tax Saver Fund (Direct) - Growth Option,JM Financial Mutual Fund,Direct,Very High,2026-02-09 09:27:15.847589+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+20,34,119773,Kotak ELSS Tax Saver Fund-Growth - Direct,Kotak Mahindra Mutual Fund,Direct,Very High,2026-02-09 09:27:16.409175+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+21,35,120270,LIC MF ELSS Tax Saver-Direct Plan-Growth,LIC Mutual Fund,Direct,Very High,2026-02-09 09:27:16.893787+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+22,36,139781,Mahindra Manulife ELSS Tax Saver Fund - Direct Plan -Growth,Mahindra Manulife Mutual Fund,Direct,Very High,2026-02-09 09:27:17.337943+00:00,19-10-2016,Equity Scheme,ELSS,NIFTY500
+23,37,135781,Mirae Asset ELSS Tax Saver Fund - Direct Plan - Growth,Mirae Asset Mutual Fund,Direct,Very High,2026-02-09 09:27:17.785410+00:00,29-12-2015,Equity Scheme,ELSS,NIFTY500
+24,38,133386,Motilal Oswal ELSS Tax Saver Fund - Direct Plan - Growth Option,Motilal Oswal Mutual Fund,Direct,Very High,2026-02-09 09:27:18.233288+00:00,22-01-2015,Equity Scheme,ELSS,NIFTY500
+25,39,135654,Navi ELSS Tax Saver Fund- Direct Plan- Growth Option,Navi Mutual Fund,Direct,Very High,2026-02-09 09:27:18.671573+00:00,31-12-2015,Equity Scheme,ELSS,NIFTY500
+26,40,151471,NAVI ELSS TAX SAVER NIFTY 50 INDEX FUND - DIRECT PLAN GROWTH,Navi Mutual Fund,Direct,Very High,2026-02-09 09:27:19.061695+00:00,21-03-2023,Equity Scheme,ELSS,NIFTY50
+27,41,118803,Nippon India ELSS Tax Saver Fund - Direct Plan Growth Plan - Growth Option,Nippon India Mutual Fund,Direct,Very High,2026-02-09 09:27:19.551927+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+28,42,151611,NJ ELSS Tax Saver Scheme Direct Growth,NJ Mutual Fund,Direct,Very High,2026-02-09 09:27:19.935517+00:00,19-06-2023,Equity Scheme,ELSS,NIFTY500
+29,43,135601,PGIM India ELSS Tax Saver Fund - Direct Plan - Growth Option,PGIM India Mutual Fund,Direct,Very High,2026-02-09 09:27:20.484615+00:00,14-12-2015,Equity Scheme,ELSS,NIFTY500
+30,44,147481,Parag Parikh ELSS Tax Saver Fund- Direct Growth,PPFAS Mutual Fund,Direct,Very High,2026-02-09 09:27:20.983698+00:00,26-07-2019,Equity Scheme,ELSS,NIFTY500
+31,45,120847,quant ELSS Tax Saver Fund - Growth Option - Direct Plan,quant Mutual Fund,Direct,Very High,2026-02-09 09:27:21.518427+00:00,07-01-2013,Equity Scheme,ELSS,NIFTY500
+32,46,111549,Quantum ELSS Tax Saver Fund - Direct Plan Growth Option,Quantum Mutual Fund,Direct,Very High,2026-02-09 09:27:22.137949+00:00,31-12-2008,Equity Scheme,ELSS,NIFTY500
+33,47,150838,Samco ELSS Tax Saver Fund - Direct Plan - Growth Option,Samco Mutual Fund,Direct,Very High,2026-02-09 09:27:22.504315+00:00,29-12-2022,Equity Scheme,ELSS,NIFTY500
+34,48,119723,SBI ELSS Tax Saver FUND - DIRECT PLAN -GROWTH,SBI Mutual Fund,Direct,Very High,2026-02-09 09:27:23.021780+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+35,49,145819,Shriram ELSS Tax Saver Fund - Direct Growth,Shriram Mutual Fund,Direct,Very High,2026-02-09 09:27:23.439268+00:00,01-02-2019,Equity Scheme,ELSS,NIFTY500
+36,50,149570,Sundaram ELSS Tax Saver Fund Direct Plan Growth,Sundaram Mutual Fund,Direct,Very High,2026-02-09 09:27:23.815153+00:00,03-01-2022,Equity Scheme,ELSS,NIFTY500
+37,51,132756,Tata ELSS Fund-Growth-Direct Plan,Tata Mutual Fund,Direct,Very High,2026-02-09 09:27:24.454467+00:00,14-10-2014,Equity Scheme,ELSS,NIFTY500
+38,52,118866,Taurus ELSS Tax Saver Fund - Direct Plan - Growth,Taurus Mutual Fund,Direct,Very High,2026-02-09 09:27:24.990864+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+39,53,119307,Union ELSS Tax Saver Fund - Direct Plan - Growth Option,Union Mutual Fund,Direct,Very High,2026-02-09 09:27:25.710946+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+40,54,120715,UTI ELSS Tax Saver Fund - Direct Plan - Growth Option,UTI Mutual Fund,Direct,Very High,2026-02-09 09:27:26.270310+00:00,02-01-2013,Equity Scheme,ELSS,NIFTY500
+41,55,150587,WhiteOak Capital ELSS Tax Saver Fund Direct Plan Growth,WhiteOak Capital Mutual Fund,Direct,Very High,2026-02-09 09:27:26.710644+00:00,17-10-2022,Equity Scheme,ELSS,NIFTY500
+42,56,151796,360 ONE FLEXICAP FUND-DIRECT PLAN- GROWTH,360 ONE Mutual Fund,Direct,Very High,2026-02-09 09:27:27.118780+00:00,06-07-2023,Equity Scheme,Flexi Cap Fund,NIFTY500
+43,57,154043,Abakkus Flexi Cap Fund - Direct - Growth,Abakkus Mutual Fund,Direct,Very High,2026-02-09 09:27:27.628257+00:00,30-12-2025,Equity Scheme,Flexi Cap Fund,NIFTY500
+44,58,120564,Aditya Birla Sun Life Flexi Cap Fund - Growth - Direct Plan,Aditya Birla Sun Life Mutual Fund,Direct,Very High,2026-02-09 09:27:28.175812+00:00,02-01-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+45,59,141925,Axis Flexi Cap Fund - Direct Plan - Growth,Axis Mutual Fund,Direct,Very High,2026-02-09 09:27:28.683932+00:00,24-11-2017,Equity Scheme,Flexi Cap Fund,NIFTY500
+46,60,151895,Bajaj Finserv Flexi Cap Fund-Direct Plan-Growth,Bajaj Finserv Mutual Fund,Direct,Very High,2026-02-09 09:27:29.039053+00:00,16-08-2023,Equity Scheme,Flexi Cap Fund,NIFTY500
+47,61,118424,BANDHAN Flexi Cap Fund-Direct Plan-Growth,Bandhan Mutual Fund,Direct,Very High,2026-02-09 09:27:29.520577+00:00,02-01-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+48,62,148404,BANK OF INDIA Flexi Cap Fund Direct Plan -Growth,Bank of India Mutual Fund,Direct,Very High,2026-02-09 09:27:29.917701+00:00,01-07-2020,Equity Scheme,Flexi Cap Fund,NIFTY500
+49,63,150387,Baroda BNP Paribas Flexi Cap Fund - Direct Plan - Growth Option,Baroda BNP Paribas Mutual Fund,Direct,Very High,2026-02-09 09:27:30.398303+00:00,22-08-2022,Equity Scheme,Flexi Cap Fund,NIFTY500
+50,64,118275,CANARA ROBECO FLEXICAP FUND - DIRECT PLAN - GROWTH OPTION,Canara Robeco Mutual Fund,Direct,Very High,2026-02-09 09:27:31.040561+00:00,02-01-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+51,65,153738,CAPITALMIND FLEXI CAP FUND DIRECT GROWTH,Capitalmind Mutual Fund,Direct,Very High,2026-02-09 09:27:31.379927+00:00,06-08-2025,Equity Scheme,Flexi Cap Fund,NIFTY500
+52,66,119076,DSP Flexi Cap Fund - Direct Plan - Growth,DSP Mutual Fund,Direct,Very High,2026-02-09 09:27:31.956314+00:00,02-01-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+53,67,140353,Edelweiss Flexi Cap Fund - Direct Plan - Growth Option,Edelweiss Mutual Fund,Direct,Very High,2026-02-09 09:27:32.460723+00:00,28-11-2016,Equity Scheme,Flexi Cap Fund,NIFTY500
+54,68,118535,Franklin India Flexi Cap Fund - Direct - Growth,Franklin Templeton Mutual Fund,Direct,Very High,2026-02-09 09:27:32.983068+00:00,01-01-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+55,69,118955,HDFC Flexi Cap Fund - Growth Option - Direct Plan,HDFC Mutual Fund,Direct,Very High,2026-02-09 09:27:33.504757+00:00,01-01-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+56,70,152135,Helios Flexi Cap Fund - Direct Plan - Growth Option,Helios Mutual Fund,Direct,Very High,2026-02-09 09:27:33.878116+00:00,15-11-2023,Equity Scheme,Flexi Cap Fund,NIFTY500
+57,71,120046,HSBC Flexi Cap Fund - Direct Growth,HSBC Mutual Fund,Direct,Very High,2026-02-09 09:27:34.365135+00:00,02-01-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+58,72,148990,ICICI Prudential Flexicap Fund - Direct Plan - Growth,ICICI Prudential Mutual Fund,Direct,Very High,2026-02-09 09:27:34.742029+00:00,19-07-2021,Equity Scheme,Flexi Cap Fund,NIFTY500
+59,73,149763,Invesco India Flexi Cap Fund - Direct Plan - Growth,Invesco Mutual Fund,Direct,Very High,2026-02-09 09:27:35.125565+00:00,16-02-2022,Equity Scheme,Flexi Cap Fund,NIFTY500
+60,74,151379,ITI Flexi Cap Fund- Direct Plan- Growth,ITI Mutual Fund,Direct,Very High,2026-02-09 09:27:35.522612+00:00,22-02-2023,Equity Scheme,Flexi Cap Fund,NIFTY500
+61,75,153859,JioBlackRock Flexi Cap Fund - Direct Plan - Growth Option,Jio BlackRock Mutual Fund,Direct,Very High,2026-02-09 09:27:35.853288+00:00,17-10-2025,Equity Scheme,Flexi Cap Fund,NIFTY500
+62,76,120492,JM Flexicap Fund (Direct) - Growth Option,JM Financial Mutual Fund,Direct,Very High,2026-02-09 09:27:36.352745+00:00,02-01-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+63,77,120166,Kotak Flexicap Fund - Growth - Direct,Kotak Mahindra Mutual Fund,Direct,Very High,2026-02-09 09:27:36.974582+00:00,04-01-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+64,78,120264,LIC MF Flexi Cap Fund-Direct Plan-Growth,LIC Mutual Fund,Direct,Very High,2026-02-09 09:27:37.484751+00:00,02-01-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+65,79,149104,Mahindra Manulife Flexi Cap Fund - Direct Plan -Growth,Mahindra Manulife Mutual Fund,Direct,Very High,2026-02-09 09:27:37.874879+00:00,25-08-2021,Equity Scheme,Flexi Cap Fund,NIFTY500
+66,80,151412,Mirae Asset Flexi Cap Fund - Direct Plan - Growth,Mirae Asset Mutual Fund,Direct,Very High,2026-02-09 09:27:38.237075+00:00,27-02-2023,Equity Scheme,Flexi Cap Fund,NIFTY500
+67,81,129046,Motilal Oswal Flexi cap Fund Direct Plan-Growth Option,Motilal Oswal Mutual Fund,Direct,Very High,2026-02-09 09:27:38.710796+00:00,29-04-2014,Equity Scheme,Flexi Cap Fund,NIFTY500
+68,82,143793,Navi Flexi Cap Fund - Direct Plan - Growth,Navi Mutual Fund,Direct,Very High,2026-02-09 09:27:39.135720+00:00,10-07-2018,Equity Scheme,Flexi Cap Fund,NIFTY500
+69,83,149094,Nippon India Flexi Cap Fund - Direct Plan - Growth Plan - Growth Option,Nippon India Mutual Fund,Direct,Very High,2026-02-09 09:27:39.519275+00:00,18-08-2021,Equity Scheme,Flexi Cap Fund,NIFTY500
+70,84,151917,NJ Flexi Cap Fund - Direct Plan - Growth Option,NJ Mutual Fund,Direct,Very High,2026-02-09 09:27:39.878958+00:00,06-09-2023,Equity Scheme,Flexi Cap Fund,NIFTY500
+71,85,133839,PGIM India Flexi Cap Fund - Direct Plan - Growth Option,PGIM India Mutual Fund,Direct,Very High,2026-02-09 09:27:40.348783+00:00,09-03-2015,Equity Scheme,Flexi Cap Fund,NIFTY500
+72,86,122639,Parag Parikh Flexi Cap Fund - Direct Plan - Growth,PPFAS Mutual Fund,Direct,Very High,2026-02-09 09:27:40.812747+00:00,28-05-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+73,87,120843,quant Flexi Cap Fund - Growth Option-Direct Plan,quant Mutual Fund,Direct,Very High,2026-02-09 09:27:41.657127+00:00,07-01-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+74,88,149450,Samco Flexi Cap Fund - Direct Plan - Growth Option,Samco Mutual Fund,Direct,Very High,2026-02-09 09:27:42.121368+00:00,09-02-2022,Equity Scheme,Flexi Cap Fund,NIFTY500
+75,89,119718,SBI Flexicap Fund - DIRECT PLAN - Growth Option,SBI Mutual Fund,Direct,Very High,2026-02-09 09:27:42.566569+00:00,07-01-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+76,90,144905,Shriram Flexi Cap Fund - Direct Growth,Shriram Mutual Fund,Direct,Very High,2026-02-09 09:27:43.031090+00:00,08-10-2018,Equity Scheme,Flexi Cap Fund,NIFTY500
+77,91,150571,Sundaram Flexicap Fund Direct Growth,Sundaram Mutual Fund,Direct,Very High,2026-02-09 09:27:43.401889+00:00,07-09-2022,Equity Scheme,Flexi Cap Fund,NIFTY500
+78,92,144546,Tata Flexi Cap Fund-Direct Plan-Growth,Tata Mutual Fund,Direct,Very High,2026-02-09 09:27:43.811918+00:00,10-09-2018,Equity Scheme,Flexi Cap Fund,NIFTY500
+79,93,118883,Taurus Flexi Cap Fund - Direct Plan - Growth,Taurus Mutual Fund,Direct,Very High,2026-02-09 09:27:44.343085+00:00,02-01-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+80,94,153872,THE WEALTH COMPANY FLEXI CAP FUND - DIRECT GROWTH,The Wealth Company Mutual Fund,Direct,Very High,2026-02-09 09:27:44.675857+00:00,17-10-2025,Equity Scheme,Flexi Cap Fund,NIFTY500
+81,95,152584,TRUSTMF Flexi Cap Fund-Direct Plan- Growth,Trust Mutual Fund,Direct,Very High,2026-02-09 09:27:45.023187+00:00,29-04-2024,Equity Scheme,Flexi Cap Fund,NIFTY500
+82,96,153543,Unifi Flexi Cap Fund - Direct Growth,Unifi Mutual Fund,Direct,Very High,2026-02-09 09:27:45.355989+00:00,09-06-2025,Equity Scheme,Flexi Cap Fund,NIFTY500
+83,97,119292,Union Flexi Cap Fund - Direct Plan - Growth Option,Union Mutual Fund,Direct,Very High,2026-02-09 09:27:45.848454+00:00,02-01-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+84,98,120662,UTI - Flexi Cap Fund-Growth Option - Direct,UTI Mutual Fund,Direct,Very High,2026-02-09 09:27:46.394802+00:00,02-01-2013,Equity Scheme,Flexi Cap Fund,NIFTY500
+85,99,150346,WhiteOak Capital Flexi Cap Fund Direct Plan-Growth,WhiteOak Capital Mutual Fund,Direct,Very High,2026-02-09 09:27:46.767380+00:00,03-08-2022,Equity Scheme,Flexi Cap Fund,NIFTY500
+86,100,131580,360 ONE Focused Fund-Direct Plan-Growth,360 ONE Mutual Fund,Direct,Very High,2026-02-09 09:27:47.241451+00:00,31-10-2014,Equity Scheme,Focused Fund,NIFTY500
+87,101,119564,Aditya Birla Sun Life Focused Fund - Growth - Direct Plan,Aditya Birla Sun Life Mutual Fund,Direct,Very High,2026-02-09 09:27:47.832948+00:00,02-01-2013,Equity Scheme,Focused Fund,NIFTY500
+88,102,120468,Axis Focused Fund - Direct Plan - Growth Option,Axis Mutual Fund,Direct,Very High,2026-02-09 09:27:48.294833+00:00,02-01-2013,Equity Scheme,Focused Fund,NIFTY500
+89,103,118421,Bandhan Focused Fund - Direct Plan - Growth,Bandhan Mutual Fund,Direct,Very High,2026-02-09 09:27:48.872416+00:00,02-01-2013,Equity Scheme,Focused Fund,NIFTY500
+90,104,150264,BARODA BNP PARIBAS Focused Fund - Direct Plan - Growth Option,Baroda BNP Paribas Mutual Fund,Direct,Very High,2026-02-09 09:27:49.250533+00:00,14-03-2022,Equity Scheme,Focused Fund,NIFTY500
+91,105,148883,Canara Robeco Focused Fund - Direct Plan - Growth Option,Canara Robeco Mutual Fund,Direct,Very High,2026-02-09 09:27:49.681109+00:00,18-05-2021,Equity Scheme,Focused Fund,NIFTY500
+92,106,119096,DSP Focused Fund - Direct Plan - Growth,DSP Mutual Fund,Direct,Very High,2026-02-09 09:27:50.219176+00:00,02-01-2013,Equity Scheme,Focused Fund,NIFTY500
+93,107,150376,Edelweiss Focused Fund - Direct Plan - Growth,Edelweiss Mutual Fund,Direct,Very High,2026-02-09 09:27:50.594873+00:00,03-08-2022,Equity Scheme,Focused Fund,NIFTY500
+94,108,118564,Franklin India Focused Equity Fund - Direct - Growth,Franklin Templeton Mutual Fund,Direct,Very High,2026-02-09 09:27:51.100146+00:00,01-01-2013,Equity Scheme,Focused Fund,NIFTY500
+95,109,118950,HDFC Focused Fund - Growth Option - Direct Plan,HDFC Mutual Fund,Direct,Very High,2026-02-09 09:27:51.661161+00:00,01-01-2013,Equity Scheme,Focused Fund,NIFTY500
+96,110,148411,HSBC Focused Fund - Direct Growth,HSBC Mutual Fund,Direct,Very High,2026-02-09 09:27:52.085520+00:00,29-07-2020,Equity Scheme,Focused Fund,NIFTY500
+97,111,120722,ICICI Prudential Focused Equity Fund - Direct Plan - Growth,ICICI Prudential Mutual Fund,Direct,Very High,2026-02-09 09:27:52.578881+00:00,10-01-2013,Equity Scheme,Focused Fund,NIFTY500
+98,112,148481,Invesco India Focused Fund - Direct Plan - Growth,Invesco Mutual Fund,Direct,Very High,2026-02-09 09:27:52.985636+00:00,01-10-2020,Equity Scheme,Focused Fund,NIFTY500
+99,113,151777,ITI Focused Fund - Direct Plan - Growth,ITI Mutual Fund,Direct,Very High,2026-02-09 09:27:53.364098+00:00,21-06-2023,Equity Scheme,Focused Fund,NIFTY500
+100,114,120488,JM Focused Fund (Direct)  - Growth Option,JM Financial Mutual Fund,Direct,Very High,2026-02-09 09:27:54.027186+00:00,02-01-2013,Equity Scheme,Focused Fund,NIFTY500
+101,115,147473,Kotak Focused Fund- Direct Plan- Growth option,Kotak Mahindra Mutual Fund,Direct,Very High,2026-02-09 09:27:54.470450+00:00,23-07-2019,Equity Scheme,Focused Fund,NIFTY500
+102,116,152010,LIC MF Focused Fund-Direct Plan-Growth,LIC Mutual Fund,Direct,Very High,2026-02-09 09:27:54.974032+00:00,31-07-2023,Equity Scheme,Focused Fund,NIFTY500
+103,117,148567,Mahindra Manulife Focused Fund - Direct Plan -Growth,Mahindra Manulife Mutual Fund,Direct,Very High,2026-02-09 09:27:55.394145+00:00,19-11-2020,Equity Scheme,Focused Fund,NIFTY500
+104,118,147206,Mirae Asset Focused Fund Direct Plan Growth,Mirae Asset Mutual Fund,Direct,Very High,2026-02-09 09:27:55.908593+00:00,15-05-2019,Equity Scheme,Focused Fund,NIFTY500
+105,119,122389,Motilal Oswal Focused Fund - Direct Plan Growth Option,Motilal Oswal Mutual Fund,Direct,Very High,2026-02-09 09:27:56.429884+00:00,15-05-2013,Equity Scheme,Focused Fund,NIFTY500
+106,120,118692,Nippon India Focused Fund - Direct Plan Growth Plan - Growth Option,Nippon India Mutual Fund,Direct,Very High,2026-02-09 09:27:56.963891+00:00,02-01-2013,Equity Scheme,Focused Fund,NIFTY500
+107,121,152358,Old Bridge Focused Fund - Direct Growth,Old Bridge Mutual Fund,Direct,Very High,2026-02-09 09:27:57.327048+00:00,25-01-2024,Equity Scheme,Focused Fund,NIFTY500
+108,122,120834,quant Focused Fund - Growth Option-Direct Plan,quant Mutual Fund,Direct,Very High,2026-02-09 09:27:57.965240+00:00,07-01-2013,Equity Scheme,Focused Fund,NIFTY500
+109,123,119727,SBI FOCUSED FUND - DIRECT PLAN -GROWTH,SBI Mutual Fund,Direct,Very High,2026-02-09 09:27:58.446616+00:00,02-01-2013,Equity Scheme,Focused Fund,NIFTY500
+110,124,149533,Sundaram Focused Fund (Formerly Known as Principal Focused Multicap Fund)- Direct Plan - Growth Option,Sundaram Mutual Fund,Direct,Very High,2026-02-09 09:27:58.828832+00:00,03-01-2022,Equity Scheme,Focused Fund,NIFTY500
+111,125,147757,Tata Focused Fund-Direct Plan-Growth,Tata Mutual Fund,Direct,Very High,2026-02-09 09:27:59.218140+00:00,06-12-2019,Equity Scheme,Focused Fund,NIFTY500
+112,126,147492,Union Focused Fund - Direct Plan - Growth Option,Union Mutual Fund,Direct,Very High,2026-02-09 09:27:59.624353+00:00,13-08-2019,Equity Scheme,Focused Fund,NIFTY500
+113,127,149091,UTI Focused Fund - Direct Plan - Growth Option,UTI Mutual Fund,Direct,Very High,2026-02-09 09:28:00.000465+00:00,26-08-2021,Equity Scheme,Focused Fund,NIFTY500
+114,128,119436,Aditya Birla Sun Life Large & Mid Cap Fund - Growth - Direct Plan,Aditya Birla Sun Life Mutual Fund,Direct,Very High,2026-02-09 09:28:00.533563+00:00,02-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+115,129,145110,Axis Large & Mid Cap Fund - Direct Plan - Growth,Axis Mutual Fund,Direct,Very High,2026-02-09 09:28:01.028693+00:00,26-10-2018,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+116,130,152408,Bajaj Finserv Large and Mid Cap Fund- Direct Plan- Growth,Bajaj Finserv Mutual Fund,Direct,Very High,2026-02-09 09:28:01.421742+00:00,29-02-2024,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+117,131,118419,Bandhan Large & Mid Cap Fund - Direct Plan - Growth,Bandhan Mutual Fund,Direct,Very High,2026-02-09 09:28:01.966647+00:00,02-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+118,132,119350,BANK OF INDIA Large & Mid Cap Fund Direct Plan-Growth,Bank of India Mutual Fund,Direct,Very High,2026-02-09 09:28:02.586307+00:00,02-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+119,133,148474,Baroda BNP Paribas Large and Mid Cap Fund- Direct Plan -Growth Option,Baroda BNP Paribas Mutual Fund,Direct,Very High,2026-02-09 09:28:03.067296+00:00,11-09-2020,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+120,134,118278,CANARA ROBECO LARGE AND MID CAP FUND - DIRECT PLAN - GROWTH OPTION,Canara Robeco Mutual Fund,Direct,Very High,2026-02-09 09:28:03.596820+00:00,02-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+121,135,119218,DSP Large & Mid Cap Fund - Direct Plan - Growth,DSP Mutual Fund,Direct,Very High,2026-02-09 09:28:04.104425+00:00,02-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+122,136,140175,Edelweiss Large & Mid Cap Fund - Direct Plan - Growth Option,Edelweiss Mutual Fund,Direct,Very High,2026-02-09 09:28:04.588770+00:00,28-11-2016,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+123,137,118510,Franklin India Large & Mid Cap Fund - Direct - Growth,Franklin Templeton Mutual Fund,Direct,Very High,2026-02-09 09:28:05.153942+00:00,01-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+124,138,130498,HDFC Large and Mid Cap Fund - Growth Option - Direct Plan,HDFC Mutual Fund,Direct,Very High,2026-02-09 09:28:05.603461+00:00,30-06-2014,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+125,139,152941,Helios Large & Mid Cap Fund - Direct Plan - Growth Option,Helios Mutual Fund,Direct,Very High,2026-02-09 09:28:05.957399+00:00,04-11-2024,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+126,140,146772,HSBC Large & Mid Cap Fund - Direct Growth,HSBC Mutual Fund,Direct,Very High,2026-02-09 09:28:06.449669+00:00,04-04-2019,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+127,141,120596,ICICI Prudential Large & Mid Cap Fund - Direct Plan - Growth,ICICI Prudential Mutual Fund,Direct,Very High,2026-02-09 09:28:06.972588+00:00,02-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+128,142,120357,Invesco India Large & Mid Cap Fund - Direct Plan - Growth,Invesco Mutual Fund,Direct,Very High,2026-02-09 09:28:07.496975+00:00,02-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+129,143,152821,ITI Large & Midcap Fund - Direct Plan - Growth,ITI Mutual Fund,Direct,Very High,2026-02-09 09:28:07.842900+00:00,13-09-2024,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+130,144,153629,JM Large & Mid Cap Fund (Direct) - Growth Option,JM Financial Mutual Fund,Direct,Very High,2026-02-09 09:28:08.217378+00:00,30-07-2025,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+131,145,120158,Kotak Large & Midcap Fund - Direct- Growth,Kotak Mahindra Mutual Fund,Direct,Very High,2026-02-09 09:28:08.719287+00:00,02-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+132,146,133710,LIC MF Large & Mid Cap Fund-Direct Plan-Growth,LIC Mutual Fund,Direct,Very High,2026-02-09 09:28:09.327867+00:00,26-02-2015,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+133,147,147840,Mahindra Manulife Large & Mid Cap Fund - Direct Plan -Growth,Mahindra Manulife Mutual Fund,Direct,Very High,2026-02-09 09:28:09.823321+00:00,01-01-2020,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+134,148,118834,Mirae Asset Large & Midcap Fund - Direct Plan - Growth,Mirae Asset Mutual Fund,Direct,Very High,2026-02-09 09:28:10.464488+00:00,02-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+135,149,147704,Motilal Oswal Large and Midcap Fund - Direct Plan Growth,Motilal Oswal Mutual Fund,Direct,Very High,2026-02-09 09:28:10.954221+00:00,22-10-2019,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+136,150,135677,Navi Large & Midcap Fund- Direct Plan- Growth Option,Navi Mutual Fund,Direct,Very High,2026-02-09 09:28:11.590978+00:00,08-12-2015,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+137,151,118675,Nippon India Vision Large & Mid Cap Fund - Direct Plan Growth Plan - Bonus Option,Nippon India Mutual Fund,Direct,Very High,2026-02-09 09:28:12.128736+00:00,02-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+138,152,118678,Nippon India Vision Large & Mid Cap Fund - Direct Plan Growth Plan - Growth Option,Nippon India Mutual Fund,Direct,Very High,2026-02-09 09:28:12.605953+00:00,02-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+139,153,152382,PGIM India Large and Midcap Fund - Direct Plan - Growth Option,PGIM India Mutual Fund,Direct,Very High,2026-02-09 09:28:13.014077+00:00,16-02-2024,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+140,154,120826,quant Large & Mid Cap Fund - Growth Option-Direct Plan,quant Mutual Fund,Direct,Very High,2026-02-09 09:28:13.535491+00:00,07-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+141,155,153534,Samco Large & Mid Cap Fund - Direct Plan - Growth Option,Samco Mutual Fund,Direct,Very High,2026-02-09 09:28:13.887232+00:00,30-06-2025,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+142,156,119721,SBI LARGE & MIDCAP FUND -DIRECT PLAN -Growth,SBI Mutual Fund,Direct,Very High,2026-02-09 09:28:14.455188+00:00,02-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+143,157,119566,Sundaram Large and Midcap Fund Direct Plan - Growth,Sundaram Mutual Fund,Direct,Very High,2026-02-09 09:28:14.962334+00:00,03-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+144,158,119202,Tata Large & MId Cap Fund -Direct Plan- Growth Option,Tata Mutual Fund,Direct,Very High,2026-02-09 09:28:15.477110+00:00,02-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+145,159,147750,Union Large & Midcap Fund - Direct Plan - Growth Option,Union Mutual Fund,Direct,Very High,2026-02-09 09:28:16.074553+00:00,13-12-2019,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+146,160,120665,UTI Large & Mid Cap Fund - Direct Plan - Growth Option,UTI Mutual Fund,Direct,Very High,2026-02-09 09:28:16.534876+00:00,02-01-2013,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+147,161,152226,Whiteoak Capital Large & Mid Cap Fund Direct Plan Growth,WhiteOak Capital Mutual Fund,Direct,Very High,2026-02-09 09:28:16.888520+00:00,26-12-2023,Equity Scheme,Large & Mid Cap Fund,NIFTYLARGEMIDCAP250
+148,162,119528,Aditya Birla Sun Life Large Cap Fund - Growth - Direct Plan,Aditya Birla Sun Life Mutual Fund,Direct,Very High,2026-02-09 09:28:17.469731+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+149,163,120465,Axis Large Cap Fund - Direct Plan - Growth,Axis Mutual Fund,Direct,Very High,2026-02-09 09:28:17.974694+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+150,164,152783,BAJAJ FINSERV LARGE CAP FUND - DIRECT PLAN - GROWTH,Bajaj Finserv Mutual Fund,Direct,Very High,2026-02-09 09:28:18.320448+00:00,23-08-2024,Equity Scheme,Large Cap Fund,NIFTY100
+151,165,118479,BANDHAN Large Cap Fund-Direct Plan-Growth,Bandhan Mutual Fund,Direct,Very High,2026-02-09 09:28:18.791183+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+152,166,148980,BANK OF INDIA Large Cap Fund Direct Plan Growth,Bank of India Mutual Fund,Direct,Very High,2026-02-09 09:28:19.172984+00:00,01-07-2021,Equity Scheme,Large Cap Fund,NIFTY100
+153,167,150187,BARODA BNP PARIBAS LARGE CAP Fund - Direct Plan - Growth Option,Baroda BNP Paribas Mutual Fund,Direct,Very High,2026-02-09 09:28:19.575139+00:00,14-03-2022,Equity Scheme,Large Cap Fund,NIFTY100
+154,168,118269,CANARA ROBECO LARGE CAP FUND - DIRECT PLAN - GROWTH OPTION,Canara Robeco Mutual Fund,Direct,Very High,2026-02-09 09:28:20.043797+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+155,169,119250,DSP Large Cap Fund - Direct Plan - Growth,DSP Mutual Fund,Direct,Very High,2026-02-09 09:28:20.598522+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+156,170,118617,Edelweiss Large Cap Fund - Direct Plan-Growth option,Edelweiss Mutual Fund,Direct,Very High,2026-02-09 09:28:21.106632+00:00,08-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+157,171,118531,Franklin India Large Cap Fund- Direct - Growth,Franklin Templeton Mutual Fund,Direct,Very High,2026-02-09 09:28:21.660328+00:00,01-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+158,172,119133,Groww Largecap Fund (formerly known as Indiabulls Blue Chip Fund) - Direct Plan - Growth Option,Groww Mutual Fund,Direct,Very High,2026-02-09 09:28:22.246992+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+159,173,119018,HDFC Large Cap Fund - Growth Option - Direct Plan,HDFC Mutual Fund,Direct,Very High,2026-02-09 09:28:22.853984+00:00,01-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+160,174,120030,HSBC Large Cap Fund - Direct Growth,HSBC Mutual Fund,Direct,Very High,2026-02-09 09:28:23.339557+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+161,175,120586,ICICI Prudential Large Cap Fund (erstwhile Bluechip Fund) - Direct Plan - Growth,ICICI Prudential Mutual Fund,Direct,Very High,2026-02-09 09:28:23.794821+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+162,176,120392,Invesco India Largecap Fund - Direct Plan - Growth,Invesco Mutual Fund,Direct,Very High,2026-02-09 09:28:24.377840+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+163,177,148353,ITI Large Cap Fund - Direct Plan - Growth Option,ITI Mutual Fund,Direct,Very High,2026-02-09 09:28:24.765375+00:00,29-12-2020,Equity Scheme,Large Cap Fund,NIFTY100
+164,178,120490,JM Large Cap Fund (Direct) - Growth Option,JM Financial Mutual Fund,Direct,Very High,2026-02-09 09:28:25.404605+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+165,179,120152,Kotak Large Cap  Fund - Growth - Direct,Kotak Mahindra Mutual Fund,Direct,Very High,2026-02-09 09:28:25.886492+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+166,180,120267,LIC MF Large Cap Fund-Direct Plan-Growth,LIC Mutual Fund,Direct,Very High,2026-02-09 09:28:26.514184+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+167,181,146549,Mahindra Manulife Large Cap Fund - Direct Plan -Growth,Mahindra Manulife Mutual Fund,Direct,Very High,2026-02-09 09:28:27.104235+00:00,19-03-2019,Equity Scheme,Large Cap Fund,NIFTY100
+168,182,118825,Mirae Asset Large Cap Fund - Direct Plan - Growth,Mirae Asset Mutual Fund,Direct,Very High,2026-02-09 09:28:27.822014+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+169,183,152354,Motilal Oswal Large Cap Direct Plan Growth,Motilal Oswal Mutual Fund,Direct,Very High,2026-02-09 09:28:28.173391+00:00,12-02-2024,Equity Scheme,Large Cap Fund,NIFTY100
+170,184,118633,Nippon India Large Cap Fund - Direct Plan Growth Plan - Bonus Option,Nippon India Mutual Fund,Direct,Very High,2026-02-09 09:28:28.706798+00:00,03-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+171,185,118632,Nippon India Large Cap Fund - Direct Plan Growth Plan - Growth Option,Nippon India Mutual Fund,Direct,Very High,2026-02-09 09:28:29.222101+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+172,186,138312,PGIM India Large Cap Fund - Direct Plan - Growth,PGIM India Mutual Fund,Direct,Very High,2026-02-09 09:28:29.762353+00:00,08-03-2016,Equity Scheme,Large Cap Fund,NIFTY100
+173,187,150440,quant Large Cap Fund - Growth Option - Direct Plan,quant Mutual Fund,Direct,Very High,2026-02-09 09:28:30.263020+00:00,12-08-2022,Equity Scheme,Large Cap Fund,NIFTY100
+174,188,153239,Samco Large Cap Fund - Direct Plan - Growth Option,Samco Mutual Fund,Direct,Very High,2026-02-09 09:28:30.663690+00:00,28-03-2025,Equity Scheme,Large Cap Fund,NIFTY100
+175,189,119598,SBI Large Cap FUND-DIRECT PLAN -GROWTH,SBI Mutual Fund,Direct,Very High,2026-02-09 09:28:31.131377+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+176,190,148507,Sundaram Large Cap Fund (Formerly Known as Sundaram Blue Chip Fund)Direct Plan - Growth,Sundaram Mutual Fund,Direct,Very High,2026-02-09 09:28:31.510553+00:00,12-10-2020,Equity Scheme,Large Cap Fund,NIFTY100
+177,191,119160,Tata Large Cap Fund -Direct Plan Growth Option,Tata Mutual Fund,Direct,Very High,2026-02-09 09:28:32.078546+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+178,192,118870,Taurus Large Cap Fund - Direct Plan - Growth,Taurus Mutual Fund,Direct,Very High,2026-02-09 09:28:32.599373+00:00,03-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+179,193,141248,Union Largecap Fund - Direct Plan - Growth Option,Union Mutual Fund,Direct,Very High,2026-02-09 09:28:33.023275+00:00,18-05-2017,Equity Scheme,Large Cap Fund,NIFTY100
+180,194,120656,UTI Large Cap Fund - Direct Plan - Growth Option,UTI Mutual Fund,Direct,Very High,2026-02-09 09:28:33.496432+00:00,02-01-2013,Equity Scheme,Large Cap Fund,NIFTY100
+181,195,150797,WhiteOak Capital Large Cap Fund Direct Plan Growth,WhiteOak Capital Mutual Fund,Direct,Very High,2026-02-09 09:28:33.859806+00:00,02-12-2022,Equity Scheme,Large Cap Fund,NIFTY100
+182,196,119620,Aditya Birla Sun Life Midcap Fund - Growth - Direct Plan,Aditya Birla Sun Life Mutual Fund,Direct,Very High,2026-02-09 09:28:34.353225+00:00,02-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+183,197,120505,Axis Midcap Fund - Direct Plan - Growth,Axis Mutual Fund,Direct,Very High,2026-02-09 09:28:34.825541+00:00,02-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+184,198,150404,BANDHAN MIDCAP FUND - GROWTH - DIRECT PLAN,Bandhan Mutual Fund,Direct,Very High,2026-02-09 09:28:35.192926+00:00,19-08-2022,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+185,199,153728,Bank of India Mid Cap Fund - Direct Plan Growth,Bank of India Mutual Fund,Direct,Very High,2026-02-09 09:28:35.525821+00:00,25-08-2025,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+186,200,150212,BARODA BNP PARIBAS Mid Cap Fund - Direct Plan - Growth Option,Baroda BNP Paribas Mutual Fund,Direct,Very High,2026-02-09 09:28:36.001426+00:00,14-03-2022,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+187,201,150817,Canara Robeco Mid Cap Fund- Direct Plan- Growth Option,Canara Robeco Mutual Fund,Direct,Very High,2026-02-09 09:28:36.445778+00:00,06-12-2022,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+188,202,119071,DSP Midcap Fund - Direct Plan - Growth,DSP Mutual Fund,Direct,Very High,2026-02-09 09:28:36.982411+00:00,02-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+189,203,140228,Edelweiss Mid Cap Fund - Direct Plan - Growth Option,Edelweiss Mutual Fund,Direct,Very High,2026-02-09 09:28:37.429286+00:00,28-11-2016,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+190,204,118533,Franklin India Mid Cap Fund - Direct - Growth,Franklin Templeton Mutual Fund,Direct,Very High,2026-02-09 09:28:38.121142+00:00,01-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+191,205,118989,HDFC Mid Cap Fund - Growth Option - Direct Plan,HDFC Mutual Fund,Direct,Very High,2026-02-09 09:28:38.612715+00:00,01-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+192,206,153326,Helios Mid Cap Fund - Direct Plan - Growth Option,Helios Mutual Fund,Direct,Very High,2026-02-09 09:28:38.953316+00:00,17-03-2025,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+193,207,151036,HSBC Midcap Fund - Direct Growth,HSBC Mutual Fund,Direct,Very High,2026-02-09 09:28:39.319977+00:00,28-11-2022,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+194,208,120381,ICICI Prudential MidCap Fund - Direct Plan -  Growth,ICICI Prudential Mutual Fund,Direct,Very High,2026-02-09 09:28:39.781315+00:00,02-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+195,209,120403,Invesco India Midcap Fund - Direct Plan - Growth Option,Invesco Mutual Fund,Direct,Very High,2026-02-09 09:28:40.264105+00:00,02-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+196,210,148733,ITI Mid Cap Fund - Direct Plan - Growth Option,ITI Mutual Fund,Direct,Very High,2026-02-09 09:28:40.646900+00:00,10-03-2021,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+197,211,150815,JM Midcap Fund (Direct) - Growth,JM Financial Mutual Fund,Direct,Very High,2026-02-09 09:28:41.023050+00:00,25-11-2022,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+198,212,119775,Kotak Midcap Fund - Direct Plan - Growth,Kotak Mahindra Mutual Fund,Direct,Very High,2026-02-09 09:28:41.534218+00:00,03-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+199,213,152002,LIC MF Mid Cap Fund-Direct Plan-Growth,LIC Mutual Fund,Direct,Very High,2026-02-09 09:28:41.906050+00:00,31-07-2023,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+200,214,142110,Mahindra Manulife Mid Cap Fund - Direct Plan -Growth,Mahindra Manulife Mutual Fund,Direct,Very High,2026-02-09 09:28:42.431886+00:00,06-02-2018,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+201,215,147445,Mirae Asset Midcap Fund- Direct Growth Option,Mirae Asset Mutual Fund,Direct,Very High,2026-02-09 09:28:42.907516+00:00,30-07-2019,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+202,216,127042,Motilal Oswal Midcap Fund-Direct Plan-Growth Option,Motilal Oswal Mutual Fund,Direct,Very High,2026-02-09 09:28:43.443243+00:00,25-02-2014,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+203,217,118666,NIPPON INDIA GROWTH MID CAP FUND - DIRECT Plan - IDCW Option,Nippon India Mutual Fund,Direct,Very High,2026-02-09 09:28:43.936263+00:00,02-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+204,218,118665,Nippon India Growth Mid Cap Fund - Direct Plan Growth Plan - Bonus Option,Nippon India Mutual Fund,Direct,Very High,2026-02-09 09:28:44.453918+00:00,03-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+205,219,118668,Nippon India Growth Mid Cap Fund - Direct Plan Growth Plan - Growth Option,Nippon India Mutual Fund,Direct,Very High,2026-02-09 09:28:44.952167+00:00,02-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+206,220,125307,PGIM India Midcap Fund - Direct Plan - Growth Option,PGIM India Mutual Fund,Direct,Very High,2026-02-09 09:28:45.407078+00:00,05-12-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+207,221,120841,quant Mid Cap Fund - Growth Option - Direct Plan,quant Mutual Fund,Direct,Very High,2026-02-09 09:28:45.955067+00:00,07-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+208,222,119716,SBI MIDCAP FUND - DIRECT PLAN - GROWTH,SBI Mutual Fund,Direct,Very High,2026-02-09 09:28:46.436836+00:00,02-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+209,223,119581,Sundaram Mid Cap Fund Direct Plan - Growth,Sundaram Mutual Fund,Direct,Very High,2026-02-09 09:28:47.055846+00:00,02-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+210,224,119178,Tata Mid Cap Fund - Direct Plan- Growth Option,Tata Mutual Fund,Direct,Very High,2026-02-09 09:28:47.532032+00:00,02-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+211,225,118872,Taurus Mid Cap Fund - Direct Plan - Growth,Taurus Mutual Fund,Direct,Very High,2026-02-09 09:28:48.009245+00:00,02-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+212,226,148073,Union Midcap Fund - Direct Plan - Growth Option,Union Mutual Fund,Direct,Very High,2026-02-09 09:28:48.428344+00:00,30-03-2020,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+213,227,120726,UTI Mid Cap Fund-Growth Option- Direct,UTI Mutual Fund,Direct,Very High,2026-02-09 09:28:48.972546+00:00,02-01-2013,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+214,228,150584,WhiteOak Capital Mid Cap Fund Direct Plan Growth,WhiteOak Capital Mutual Fund,Direct,Very High,2026-02-09 09:28:49.351939+00:00,08-09-2022,Equity Scheme,Mid Cap Fund,NIFTYMIDCAP150
+215,229,148921,Aditya Birla Sun Life Multi-Cap Fund-Direct Growth,Aditya Birla Sun Life Mutual Fund,Direct,Very High,2026-02-09 09:28:49.748013+00:00,10-05-2021,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+216,230,149383,Axis Multicap Fund - Direct Growth,Axis Mutual Fund,Direct,Very High,2026-02-09 09:28:50.448430+00:00,23-12-2021,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+217,231,153309,BAJAJ FINSERV MULTI CAP FUND - DIRECT - GROWTH,Bajaj Finserv Mutual Fund,Direct,Very High,2026-02-09 09:28:50.910700+00:00,03-03-2025,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+218,232,149303,BANDHAN MULTI CAP FUND - GROWTH - DIRECT PLAN,Bandhan Mutual Fund,Direct,Very High,2026-02-09 09:28:51.773490+00:00,03-12-2021,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+219,233,151443,Bank of India Multi Cap Fund Direct Plan - Growth,Bank of India Mutual Fund,Direct,Very High,2026-02-09 09:28:52.127179+00:00,06-03-2023,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+220,234,119354,Baroda BNP Paribas MULTI CAP FUND - Direct Plan - Growth Option,Baroda BNP Paribas Mutual Fund,Direct,Very High,2026-02-09 09:28:52.667757+00:00,02-01-2013,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+221,235,151824,Canara Robeco Multi Cap Fund - Direct Plan - Growth Option,Canara Robeco Mutual Fund,Direct,Very High,2026-02-09 09:28:53.137507+00:00,02-08-2023,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+222,236,152310,DSP Multicap Fund - Direct - Growth,DSP Mutual Fund,Direct,Very High,2026-02-09 09:28:53.487852+00:00,31-01-2024,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+223,237,152094,Edelweiss Multi Cap Fund - Direct Plan - Growth,Edelweiss Mutual Fund,Direct,Very High,2026-02-09 09:28:53.954178+00:00,30-10-2023,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+224,238,152739,Franklin India Multi Cap Fund - Direct - Growth,Franklin Templeton Mutual Fund,Direct,Very High,2026-02-09 09:28:54.360054+00:00,29-07-2024,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+225,239,153034,Groww Multicap Fund - Direct - Growth,Groww Mutual Fund,Direct,Very High,2026-02-09 09:28:54.873676+00:00,18-12-2024,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+226,240,149368,HDFC Multi Cap Fund - Growth Option - Direct Plan,HDFC Mutual Fund,Direct,Very High,2026-02-09 09:28:55.597356+00:00,10-12-2021,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+227,241,151290,HSBC Multi Cap Fund - Direct - Growth,HSBC Mutual Fund,Direct,Very High,2026-02-09 09:28:56.003704+00:00,03-02-2023,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+228,242,120599,ICICI Prudential Multicap Fund - Direct Plan -  Growth,ICICI Prudential Mutual Fund,Direct,Very High,2026-02-09 09:28:56.537498+00:00,02-01-2013,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+229,243,120413,Invesco India Multicap Fund - Direct Plan - Growth Option,Invesco Mutual Fund,Direct,Very High,2026-02-09 09:28:57.052772+00:00,02-01-2013,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+230,244,147183,ITI Multi Cap Fund - Direct Plan - Growth Option,ITI Mutual Fund,Direct,Very High,2026-02-09 09:28:57.524674+00:00,16-05-2019,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+231,245,149185,Kotak Multicap Fund-Direct Plan-Growth,Kotak Mahindra Mutual Fund,Direct,Very High,2026-02-09 09:28:57.949499+00:00,06-10-2021,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+232,246,150659,LIC MF Multi Cap Fund-Direct Plan-Growth,LIC Mutual Fund,Direct,Very High,2026-02-09 09:28:58.366701+00:00,02-11-2022,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+233,247,141226,Mahindra Manulife Multi Cap Fund - Direct Plan -Growth,Mahindra Manulife Mutual Fund,Direct,Very High,2026-02-09 09:28:58.887995+00:00,18-05-2017,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+234,248,151810,Mirae Asset Multicap Fund - Direct Plan - Growth,Mirae Asset Mutual Fund,Direct,Very High,2026-02-09 09:28:59.281629+00:00,22-08-2023,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+235,249,152651,Motilal Oswal Multi Cap Fund-Direct Plan Growth,Motilal Oswal Mutual Fund,Direct,Very High,2026-02-09 09:28:59.686927+00:00,21-06-2024,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+236,250,118651,Nippon India Multi Cap Fund - Direct Plan Growth Plan - Bonus Option,Nippon India Mutual Fund,Direct,Very High,2026-02-09 09:29:00.238534+00:00,02-01-2013,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+237,251,118650,Nippon India Multi Cap Fund - Direct Plan Growth Plan - Growth Option,Nippon India Mutual Fund,Direct,Very High,2026-02-09 09:29:00.857084+00:00,02-01-2013,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+238,252,152815,PGIM India Multi Cap Fund - Direct Plan - Growth Option,PGIM India Mutual Fund,Direct,Very High,2026-02-09 09:29:01.203253+00:00,13-09-2024,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+239,253,120823,quant Multi Cap Fund-GROWTH OPTION-Direct Plan,quant Mutual Fund,Direct,Very High,2026-02-09 09:29:01.705949+00:00,07-01-2013,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+240,254,152847,Samco Multi Cap Fund - Direct Plan - Growth,Samco Mutual Fund,Direct,Very High,2026-02-09 09:29:02.148717+00:00,06-11-2024,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+241,255,149882,SBI Multicap Fund- Direct Plan- Growth option,SBI Mutual Fund,Direct,Very High,2026-02-09 09:29:02.560637+00:00,15-03-2022,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+242,256,149668,Sundaram Multi Cap Fund (Formerly Known as Principal Multi Cap Growth Fund) - Direct Plan - Income Distribution CUM Capital Withdrawal Option (IDCW),Sundaram Mutual Fund,Direct,Very High,2026-02-09 09:29:03.042648+00:00,03-01-2022,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+243,257,149669,Sundaram Multi Cap Fund (Formerly Known as Principal Multi Cap Growth Fund)-Direct Plan - Growth Option,Sundaram Mutual Fund,Direct,Very High,2026-02-09 09:29:03.427872+00:00,03-01-2022,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+244,258,151232,Tata Multicap Fund - Direct Plan - Growth,Tata Mutual Fund,Direct,Very High,2026-02-09 09:29:03.853666+00:00,09-02-2023,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+245,259,153644,TRUSTMF MULTI CAP FUND -DIRECT PLAN-GROWTH,Trust Mutual Fund,Direct,Very High,2026-02-09 09:29:04.275409+00:00,25-07-2025,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+246,260,150858,Union Multicap Fund - Direct Plan - Growth Option,Union Mutual Fund,Direct,Very High,2026-02-09 09:29:04.630772+00:00,26-12-2022,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+247,261,153515,UTI Multi Cap Fund - Direct Plan - Growth Option,UTI Mutual Fund,Direct,Very High,2026-02-09 09:29:05.129282+00:00,20-05-2025,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+248,262,152071,WhiteOak Capital Multi Cap Fund Direct Plan Growth,WhiteOak Capital Mutual Fund,Direct,Very High,2026-02-09 09:29:05.513453+00:00,25-09-2023,Equity Scheme,Multi Cap Fund,NIFTYMULTICAP500502550
+249,506,119556,Aditya Birla Sun Life Small Cap Fund - Growth - Direct Plan,Aditya Birla Sun Life Mutual Fund,Direct,Very High,2026-02-09 09:31:11.722141+00:00,07-01-2013,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+250,507,125354,Axis Small Cap Fund - Direct Plan - Growth,Axis Mutual Fund,Direct,Very High,2026-02-09 09:31:12.540048+00:00,05-12-2013,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+251,508,153612,BAJAJ FINSERV SMALL CAP FUND - DIRECT - GROWTH,Bajaj Finserv Mutual Fund,Direct,Very High,2026-02-09 09:31:12.932396+00:00,22-07-2025,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+252,509,147946,BANDHAN SMALL CAP FUND - DIRECT PLAN GROWTH,Bandhan Mutual Fund,Direct,Very High,2026-02-09 09:31:13.332987+00:00,26-02-2020,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+253,510,145678,BANK OF INDIA Small Cap Fund Direct Plan Growth,Bank of India Mutual Fund,Direct,Very High,2026-02-09 09:31:13.756946+00:00,27-12-2018,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+254,511,152128,Baroda BNP Paribas Small Cap Fund - Direct Plan - Growth option,Baroda BNP Paribas Mutual Fund,Direct,Very High,2026-02-09 09:31:14.129358+00:00,01-11-2023,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+255,512,146130,CANARA ROBECO SMALL CAP FUND - DIRECT PLAN - GROWTH OPTION,Canara Robeco Mutual Fund,Direct,Very High,2026-02-09 09:31:14.657968+00:00,19-02-2019,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+256,513,119212,DSP Small Cap Fund - Direct Plan - Growth,DSP Mutual Fund,Direct,Very High,2026-02-09 09:31:15.139471+00:00,02-01-2013,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+257,514,146196,Edelweiss Small Cap Fund - Direct Plan - Growth,Edelweiss Mutual Fund,Direct,Very High,2026-02-09 09:31:15.714871+00:00,14-02-2019,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+258,515,118525,Franklin India Small Cap Fund - Direct - Growth,Franklin Templeton Mutual Fund,Direct,Very High,2026-02-09 09:31:16.276157+00:00,01-01-2013,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+259,516,154063,Groww Small Cap Fund-Direct-Growth,Groww Mutual Fund,Direct,Very High,2026-02-09 09:31:16.603484+00:00,02-02-2026,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+260,517,130503,HDFC Small Cap Fund - Growth Option - Direct Plan,HDFC Mutual Fund,Direct,Very High,2026-02-09 09:31:17.148432+00:00,30-06-2014,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+261,518,153912,Helios Small Cap Fund - Direct Plan - Growth Option,Helios Mutual Fund,Direct,Very High,2026-02-09 09:31:17.500374+00:00,28-11-2025,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+262,519,151130,HSBC Small Cap Fund - Direct Growth,HSBC Mutual Fund,Direct,Very High,2026-02-09 09:31:18.075295+00:00,28-11-2022,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+263,520,120591,ICICI Prudential Smallcap Fund - Direct Plan - Growth,ICICI Prudential Mutual Fund,Direct,Very High,2026-02-09 09:31:18.689515+00:00,03-01-2013,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+264,521,145137,Invesco India Smallcap Fund - Direct Plan - Growth,Invesco Mutual Fund,Direct,Very High,2026-02-09 09:31:19.100468+00:00,02-11-2018,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+265,522,147919,ITI Small Cap Fund - Direct Plan - Growth Option,ITI Mutual Fund,Direct,Very High,2026-02-09 09:31:19.499491+00:00,19-02-2020,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+266,523,152614,JM Small Cap Fund (Direct) - Growth Option,JM Financial Mutual Fund,Direct,Very High,2026-02-09 09:31:19.844345+00:00,24-06-2024,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+267,524,120164,Kotak-Small Cap Fund - Growth - Direct,Kotak Mahindra Mutual Fund,Direct,Very High,2026-02-09 09:31:20.415822+00:00,02-01-2013,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+268,525,152004,LIC MF Small Cap Fund-Direct Plan-Growth,LIC Mutual Fund,Direct,Very High,2026-02-09 09:31:20.799889+00:00,31-07-2023,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+269,526,150915,Mahindra Manulife Small Cap Fund - Direct Plan - Growth,Mahindra Manulife Mutual Fund,Direct,Very High,2026-02-09 09:31:21.516226+00:00,14-12-2022,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+270,527,153196,Mirae Asset Small Cap Fund - Direct Plan - Growth,Mirae Asset Mutual Fund,Direct,Very High,2026-02-09 09:31:21.854854+00:00,03-02-2025,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+271,528,152237,Motilal Oswal Small Cap Fund - Direct - Growth,Motilal Oswal Mutual Fund,Direct,Very High,2026-02-09 09:31:22.231685+00:00,29-12-2023,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+272,529,118777,Nippon India Small Cap Fund - Direct Plan Growth Plan - Bonus Option,Nippon India Mutual Fund,Direct,Very High,2026-02-09 09:31:22.767834+00:00,03-01-2013,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+273,530,118778,Nippon India Small Cap Fund - Direct Plan Growth Plan - Growth Option,Nippon India Mutual Fund,Direct,Very High,2026-02-09 09:31:23.280266+00:00,02-01-2013,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+274,531,149019,PGIM India Small Cap Fund - Direct Plan- Growth Option,PGIM India Mutual Fund,Direct,Very High,2026-02-09 09:31:23.672458+00:00,02-08-2021,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+275,532,120828,quant Small Cap Fund - Growth Option - Direct Plan,quant Mutual Fund,Direct,Very High,2026-02-09 09:31:24.317469+00:00,07-01-2013,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+276,533,152107,QUANTUM SMALL CAP FUND - DIRECT PLAN GROWTH OPTION,Quantum Mutual Fund,Direct,Very High,2026-02-09 09:31:24.793535+00:00,03-11-2023,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+277,534,125497,SBI Small Cap Fund - Direct Plan - Growth,SBI Mutual Fund,Direct,Very High,2026-02-09 09:31:25.337148+00:00,18-11-2013,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+278,535,119589,Sundaram Small Cap Fund Direct Plan - Growth,Sundaram Mutual Fund,Direct,Very High,2026-02-09 09:31:25.876457+00:00,02-01-2013,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+279,536,145206,Tata Small Cap Fund-Direct Plan-Growth,Tata Mutual Fund,Direct,Very High,2026-02-09 09:31:26.303185+00:00,13-11-2018,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+280,537,152939,TRUSTMF SMALL CAP FUND -DIRECT PLAN-GROWTH,Trust Mutual Fund,Direct,Very High,2026-02-09 09:31:26.643857+00:00,05-11-2024,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+281,538,129649,Union Small Cap Fund - Direct Plan - Growth Option,Union Mutual Fund,Direct,Very High,2026-02-09 09:31:27.090258+00:00,17-06-2014,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
+282,539,148618,UTI Small Cap Fund - Direct Plan - Growth Option,UTI Mutual Fund,Direct,Very High,2026-02-09 09:31:27.579147+00:00,23-12-2020,Equity Scheme,Small Cap Fund,NIFTYSMALLCAP250
