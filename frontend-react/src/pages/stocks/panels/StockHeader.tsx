@@ -1,9 +1,4 @@
-const money = (value: unknown) =>
-  value == null || value === ''
-    ? '—'
-    : `₹${new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value))}`;
-
-const formatDate = (value: unknown) => (value == null ? '—' : String(value).slice(0, 10));
+import { formatDate, formatInr } from '../../../lib/format';
 
 export default function StockHeader({ stock }: { stock: any }) {
   const price = stock?.latest_price;
@@ -20,14 +15,14 @@ export default function StockHeader({ stock }: { stock: any }) {
       <div className="stock-header-main">
         <div>
           <p className="eyebrow">{stock?.trading_symbol || '—'}</p>
-          <h2>{stock?.company_name || stock?.trading_symbol || 'Stock'}</h2>
+          <h1 className="stock-title">{stock?.company_name || stock?.trading_symbol || 'Stock'}</h1>
           <p className="subtitle">
             {[stock?.exchange, stock?.sector_name, stock?.industry_name].filter(Boolean).join(' · ') || '—'}
           </p>
         </div>
         <div className="stock-price-block">
           <small>Last close</small>
-          <strong>{money(price?.close)}</strong>
+          <strong>{formatInr(price?.close)}</strong>
           <small>{formatDate(price?.date)}</small>
         </div>
       </div>

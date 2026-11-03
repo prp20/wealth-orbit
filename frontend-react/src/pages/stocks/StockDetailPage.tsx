@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api';
 import MarketChart from '../../components/MarketChart';
 import SyncJobButton from '../../components/SyncJobButton';
+import ChartToolbar, { ChartRange } from '../../components/ChartToolbar';
+import { formatCompactInr, formatPct, formatRatio } from '../../lib/format';
 import StockHeader from './panels/StockHeader';
 import InsightsPanel from './panels/InsightsPanel';
 import FundamentalsPanel from './panels/FundamentalsPanel';
@@ -11,102 +13,52 @@ import PeersPanel from './panels/PeersPanel';
 import ShareholdingPanel from './panels/ShareholdingPanel';
 import TechnicalsPanel from './panels/TechnicalsPanel';
 
-const money = (value: unknown) =>
-  value == null || value === ''
-    ? '—'
-    : new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(Number(value));
-
-function Page({ title, subtitle, children }: { title: string; subtitle: string; children?: React.ReactNode }) {
-  return (
-    <>
-      <header>
-        <p className="eyebrow">Wealth Orbit</p>
-        <h1>{title}</h1>
-        <p className="subtitle">{subtitle}</p>
-      </header>
-      {children}
-    </>
-  );
-}
-
 export default function StockDetailPage() {
   const { symbol = '' } = useParams();
+  const [range, setRange] = React.useState<ChartRange>('1Y');
+  const [mode, setMode] = React.useState('line');
   const stock = useQuery({ queryKey: ['stock', symbol], queryFn: () => api.stock(symbol) });
   const metrics = stock.data?.latest_daily_metrics;
 
   if (stock.isLoading) {
     return (
-      <Page title={symbol} subtitle="Loading stock decision surface…">
+      <>
+        <Link className="back" to="/stocks">
+          ← Back to stocks
+        </Link>
         <div className="loading">Loading stock…</div>
-      </Page>
+      </>
     );
   }
 
   if (stock.error) {
     return (
-      <Page title={symbol} subtitle="Stock detail">
+      <>
         <Link className="back" to="/stocks">
           ← Back to stocks
         </Link>
         <div className="empty">{(stock.error as Error).message}</div>
-      </Page>
+      </>
     );
   }
 
   const detail = stock.data || {};
 
   return (
-    <Page title={detail.company_name || symbol} subtitle="Scannable market context for decision-making.">
+    <div className="stock-detail">
       <Link className="back" to="/stocks">
         ← Back to stocks
       </Link>
+      <p className="eyebrow detail-eyebrow">Stock research</p>
+
       <StockHeader stock={detail} />
       <InsightsPanel items={[]} />
-      <section className="metrics compact-metrics snapshot-metrics">
-        <div className="metric">
-          <small>PE</small>
-          <strong>{money(metrics?.stock_pe)}</strong>
-        </div>
-        <div className="metric">
-          <small>PB</small>
-          <strong>{money(metrics?.price_to_book)}</strong>
-        </div>
-        <div className="metric">
-          <small>ROE</small>
-          <strong>{money(metrics?.roe)}</strong>
-        </div>
-        <div className="metric">
-          <small>ROCE</small>
-          <strong>{money(metrics?.roce)}</strong>
-        </div>
-        <div className="metric">
-          <small>Div yield</small>
-          <strong>{money(metrics?.dividend_yield)}</strong>
-        </div>
-        <div className="metric">
-          <small>Market cap</small>
-          <strong>{money(metrics?.market_cap)}</strong>
-        </div>
-      </section>
-      <section className="panel">
+
+      <section className="panel key-ratios-panel">
         <div className="panel-heading">
           <div>
-            <h2>Price chart</h2>
-            <p className="panel-subtitle">Choose a range to inspect recent price action.</p>
-          </div>
-          <SyncJobButton
-            symbol={symbol}
-            kind="prices"
-            invalidateKeys={[['history', 'stock', symbol], ['stock', symbol]]}
-          />
-        </div>
-        <MarketChart kind="stock" id={symbol} />
-      </section>
-      <section className="panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Daily metrics sync</h2>
-            <p className="panel-subtitle">Refresh PE/PB/ROE snapshot used in the header cards.</p>
+            <h2>Key ratios</h2>
+            <p className="panel-subtitle">Latest daily snapshot for quick comparison.</p>
           </div>
           <SyncJobButton
             symbol={symbol}
@@ -114,11 +66,68 @@ export default function StockDetailPage() {
             invalidateKeys={[['stock-daily-metrics', symbol], ['stock', symbol], ['stock-peers', symbol]]}
           />
         </div>
+        <section className="metrics compact-metrics snapshot-metrics">
+          <div className="metric">
+            <small>PE</small>
+            <strong>{formatRatio(metrics?.stock_pe)}</strong>
+          </div>
+          <div className="metric">
+            <small>PB</small>
+            <strong>{formatRatio(metrics?.price_to_book)}</strong>
+          </div>
+          <div className="metric">
+            <small>ROE</small>
+            <strong>{formatPct(metrics?.roe)}</strong>
+          </div>
+          <div className="metric">
+            <small>ROCE</small>
+            <strong>{formatPct(metrics?.roce)}</strong>
+          </div>
+          <div className="metric">
+            <small>Div yield</small>
+            <strong>{formatPct(metrics?.dividend_yield)}</strong>
+          </div>
+          <div className="metric">
+            <small>Market cap</small>
+            <strong>{formatCompactInr(metrics?.market_cap)}</strong>
+          </div>
+        </section>
       </section>
+
+      <section className="panel">
+        <div className="panel-heading chart-panel-heading">
+          <div>
+            <h2>Price chart</h2>
+            <p className="panel-subtitle">Recent price action with selectable ranges.</p>
+          </div>
+          <div className="chart-panel-controls">
+            <ChartToolbar range={range} onChange={setRange} />
+            <select value={mode} onChange={(event) => setMode(event.target.value)}>
+              <option value="line">Line + volume</option>
+              <option value="candles">Candlesticks + volume</option>
+            </select>
+            <SyncJobButton
+              symbol={symbol}
+              kind="prices"
+              invalidateKeys={[['history', 'stock', symbol], ['stock', symbol]]}
+            />
+          </div>
+        </div>
+        <MarketChart
+          kind="stock"
+          id={symbol}
+          bare
+          range={range}
+          onRangeChange={setRange}
+          mode={mode}
+          onModeChange={setMode}
+        />
+      </section>
+
       <FundamentalsPanel symbol={symbol} />
       <PeersPanel symbol={symbol} />
       <ShareholdingPanel symbol={symbol} />
       <TechnicalsPanel symbol={symbol} />
-    </Page>
+    </div>
   );
 }

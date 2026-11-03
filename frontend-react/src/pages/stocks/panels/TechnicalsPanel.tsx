@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../api';
 import SyncJobButton from '../../../components/SyncJobButton';
+import { formatDate, formatRatio } from '../../../lib/format';
 
 const FAMILIES: { title: string; match: (code: string) => boolean }[] = [
   { title: 'RSI', match: (code) => code.startsWith('RSI') },
@@ -61,8 +62,8 @@ export default function TechnicalsPanel({ symbol }: { symbol: string }) {
                     {row.indicator_period ? ` (${row.indicator_period})` : ''}
                     {row.component ? ` · ${row.component}` : ''}
                   </small>
-                  <strong>{row.indicator_value == null ? '—' : Number(row.indicator_value).toFixed(2)}</strong>
-                  <small>{String(row.date || '').slice(0, 10)}</small>
+                  <strong>{formatRatio(row.indicator_value)}</strong>
+                  <small>{formatDate(row.date)}</small>
                 </div>
               ))}
             </div>

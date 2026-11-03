@@ -3,10 +3,34 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../api';
 import ChartToolbar, { ChartRange, rangeToFromDate } from './ChartToolbar';
 
-export default function MarketChart({ kind, id }: { kind: 'stock' | 'fund'; id: string }) {
-  const [mode, setMode] = useState('line');
-  const [range, setRange] = useState<ChartRange>('1Y');
+type Props = {
+  kind: 'stock' | 'fund';
+  id: string;
+  /** When true, omit nested card title/toolbar (parent owns chrome). */
+  bare?: boolean;
+  range?: ChartRange;
+  onRangeChange?: (range: ChartRange) => void;
+  mode?: string;
+  onModeChange?: (mode: string) => void;
+};
+
+export default function MarketChart({
+  kind,
+  id,
+  bare = false,
+  range: controlledRange,
+  onRangeChange,
+  mode: controlledMode,
+  onModeChange,
+}: Props) {
+  const [internalRange, setInternalRange] = useState<ChartRange>('1Y');
+  const [internalMode, setInternalMode] = useState('line');
+  const range = controlledRange ?? internalRange;
+  const mode = controlledMode ?? internalMode;
+  const setRange = onRangeChange ?? setInternalRange;
+  const setMode = onModeChange ?? setInternalMode;
   const fromDate = rangeToFromDate(range);
+
   const query = useQuery({
     queryKey: ['history', kind, id, range],
     queryFn: () =>
@@ -32,20 +56,8 @@ export default function MarketChart({ kind, id }: { kind: 'stock' | 'fund'; id: 
     return `${value} (${date.toLocaleDateString('en-IN', { weekday: 'short' })})`;
   };
 
-  return (
-    <section className="chart-card">
-      <div className="chart-head">
-        <h2>Price history</h2>
-        <div className="chart-controls">
-          <ChartToolbar range={range} onChange={setRange} />
-          {kind === 'stock' && (
-            <select value={mode} onChange={(event) => setMode(event.target.value)}>
-              <option value="line">Line + volume</option>
-              <option value="candles">Candlesticks + volume</option>
-            </select>
-          )}
-        </div>
-      </div>
+  const plot = (
+    <>
       {mode === 'line' ? (
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="line-chart">
           <polyline
@@ -96,9 +108,29 @@ export default function MarketChart({ kind, id }: { kind: 'stock' | 'fund'; id: 
           ))}
         </div>
       )}
-      <small>
+      <small className="chart-caption">
         {label(visible[0].date)} to {label(visible[visible.length - 1].date)} · {visible.length} points
       </small>
+    </>
+  );
+
+  if (bare) return <div className="chart-plot">{plot}</div>;
+
+  return (
+    <section className="chart-card">
+      <div className="chart-head">
+        <h2>Price history</h2>
+        <div className="chart-controls">
+          <ChartToolbar range={range} onChange={setRange} />
+          {kind === 'stock' && (
+            <select value={mode} onChange={(event) => setMode(event.target.value)}>
+              <option value="line">Line + volume</option>
+              <option value="candles">Candlesticks + volume</option>
+            </select>
+          )}
+        </div>
+      </div>
+      {plot}
     </section>
   );
 }

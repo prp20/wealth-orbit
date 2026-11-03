@@ -27,8 +27,10 @@ export default function SyncJobButton({
 }) {
   const queryClient = useQueryClient();
   const [busy, setBusy] = React.useState(false);
-  const [message, setMessage] = React.useState('');
+  const [error, setError] = React.useState('');
   const [status, setStatus] = React.useState('idle');
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const rootRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -36,8 +38,9 @@ export default function SyncJobButton({
       .then((payload) => {
         if (cancelled) return;
         setStatus(payload.status || 'idle');
-        if (payload.job?.last_error) setMessage(payload.job.last_error);
-        else if (payload.job?.status) setMessage(payload.job.status);
+        if (payload.job?.last_error && String(payload.job.status).toUpperCase() === 'FAILED') {
+          setError(payload.job.last_error);
+        }
       })
       .catch(() => undefined);
     return () => {
@@ -45,40 +48,72 @@ export default function SyncJobButton({
     };
   }, [symbol, kind]);
 
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [menuOpen]);
+
   const run = async (force: boolean) => {
     setBusy(true);
-    setMessage('Queued…');
+    setError('');
+    setMenuOpen(false);
     setStatus('queued');
     try {
       const job = await api.syncStock(symbol, kind, force);
       setStatus(String(job.status || 'QUEUED').toLowerCase());
-      setMessage(job.duplicate ? 'Already queued' : job.status || 'Queued');
       const terminal = await pollJob(job.job_id, (current) => {
         setStatus(String(current.status || '').toLowerCase());
-        setMessage(current.last_error || current.status || '');
+        if (current.last_error && String(current.status).toUpperCase() === 'FAILED') {
+          setError(current.last_error);
+        }
       });
-      setStatus(String(terminal.status || '').toLowerCase());
-      setMessage(terminal.last_error || terminal.status || 'Done');
+      const terminalStatus = String(terminal.status || '').toLowerCase();
+      setStatus(terminalStatus);
+      if (terminalStatus === 'failed') {
+        setError(terminal.last_error || 'Sync failed');
+      } else {
+        setError('');
+      }
       await Promise.all(invalidateKeys.map((key) => queryClient.invalidateQueries({ queryKey: key })));
       await queryClient.invalidateQueries({ queryKey: ['stock', symbol] });
-    } catch (error: any) {
+    } catch (err: any) {
       setStatus('failed');
-      setMessage(error.message || 'Sync failed');
+      setError(err.message || 'Sync failed');
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="panel-sync">
-      <button disabled={busy} onClick={() => run(false)}>
+    <div className="panel-sync" ref={rootRef}>
+      <button type="button" disabled={busy} onClick={() => run(false)}>
         {busy ? 'Working…' : label}
       </button>
-      <button disabled={busy} className="secondary" onClick={() => run(true)}>
-        Force sync
-      </button>
+      <div className="sync-overflow">
+        <button
+          type="button"
+          className="sync-overflow-trigger"
+          disabled={busy}
+          aria-label="More sync options"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          ⋯
+        </button>
+        {menuOpen && (
+          <div className="sync-overflow-menu">
+            <button type="button" disabled={busy} onClick={() => run(true)}>
+              Force sync
+            </button>
+          </div>
+        )}
+      </div>
       <span className={`sync-chip status-${status}`}>{status}</span>
-      {message && <small>{message}</small>}
+      {error && <small className="sync-error">{error}</small>}
     </div>
   );
 }
