@@ -649,6 +649,215 @@ def mutual_fund_benchmark(scheme_code: str):
         WHERE m.scheme_code=%s""", (scheme_code,))
     return None if frame.empty else frame.iloc[0].to_dict()
 
+
+def _disclosure_holdings(disclosure_id) -> list[dict]:
+    frame = _query(
+        """SELECT security_name, isin, sector, market_cap_bucket, instrument_type, weight_pct
+           FROM market_data.mutual_fund_portfolio_holdings
+           WHERE disclosure_id=%s ORDER BY weight_pct DESC, security_name""",
+        (disclosure_id,),
+    )
+    return frame.to_dict(orient="records")
+
+
+def _latest_disclosures(scheme_code: str, limit: int = 2) -> list[dict]:
+    frame = _query(
+        """SELECT d.disclosure_id, d.as_of_date, d.source_name, d.equity_pct, d.debt_pct,
+                  d.cash_pct, d.other_pct, d.warnings
+           FROM market_data.mutual_fund_portfolio_disclosures d
+           JOIN market_data.mutual_fund_reference m ON m.scheme_id=d.scheme_id
+           WHERE m.scheme_code=%s
+           ORDER BY d.as_of_date DESC
+           LIMIT %s""",
+        (scheme_code, limit),
+    )
+    return frame.to_dict(orient="records")
+
+
+def mutual_fund_holdings_snapshot(scheme_code: str, top_n: int = 20) -> dict:
+    """Latest disclosure with allocations, concentration, and MoM holding changes."""
+    from .market_data.mutual_fund_holdings import concentration_stats, holding_changes
+
+    if mutual_fund_detail(scheme_code) is None:
+        return None
+    disclosures = _latest_disclosures(scheme_code, limit=2)
+    if not disclosures:
+        return {
+            "available": False,
+            "reason": "No portfolio disclosure synced yet",
+            "scheme_code": scheme_code,
+        }
+    current = disclosures[0]
+    previous = disclosures[1] if len(disclosures) > 1 else None
+    holdings = _disclosure_holdings(current["disclosure_id"])
+    prior_holdings = _disclosure_holdings(previous["disclosure_id"]) if previous else None
+    top_n = max(1, min(int(top_n), 50))
+    sector_alloc: dict[str, float] = {}
+    mcap_alloc: dict[str, float] = {}
+    for row in holdings:
+        sector = row.get("sector") or "Unknown"
+        mcap = row.get("market_cap_bucket") or "Unknown"
+        weight = float(row["weight_pct"])
+        sector_alloc[sector] = sector_alloc.get(sector, 0.0) + weight
+        mcap_alloc[mcap] = mcap_alloc.get(mcap, 0.0) + weight
+    stale = False
+    as_of = current.get("as_of_date")
+    if as_of is not None:
+        try:
+            from datetime import date, datetime, timedelta
+
+            as_date = as_of if hasattr(as_of, "year") else date.fromisoformat(str(as_of)[:10])
+            stale = as_date < (date.today() - timedelta(days=120))
+        except Exception:
+            stale = False
+    return {
+        "available": True,
+        "scheme_code": scheme_code,
+        "as_of_date": current.get("as_of_date"),
+        "source_name": current.get("source_name"),
+        "stale": stale,
+        "asset_allocation": {
+            "equity_pct": current.get("equity_pct"),
+            "debt_pct": current.get("debt_pct"),
+            "cash_pct": current.get("cash_pct"),
+            "other_pct": current.get("other_pct"),
+        },
+        "sector_allocation": [
+            {"sector": key, "weight_pct": value}
+            for key, value in sorted(sector_alloc.items(), key=lambda item: item[1], reverse=True)
+        ],
+        "market_cap_allocation": [
+            {"market_cap_bucket": key, "weight_pct": value}
+            for key, value in sorted(mcap_alloc.items(), key=lambda item: item[1], reverse=True)
+        ],
+        "concentration": concentration_stats([row["weight_pct"] for row in holdings]),
+        "top_holdings": holdings[:top_n],
+        "changes": holding_changes(holdings, prior_holdings),
+        "prior_as_of_date": None if previous is None else previous.get("as_of_date"),
+        "warnings": current.get("warnings") or [],
+    }
+
+
+def mutual_fund_overlap(scheme_codes: list[str]) -> dict:
+    """Pairwise min-weight overlap for up to 10 schemes with latest disclosures."""
+    from .market_data.mutual_fund_holdings import min_weight_overlap, sector_overlap
+
+    codes = [code.strip() for code in scheme_codes if code and code.strip()][:10]
+    if len(codes) < 2:
+        raise ValueError("overlap requires at least 2 scheme_codes")
+    snapshots = []
+    for code in codes:
+        detail = mutual_fund_detail(code)
+        if detail is None:
+            continue
+        disclosures = _latest_disclosures(code, limit=1)
+        if not disclosures:
+            snapshots.append(
+                {
+                    "scheme_code": code,
+                    "scheme_name": detail.get("scheme_name"),
+                    "available": False,
+                    "reason": "No portfolio disclosure",
+                    "as_of_date": None,
+                    "holdings": [],
+                    "stale": True,
+                }
+            )
+            continue
+        holdings = _disclosure_holdings(disclosures[0]["disclosure_id"])
+        snap = mutual_fund_holdings_snapshot(code, top_n=50)
+        snapshots.append(
+            {
+                "scheme_code": code,
+                "scheme_name": detail.get("scheme_name"),
+                "available": True,
+                "as_of_date": disclosures[0].get("as_of_date"),
+                "stale": bool(snap and snap.get("stale")),
+                "holdings": holdings,
+            }
+        )
+    pairs = []
+    for i in range(len(snapshots)):
+        for j in range(i + 1, len(snapshots)):
+            left, right = snapshots[i], snapshots[j]
+            if not left["available"] or not right["available"]:
+                pairs.append(
+                    {
+                        "scheme_a": left["scheme_code"],
+                        "scheme_b": right["scheme_code"],
+                        "available": False,
+                        "reason": "Missing disclosure on one or both schemes",
+                    }
+                )
+                continue
+            overlap = min_weight_overlap(left["holdings"], right["holdings"])
+            pairs.append(
+                {
+                    "scheme_a": left["scheme_code"],
+                    "scheme_b": right["scheme_code"],
+                    "available": True,
+                    "as_of_a": left["as_of_date"],
+                    "as_of_b": right["as_of_date"],
+                    "stale_warning": left["stale"] or right["stale"],
+                    **overlap,
+                    "sector_overlap": sector_overlap(left["holdings"], right["holdings"]),
+                }
+            )
+    return {
+        "method": "sum_of_min_weights",
+        "schemes": [
+            {
+                "scheme_code": item["scheme_code"],
+                "scheme_name": item.get("scheme_name"),
+                "available": item["available"],
+                "as_of_date": item.get("as_of_date"),
+                "stale": item.get("stale"),
+                "reason": item.get("reason"),
+            }
+            for item in snapshots
+        ],
+        "pairs": pairs,
+    }
+
+
+def mutual_fund_managers(scheme_code: str) -> dict:
+    """Manager assignment history with tenure-adjusted scheme returns."""
+    from .market_data.mutual_fund_holdings import parse_date, tenure_return_from_nav
+
+    detail = mutual_fund_detail(scheme_code)
+    if detail is None:
+        return None
+    frame = _query(
+        """SELECT a.manager_name, a.start_date, a.end_date, a.is_current, a.source_name
+           FROM market_data.mutual_fund_manager_assignments a
+           JOIN market_data.mutual_fund_reference m ON m.scheme_id=a.scheme_id
+           WHERE m.scheme_code=%s
+           ORDER BY a.is_current DESC, a.start_date DESC""",
+        (scheme_code,),
+    )
+    nav = mutual_fund_history(scheme_code)
+    assignments = []
+    for row in frame.to_dict(orient="records"):
+        start = parse_date(row.get("start_date"))
+        end = parse_date(row.get("end_date"))
+        tenure = None
+        if start is not None:
+            tenure = tenure_return_from_nav(nav, start, end)
+        assignments.append(
+            {
+                **row,
+                "tenure_absolute_return": tenure,
+                "note": "Tenure return uses scheme NAV only over the assignment window — not full scheme history.",
+            }
+        )
+    return {
+        "scheme_code": scheme_code,
+        "scheme_name": detail.get("scheme_name"),
+        "available": bool(assignments),
+        "reason": None if assignments else "No manager assignments synced yet",
+        "assignments": assignments,
+    }
+
 def mutual_fund_benchmark_history(scheme_code: str) -> list[dict]:
     return _index_history_query(
         lambda d, c, volume_expr: f'''SELECT h.{quote_identifier(d)} AS date,h.open,h.high,h.low,h.{quote_identifier(c)} AS close,{volume_expr}

@@ -11,17 +11,21 @@ from .portfolio_backend import (filter_values, mutual_funds, mutual_fund_detail,
     stock_history, stocks, stock_daily_metrics, stock_fundamentals,
     stock_shareholding, stock_technical_indicators, sync_stock_fundamentals,
     mutual_fund_similar_enriched, mutual_fund_screen, mutual_fund_compare,
+    mutual_fund_holdings_snapshot, mutual_fund_overlap, mutual_fund_managers,
     compute_metrics, has_nav_history, sync_nav, recompute_metrics, sync_benchmark, sync_enrichment,
+    sync_holdings, sync_managers,
     METRIC_PERIODS, SCREEN_SORT_COLUMNS)
 from .sync_queue import enqueue, get_job, list_jobs, latest_job, latest_jobs_by_kind
 
 STOCK_SYNC_KINDS = ("PRICES", "TECHNICAL", "FUNDAMENTALS", "DAILY_METRICS", "SHAREHOLDING")
-MF_SYNC_KINDS = ("MF_NAV", "MF_METRICS", "MF_BENCHMARK", "MF_ENRICHMENT")
+MF_SYNC_KINDS = ("MF_NAV", "MF_METRICS", "MF_BENCHMARK", "MF_ENRICHMENT", "MF_HOLDINGS", "MF_MANAGERS")
 MF_KIND_ALIASES = {
     "nav": "MF_NAV",
     "metrics": "MF_METRICS",
     "benchmark": "MF_BENCHMARK",
     "enrichment": "MF_ENRICHMENT",
+    "holdings": "MF_HOLDINGS",
+    "managers": "MF_MANAGERS",
 }
 
 router = APIRouter(prefix="/market-data", tags=["market-data"])
@@ -57,8 +61,14 @@ def _enqueue_mf_sync(
         work = lambda: recompute_metrics(scheme_code, force)
     elif sync_type == "MF_BENCHMARK":
         work = lambda: sync_benchmark(scheme_code, force)
-    else:
+    elif sync_type == "MF_ENRICHMENT":
         work = lambda: sync_enrichment(scheme_code, force)
+    elif sync_type == "MF_HOLDINGS":
+        work = lambda: sync_holdings(scheme_code, force)
+    elif sync_type == "MF_MANAGERS":
+        work = lambda: sync_managers(scheme_code, force)
+    else:
+        raise HTTPException(status_code=422, detail="invalid sync kind")
     job, created = enqueue("MUTUAL_FUND", scheme_code, sync_type, force, work)
     return {**job, "duplicate": not created}
 
@@ -188,6 +198,38 @@ def mutual_fund_benchmark_sync(scheme_code: str, force: bool = Query(False)):
 @router.post("/mutual-funds/{scheme_code}/sync/enrichment")
 def mutual_fund_enrichment_sync(scheme_code: str, force: bool = Query(False)):
     return _enqueue_mf_sync(scheme_code, "enrichment", force)
+
+@router.post("/mutual-funds/{scheme_code}/sync/holdings")
+def mutual_fund_holdings_sync(scheme_code: str, force: bool = Query(False)):
+    return _enqueue_mf_sync(scheme_code, "holdings", force)
+
+@router.post("/mutual-funds/{scheme_code}/sync/managers")
+def mutual_fund_managers_sync(scheme_code: str, force: bool = Query(False)):
+    return _enqueue_mf_sync(scheme_code, "managers", force)
+
+@router.get("/mutual-funds/overlap")
+def mutual_fund_overlap_route(scheme_codes: str = Query(..., description="Comma-separated scheme codes")):
+    parts = [part.strip() for part in scheme_codes.split(",") if part.strip()]
+    if len(parts) < 2:
+        raise HTTPException(status_code=422, detail="scheme_codes requires at least 2 codes")
+    if len(parts) > 10:
+        raise HTTPException(status_code=422, detail="overlap at most 10 schemes")
+    try:
+        return mutual_fund_overlap(parts)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+@router.get("/mutual-funds/{scheme_code}/holdings")
+def mutual_fund_holdings_route(scheme_code: str, top_n: int = Query(20, ge=1, le=50)):
+    if mutual_fund_detail(scheme_code) is None:
+        raise HTTPException(status_code=404, detail="Mutual fund not found")
+    return mutual_fund_holdings_snapshot(scheme_code, top_n=top_n)
+
+@router.get("/mutual-funds/{scheme_code}/managers")
+def mutual_fund_managers_route(scheme_code: str):
+    if mutual_fund_detail(scheme_code) is None:
+        raise HTTPException(status_code=404, detail="Mutual fund not found")
+    return mutual_fund_managers(scheme_code)
 
 @router.get("/mutual-funds")
 def mutual_fund_list(search: str = Query(""), amc: str = Query("All"), category: str = Query("All"), subcategory: str = Query("All"), plan_type: str = Query("All"), option_type: str = Query("All")):
