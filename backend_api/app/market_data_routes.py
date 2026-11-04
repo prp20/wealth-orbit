@@ -10,8 +10,10 @@ from .portfolio_backend import (filter_values, mutual_funds, mutual_fund_detail,
     benchmark_list, benchmark_history,
     stock_history, stocks, stock_daily_metrics, stock_fundamentals,
     stock_shareholding, stock_technical_indicators, sync_stock_fundamentals,
-    mutual_fund_similar_enriched,
+    mutual_fund_similar_enriched, mutual_fund_screen, mutual_fund_compare,
     compute_metrics, has_nav_history, sync_nav, recompute_metrics, sync_benchmark, sync_enrichment)
+
+MF_SCREEN_PERIODS = ("1M", "3M", "6M", "1Y", "3Y", "5Y", "10Y")
 from .sync_queue import enqueue, get_job, list_jobs, latest_job, latest_jobs_by_kind
 
 STOCK_SYNC_KINDS = ("PRICES", "TECHNICAL", "FUNDAMENTALS", "DAILY_METRICS", "SHAREHOLDING")
@@ -191,6 +193,71 @@ def mutual_fund_enrichment_sync(scheme_code: str, force: bool = Query(False)):
 @router.get("/mutual-funds")
 def mutual_fund_list(search: str = Query(""), amc: str = Query("All"), category: str = Query("All"), subcategory: str = Query("All"), plan_type: str = Query("All"), option_type: str = Query("All")):
     return mutual_funds(search, amc, category, subcategory, plan_type, option_type).to_dict(orient="records")
+
+@router.get("/mutual-funds/screen")
+def mutual_fund_screen_route(
+    search: str = Query(""),
+    amc: str = Query("All"),
+    category: str = Query("All"),
+    subcategory: str = Query("All"),
+    plan_type: str = Query("All"),
+    option_type: str = Query("All"),
+    metric_period: str = Query("1Y"),
+    min_trailing: float | None = Query(None),
+    min_cagr: float | None = Query(None),
+    min_sharpe: float | None = Query(None),
+    max_drawdown: float | None = Query(None),
+    min_aum: float | None = Query(None),
+    max_aum: float | None = Query(None),
+    max_expense_ratio: float | None = Query(None),
+    require_metrics: bool = Query(False),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    if metric_period not in MF_SCREEN_PERIODS:
+        raise HTTPException(status_code=422, detail=f"metric_period must be one of {', '.join(MF_SCREEN_PERIODS)}")
+    try:
+        return mutual_fund_screen(
+            search=search,
+            amc=amc,
+            category=category,
+            subcategory=subcategory,
+            plan_type=plan_type,
+            option_type=option_type,
+            metric_period=metric_period,
+            min_trailing=min_trailing,
+            min_cagr=min_cagr,
+            min_sharpe=min_sharpe,
+            max_drawdown=max_drawdown,
+            min_aum=min_aum,
+            max_aum=max_aum,
+            max_expense_ratio=max_expense_ratio,
+            require_metrics=require_metrics,
+            limit=limit,
+            offset=offset,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+@router.get("/mutual-funds/compare")
+def mutual_fund_compare_route(
+    scheme_codes: str = Query(..., description="Comma-separated scheme codes"),
+    metric_period: str = Query("1Y"),
+):
+    parts = [part.strip() for part in scheme_codes.split(",") if part.strip()]
+    if not parts:
+        raise HTTPException(status_code=422, detail="scheme_codes is required")
+    if len(parts) > 10:
+        raise HTTPException(status_code=422, detail="compare at most 10 schemes")
+    if metric_period not in MF_SCREEN_PERIODS:
+        raise HTTPException(status_code=422, detail=f"metric_period must be one of {', '.join(MF_SCREEN_PERIODS)}")
+    try:
+        rows = mutual_fund_compare(parts, metric_period=metric_period)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not rows:
+        raise HTTPException(status_code=422, detail="no matching mutual funds for scheme_codes")
+    return rows
 
 @router.get("/benchmarks")
 def benchmark_list_route():
