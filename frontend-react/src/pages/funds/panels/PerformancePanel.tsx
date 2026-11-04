@@ -6,14 +6,14 @@ import { SHORT_METRIC_PERIODS } from '../../../lib/fundMetrics';
 
 const COLUMNS: { key: string; label: string; format: (value: unknown, row?: any) => string }[] = [
   { key: 'metric_period', label: 'Period', format: (v) => String(v ?? '—') },
-  { key: 'as_of_date', label: 'As of', format: formatDate },
-  { key: 'current_nav', label: 'NAV', format: formatInr },
-  { key: 'trailing_return', label: 'Trailing', format: formatPct },
-  { key: 'cagr', label: 'CAGR', format: formatPct },
-  { key: 'rolling_latest', label: 'Rolling latest', format: formatPct },
-  { key: 'rolling_median', label: 'Rolling median', format: formatPct },
-  { key: 'rolling_min', label: 'Rolling min', format: formatPct },
-  { key: 'rolling_max', label: 'Rolling max', format: formatPct },
+  { key: 'as_of_date', label: 'As of', format: (v) => formatDate(v) },
+  { key: 'current_nav', label: 'NAV', format: (v) => formatInr(v) },
+  { key: 'trailing_return', label: 'Trailing', format: (v) => formatPct(v) },
+  { key: 'cagr', label: 'CAGR', format: (v) => formatPct(v) },
+  { key: 'rolling_latest', label: 'Rolling latest', format: (v) => formatPct(v) },
+  { key: 'rolling_median', label: 'Rolling median', format: (v) => formatPct(v) },
+  { key: 'rolling_min', label: 'Rolling min', format: (v) => formatPct(v) },
+  { key: 'rolling_max', label: 'Rolling max', format: (v) => formatPct(v) },
   {
     key: 'sharpe',
     label: 'Sharpe',
