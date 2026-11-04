@@ -5,6 +5,7 @@ import { api } from '../../api';
 import PageHeader from '../../components/PageHeader';
 import { formatCompactInr, formatDate, formatInr, formatPct, formatRatio } from '../../lib/format';
 import { METRIC_PERIODS } from '../../lib/fundMetrics';
+import OverlapPanel from './panels/OverlapPanel';
 
 type MetricRow = {
   label: string;
@@ -165,6 +166,7 @@ export default function FundComparePage() {
           </div>
         )}
       </section>
+      {codes.length >= 2 && <OverlapPanel schemeCodes={codes} />}
     </>
   );
 }

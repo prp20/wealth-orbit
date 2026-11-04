@@ -1,0 +1,51 @@
+{
+  "scheme_code": "122639",
+  "managers": [
+    {"manager_name": "Rajeev Thakkar", "start_date": "2013-05-24", "end_date": null, "is_current": true},
+    {"manager_name": "Raunak Onkar", "start_date": "2013-05-24", "end_date": null, "is_current": true}
+  ],
+  "disclosures": [
+    {
+      "as_of_date": "2026-09-30",
+      "source_name": "seed",
+      "equity_pct": 0.86,
+      "debt_pct": 0.05,
+      "cash_pct": 0.09,
+      "other_pct": 0.0,
+      "holdings": [
+        {"security_name": "HDFC Bank Ltd", "isin": "INE040A01034", "sector": "Financials", "market_cap_bucket": "Large", "weight_pct": 0.078},
+        {"security_name": "Power Grid Corp", "isin": "INE752E01010", "sector": "Utilities", "market_cap_bucket": "Large", "weight_pct": 0.065},
+        {"security_name": "Bajaj Holdings", "isin": "INE118A01012", "sector": "Financials", "market_cap_bucket": "Large", "weight_pct": 0.061},
+        {"security_name": "ITC Ltd", "isin": "INE154A01025", "sector": "Consumer", "market_cap_bucket": "Large", "weight_pct": 0.055},
+        {"security_name": "Coal India", "isin": "INE522F01014", "sector": "Energy", "market_cap_bucket": "Large", "weight_pct": 0.052},
+        {"security_name": "ICICI Bank", "isin": "INE090A01021", "sector": "Financials", "market_cap_bucket": "Large", "weight_pct": 0.048},
+        {"security_name": "Axis Bank", "isin": "INE238A01034", "sector": "Financials", "market_cap_bucket": "Large", "weight_pct": 0.042},
+        {"security_name": "Maruti Suzuki", "isin": "INE585B01010", "sector": "Automobile", "market_cap_bucket": "Large", "weight_pct": 0.038},
+        {"security_name": "Infosys", "isin": "INE009A01021", "sector": "Technology", "market_cap_bucket": "Large", "weight_pct": 0.035},
+        {"security_name": "Alphabet Inc", "isin": "US02079K3059", "sector": "Technology", "market_cap_bucket": "Large", "weight_pct": 0.033},
+        {"security_name": "Microsoft Corp", "isin": "US5949181045", "sector": "Technology", "market_cap_bucket": "Large", "weight_pct": 0.031},
+        {"security_name": "Amazon.com", "isin": "US0231351067", "sector": "Consumer", "market_cap_bucket": "Large", "weight_pct": 0.028}
+      ]
+    },
+    {
+      "as_of_date": "2026-08-31",
+      "source_name": "seed",
+      "equity_pct": 0.85,
+      "debt_pct": 0.06,
+      "cash_pct": 0.09,
+      "other_pct": 0.0,
+      "holdings": [
+        {"security_name": "HDFC Bank Ltd", "isin": "INE040A01034", "sector": "Financials", "market_cap_bucket": "Large", "weight_pct": 0.081},
+        {"security_name": "Power Grid Corp", "isin": "INE752E01010", "sector": "Utilities", "market_cap_bucket": "Large", "weight_pct": 0.062},
+        {"security_name": "Bajaj Holdings", "isin": "INE118A01012", "sector": "Financials", "market_cap_bucket": "Large", "weight_pct": 0.059},
+        {"security_name": "ITC Ltd", "isin": "INE154A01025", "sector": "Consumer", "market_cap_bucket": "Large", "weight_pct": 0.057},
+        {"security_name": "Coal India", "isin": "INE522F01014", "sector": "Energy", "market_cap_bucket": "Large", "weight_pct": 0.05},
+        {"security_name": "ICICI Bank", "isin": "INE090A01021", "sector": "Financials", "market_cap_bucket": "Large", "weight_pct": 0.045},
+        {"security_name": "Axis Bank", "isin": "INE238A01034", "sector": "Financials", "market_cap_bucket": "Large", "weight_pct": 0.04},
+        {"security_name": "Maruti Suzuki", "isin": "INE585B01010", "sector": "Automobile", "market_cap_bucket": "Large", "weight_pct": 0.036},
+        {"security_name": "TCS", "isin": "INE467B01029", "sector": "Technology", "market_cap_bucket": "Large", "weight_pct": 0.034},
+        {"security_name": "Alphabet Inc", "isin": "US02079K3059", "sector": "Technology", "market_cap_bucket": "Large", "weight_pct": 0.032}
+      ]
+    }
+  ]
+}

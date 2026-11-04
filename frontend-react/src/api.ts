@@ -97,6 +97,13 @@ export const api = {
     get<any[]>(
       `/market-data/mutual-funds/compare?scheme_codes=${encodeURIComponent(codes.join(','))}&metric_period=${encodeURIComponent(metricPeriod)}`,
     ),
+  fundHoldings: (id: string, topN = 20) =>
+    get<any>(`/market-data/mutual-funds/${encodeURIComponent(id)}/holdings?top_n=${topN}`),
+  fundManagers: (id: string) => get<any>(`/market-data/mutual-funds/${encodeURIComponent(id)}/managers`),
+  fundOverlap: (codes: string[]) =>
+    get<any>(
+      `/market-data/mutual-funds/overlap?scheme_codes=${encodeURIComponent(codes.join(','))}`,
+    ),
   stocks: (params: string) => get<any[]>(`/market-data/stocks?${params}`),
   stock: (id: string) => get<any>(`/market-data/stocks/${encodeURIComponent(id)}`),
   stockHistory: (id: string, from = '', to = '') =>
