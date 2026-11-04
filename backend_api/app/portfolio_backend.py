@@ -16,11 +16,14 @@ if str(PORTFOLIO_SERVICE_ROOT) not in sys.path:
 
 from backend.models import Holding, Portfolio, Transaction, TransactionType  # noqa: E402
 from backend.mutual_fund_service import compute_metrics, has_nav_history, sync_nav  # noqa: E402
+from backend.market_data.mutual_fund_analytics import METRIC_PERIODS  # noqa: E402
 from backend.market_data.mutual_fund_sync import recompute_metrics, sync_benchmark, sync_enrichment  # noqa: E402
 from backend.reference_service import (  # noqa: E402
+    SCREEN_SORT_COLUMNS,
     filter_values,
     mutual_fund_detail,
     mutual_fund_detail_by_name,
+    mutual_fund_detail_enriched,
     mutual_fund_history,
     mutual_fund_metric_snapshots,
     mutual_fund_enrichment,
@@ -29,6 +32,9 @@ from backend.reference_service import (  # noqa: E402
     benchmark_list,
     benchmark_history,
     mutual_fund_similar,
+    mutual_fund_similar_enriched,
+    mutual_fund_screen,
+    mutual_fund_compare,
     mutual_funds,
     stock_categories,
     stock_compare,
@@ -50,9 +56,14 @@ __all__ = [
     "Holding", "Portfolio", "Transaction", "TransactionType",
     "InsufficientHoldingsError", "compute_metrics", "filter_values",
     "has_nav_history", "mutual_fund_detail", "mutual_fund_detail_by_name",
-    "mutual_fund_history", "mutual_fund_similar", "mutual_funds", "stock_categories",
+    "mutual_fund_detail_enriched", "mutual_fund_history", "mutual_fund_similar",
+    "mutual_fund_similar_enriched", "mutual_fund_screen", "mutual_fund_compare",
+    "mutual_funds", "stock_categories",
     "stock_compare", "stock_daily_metrics", "stock_detail", "stock_detail_enriched",
     "stock_fundamentals", "stock_fundamentals_summary", "stock_history", "stock_peers",
     "stock_shareholding", "stock_technical_indicators", "stocks", "sync_nav",
-    "sync_stock_fundamentals",
+    "sync_stock_fundamentals", "recompute_metrics", "sync_benchmark", "sync_enrichment",
+    "mutual_fund_metric_snapshots", "mutual_fund_enrichment", "mutual_fund_benchmark",
+    "mutual_fund_benchmark_history", "benchmark_list", "benchmark_history",
+    "METRIC_PERIODS", "SCREEN_SORT_COLUMNS",
 ]

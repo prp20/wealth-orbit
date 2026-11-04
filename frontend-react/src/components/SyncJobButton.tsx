@@ -15,17 +15,23 @@ async function pollJob(jobId: string, onUpdate: (job: SyncJob) => void): Promise
 }
 
 export default function SyncJobButton({
+  entity = 'stock',
+  id,
   symbol,
   kind,
   invalidateKeys = [],
   label = 'Sync',
 }: {
-  symbol: string;
+  entity?: 'stock' | 'fund';
+  id?: string;
+  /** @deprecated Prefer `id`; kept for stock call sites. */
+  symbol?: string;
   kind: string;
   invalidateKeys?: unknown[][];
   label?: string;
 }) {
   const queryClient = useQueryClient();
+  const entityId = id || symbol || '';
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState('');
   const [status, setStatus] = React.useState('idle');
@@ -33,8 +39,11 @@ export default function SyncJobButton({
   const rootRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
+    if (!entityId) return;
     let cancelled = false;
-    api.syncStockStatus(symbol, kind)
+    const statusPromise =
+      entity === 'fund' ? api.syncFundStatus(entityId, kind) : api.syncStockStatus(entityId, kind);
+    statusPromise
       .then((payload) => {
         if (cancelled) return;
         const failure = syncJobFailureMessage(payload.job);
@@ -45,7 +54,7 @@ export default function SyncJobButton({
     return () => {
       cancelled = true;
     };
-  }, [symbol, kind]);
+  }, [entity, entityId, kind]);
 
   React.useEffect(() => {
     if (!menuOpen) return;
@@ -62,7 +71,10 @@ export default function SyncJobButton({
     setMenuOpen(false);
     setStatus('queued');
     try {
-      const job = await api.syncStock(symbol, kind, force);
+      const job =
+        entity === 'fund'
+          ? await api.syncFundKind(entityId, kind, force)
+          : await api.syncStock(entityId, kind, force);
       setStatus(String(job.status || 'QUEUED').toLowerCase());
       const terminal = await pollJob(job.job_id, (current) => {
         const failure = syncJobFailureMessage(current);
@@ -78,7 +90,11 @@ export default function SyncJobButton({
         setError('');
       }
       await Promise.all(invalidateKeys.map((key) => queryClient.invalidateQueries({ queryKey: key })));
-      await queryClient.invalidateQueries({ queryKey: ['stock', symbol] });
+      if (entity === 'fund') {
+        await queryClient.invalidateQueries({ queryKey: ['fund', entityId] });
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ['stock', entityId] });
+      }
     } catch (err: any) {
       setStatus('failed');
       setError(err.message || 'Sync failed');
@@ -89,14 +105,14 @@ export default function SyncJobButton({
 
   return (
     <div className="panel-sync" ref={rootRef}>
-      <button type="button" disabled={busy} onClick={() => run(false)}>
+      <button type="button" disabled={busy || !entityId} onClick={() => run(false)}>
         {busy ? 'Working…' : label}
       </button>
       <div className="sync-overflow">
         <button
           type="button"
           className="sync-overflow-trigger"
-          disabled={busy}
+          disabled={busy || !entityId}
           aria-label="More sync options"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((open) => !open)}

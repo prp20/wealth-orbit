@@ -36,13 +36,25 @@ Run tests with `pytest`.
 
 ### Seed market data (Postgres / Supabase)
 
-Reference CSVs live under `data/seed/` (`indices.csv`, `stocks.csv`, `new_equity_only_updated.csv`). With `DATABASE_URL` set, bootstrap masters plus historical prices, index history, fund NAV, and Screener fundamentals:
+Reference CSVs live under `data/seed/` (`indices.csv`, `stocks.csv`, `new_equity_only_updated.csv`). With `DATABASE_URL` set, seed each asset class separately (recommended) or all together:
 
 ```bash
+# Indexes only (masters + Yahoo OHLC history)
+uv run python portfolio-service/scripts/seed/run_seed_indexes.py --data-dir data/seed
+
+# Stocks: masters + OHLC by default (fundamentals are optional / slow)
+uv run python portfolio-service/scripts/seed/run_seed_stocks.py --data-dir data/seed --limit 20
+uv run python portfolio-service/scripts/seed/run_seed_stocks.py --with-fundamentals --limit 5
+
+# Mutual funds: masters + NAV history (metrics/enrichment/benchmark stay on-demand in UI)
+uv run python portfolio-service/scripts/seed/run_seed_funds.py --data-dir data/seed --limit 10
+
+# Or orchestrate all three
 uv run python portfolio-service/scripts/seed/run_all_seeds.py --data-dir data/seed
+uv run python portfolio-service/scripts/seed/run_all_seeds.py --only stocks --with-fundamentals --limit 3
 ```
 
-Useful flags: `--dry-run`, `--limit N` (caps history/NAV/fundamentals phases), `--price-period 5y`, `--index-period max`, and `--skip-masters` / `--skip-index-history` / `--skip-prices` / `--skip-nav` / `--skip-fundamentals`.
+Useful flags: `--dry-run`, `--limit N`, `--price-period 5y`, `--index-period max`, `--skip-masters` / `--skip-history` / `--skip-prices` / `--skip-nav`, and for stocks `--with-fundamentals` (off by default).
 
 Masters-only and price-only wrappers still work:
 
