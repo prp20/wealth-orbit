@@ -21,12 +21,21 @@ def _prior(frame: pd.DataFrame, target) -> pd.Series | None:
     return None if candidates.empty else candidates.iloc[-1]
 
 
+PERIOD_DAYS = {"1M": 30, "3M": 91, "6M": 182}
+YEAR_PERIODS = {"1Y": 1, "3Y": 3, "5Y": 5, "10Y": 10}
+METRIC_PERIODS = ("1M", "3M", "6M", "1Y", "3Y", "5Y", "10Y")
+
+
 def trailing_return(frame: pd.DataFrame, years: int) -> float | None:
+    return trailing_return_days(frame, int(round(365.25 * years)))
+
+
+def trailing_return_days(frame: pd.DataFrame, days: int) -> float | None:
     data = _clean(frame)
-    if data.empty:
+    if data.empty or days <= 0:
         return None
     end = data.iloc[-1]
-    start = _prior(data, end["date"] - timedelta(days=365.25 * years))
+    start = _prior(data, end["date"] - timedelta(days=days))
     if start is None or start["date"] >= end["date"]:
         return None
     return float(end["nav"] / start["nav"] - 1)

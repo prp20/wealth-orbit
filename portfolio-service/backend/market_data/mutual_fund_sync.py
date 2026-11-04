@@ -10,7 +10,15 @@ import pandas as pd
 import psycopg2
 from psycopg2.extras import Json, execute_values
 
-from .mutual_fund_analytics import cagr, metric_snapshot, rolling_returns
+from .mutual_fund_analytics import (
+    METRIC_PERIODS,
+    PERIOD_DAYS,
+    YEAR_PERIODS,
+    cagr,
+    metric_snapshot,
+    rolling_returns,
+    trailing_return_days,
+)
 from .index_history import quote_identifier, resolve_index_history_columns
 
 
@@ -41,15 +49,28 @@ def recompute_metrics(scheme_code: str, force: bool = False, risk_free_rate: flo
                 benchmark = pd.DataFrame(cur.fetchall(), columns=["date", "nav"])
             snapshot = metric_snapshot(nav, benchmark, risk_free_rate)
             as_of = nav.iloc[-1]["date"]
-            periods = ("1Y", "3Y", "5Y", "10Y")
+            periods = METRIC_PERIODS
             for period in periods:
-                years = int(period[:-1])
-                rolling = rolling_returns(nav, years)
+                if period in PERIOD_DAYS:
+                    trailing = trailing_return_days(nav, PERIOD_DAYS[period])
+                    period_cagr = None
+                    rolling_latest = rolling_min = rolling_max = rolling_median = None
+                else:
+                    years = YEAR_PERIODS[period]
+                    trailing = snapshot.get(f"trailing_{years}y")
+                    period_cagr = cagr(nav, years)
+                    rolling = rolling_returns(nav, years)
+                    rolling_latest = float(rolling.iloc[-1]) if not rolling.empty else None
+                    rolling_min = float(rolling.min()) if not rolling.empty else None
+                    rolling_max = float(rolling.max()) if not rolling.empty else None
+                    rolling_median = float(rolling.median()) if not rolling.empty else None
+                available = trailing is not None
+                reason = None if available else f"Insufficient NAV history for {period}"
                 cur.execute("""INSERT INTO market_data.mutual_fund_metric_snapshots
                     (scheme_id,as_of_date,metric_period,current_nav,trailing_return,cagr,rolling_latest,rolling_min,rolling_max,rolling_median,standard_deviation,sharpe,sortino,maximum_drawdown,alpha,beta,benchmark_index_id,benchmark_as_of_date,observations,aligned_observations,risk_free_rate,available,reason,calculation_version)
                     VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'v1')
                     ON CONFLICT(scheme_id,as_of_date,metric_period,calculation_version) DO UPDATE SET current_nav=EXCLUDED.current_nav,trailing_return=EXCLUDED.trailing_return,cagr=EXCLUDED.cagr,rolling_latest=EXCLUDED.rolling_latest,rolling_min=EXCLUDED.rolling_min,rolling_max=EXCLUDED.rolling_max,rolling_median=EXCLUDED.rolling_median,standard_deviation=EXCLUDED.standard_deviation,sharpe=EXCLUDED.sharpe,sortino=EXCLUDED.sortino,maximum_drawdown=EXCLUDED.maximum_drawdown,alpha=EXCLUDED.alpha,beta=EXCLUDED.beta,benchmark_index_id=EXCLUDED.benchmark_index_id,benchmark_as_of_date=EXCLUDED.benchmark_as_of_date,observations=EXCLUDED.observations,aligned_observations=EXCLUDED.aligned_observations,available=EXCLUDED.available,reason=EXCLUDED.reason,updated_at=NOW()""",
-                    (scheme_id, as_of, period, snapshot["current_nav"], snapshot.get(f"trailing_{years}y"), cagr(nav, years), float(rolling.iloc[-1]) if not rolling.empty else None, float(rolling.min()) if not rolling.empty else None, float(rolling.max()) if not rolling.empty else None, float(rolling.median()) if not rolling.empty else None, snapshot["standard_deviation"], snapshot["sharpe"], snapshot["sortino"], snapshot["maximum_drawdown"], snapshot["alpha"], snapshot["beta"], benchmark_id, benchmark.iloc[-1]["date"] if benchmark is not None and not benchmark.empty else None, snapshot["observations"], snapshot["aligned_observations"], risk_free_rate, bool(snapshot.get(f"trailing_{years}y") is not None), None if snapshot.get(f"trailing_{years}y") is not None else f"Insufficient NAV history for {period}"))
+                    (scheme_id, as_of, period, snapshot["current_nav"], trailing, period_cagr, rolling_latest, rolling_min, rolling_max, rolling_median, snapshot["standard_deviation"], snapshot["sharpe"], snapshot["sortino"], snapshot["maximum_drawdown"], snapshot["alpha"], snapshot["beta"], benchmark_id, benchmark.iloc[-1]["date"] if benchmark is not None and not benchmark.empty else None, snapshot["observations"], snapshot["aligned_observations"], risk_free_rate, available, reason))
         conn.commit()
     return {"scheme_code": scheme_code, "kind": "metrics", "status": "completed", "records_processed": len(periods), "as_of_date": str(as_of), "benchmark_available": benchmark is not None and not benchmark.empty, "force": force}
 
