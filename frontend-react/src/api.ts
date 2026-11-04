@@ -89,6 +89,14 @@ export const api = {
   fundMetrics: (id: string) => get<any>(`/market-data/mutual-funds/${encodeURIComponent(id)}/metrics`),
   fundEnrichment: (id: string) => get<any[]>(`/market-data/mutual-funds/${encodeURIComponent(id)}/enrichment`),
   fundSimilar: (id: string) => get<any[]>(`/market-data/mutual-funds/${encodeURIComponent(id)}/similar`),
+  fundScreen: (params: string) =>
+    get<{ metric_period: string; total: number; limit: number; offset: number; rows: any[] }>(
+      `/market-data/mutual-funds/screen?${params}`,
+    ),
+  fundCompare: (codes: string[], metricPeriod = '1Y') =>
+    get<any[]>(
+      `/market-data/mutual-funds/compare?scheme_codes=${encodeURIComponent(codes.join(','))}&metric_period=${encodeURIComponent(metricPeriod)}`,
+    ),
   stocks: (params: string) => get<any[]>(`/market-data/stocks?${params}`),
   stock: (id: string) => get<any>(`/market-data/stocks/${encodeURIComponent(id)}`),
   stockHistory: (id: string, from = '', to = '') =>
