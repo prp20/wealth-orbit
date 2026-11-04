@@ -77,14 +77,29 @@
 .detail-eyebrow{margin:0 0 10px}
 .stock-detail>.panel,.stock-detail>.key-ratios-panel{margin-top:14px}
 .page-header{margin-bottom:clamp(24px,4vw,42px)}
+.page-header-actions-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.text-link{color:#2f6b52;font-weight:600;text-decoration:none;font-size:14px}
+.text-link:hover{text-decoration:underline}
+.primary-btn{border:0;border-radius:8px;padding:10px 14px;background:#42a87c;color:#fff;font-weight:600;cursor:pointer}
+.primary-btn:disabled{opacity:.45;cursor:not-allowed}
+.fund-screener-toolbar{grid-template-columns:minmax(180px,1.4fr) repeat(auto-fill,minmax(130px,1fr))}
+.fund-compare-toolbar{grid-template-columns:minmax(140px,180px) 1fr;align-items:end}
+.fund-compare-codes{margin:0;align-self:center}
+.fund-compare-table-wrap{max-height:min(75vh,820px)}
+.fund-compare-table th .fund-compare-name{display:block;font-weight:500;color:#55706b;font-size:12px;margin-top:4px;max-width:160px;white-space:normal;line-height:1.3}
+.fund-compare-label{font-weight:600;color:#39535a;white-space:nowrap}
+.fund-tabs{display:flex;gap:4px;margin:8px 0 18px;border-bottom:1px solid #edf1f0;overflow-x:auto}
+.fund-tabs button{border:0;background:transparent;padding:10px 14px;color:#718089;font-weight:600;font-size:14px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.fund-tabs button.active{color:#2f6b52;border-bottom-color:#42a87c}
+.fund-risk-metrics{grid-template-columns:repeat(6,minmax(0,1fr))}
 @media(max-width:900px){
-  .freshness-badges,.snapshot-metrics,.compact-metrics,.fund-key-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .freshness-badges,.snapshot-metrics,.compact-metrics,.fund-key-metrics,.fund-risk-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
   .stock-toolbar,.fund-toolbar{grid-template-columns:1fr 1fr}
   .stock-toolbar .stock-field:first-child,.fund-toolbar .stock-field:first-child{grid-column:1/-1}
   .chart-panel-controls{width:100%;justify-content:flex-start}
 }
 @media(max-width:640px){
-  .freshness-badges,.snapshot-metrics,.compact-metrics,.fund-key-metrics{grid-template-columns:1fr 1fr}
+  .freshness-badges,.snapshot-metrics,.compact-metrics,.fund-key-metrics,.fund-risk-metrics{grid-template-columns:1fr 1fr}
   .stock-price-block{text-align:left}
   .stock-toolbar,.fund-toolbar{grid-template-columns:1fr}
 }

@@ -6,6 +6,8 @@ import StockListPage from '../pages/stocks/StockListPage';
 import StockDetailPage from '../pages/stocks/StockDetailPage';
 import FundListPage from '../pages/funds/FundListPage';
 import FundDetailPage from '../pages/funds/FundDetailPage';
+import FundScreenerPage from '../pages/funds/FundScreenerPage';
+import FundComparePage from '../pages/funds/FundComparePage';
 import { formatInr } from '../lib/format';
 
 function Page({ title, subtitle, children }: { title: string; subtitle: string; children?: React.ReactNode }) {
@@ -86,8 +88,12 @@ function Shell() {
           <Route path="/portfolio" element={<PortfolioPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/mutualfunds" element={<FundListPage />} />
+          <Route path="/mutualfunds/screen" element={<FundScreenerPage />} />
+          <Route path="/mutualfunds/compare" element={<FundComparePage />} />
           <Route path="/mutualfunds/:schemeId" element={<FundDetailPage />} />
           <Route path="/mutual-funds" element={<Navigate replace to="/mutualfunds" />} />
+          <Route path="/mutual-funds/screen" element={<Navigate replace to="/mutualfunds/screen" />} />
+          <Route path="/mutual-funds/compare" element={<Navigate replace to="/mutualfunds/compare" />} />
           <Route path="/mutual-funds/:schemeId" element={<FundDetailPage />} />
           <Route path="/stocks" element={<StockListPage />} />
           <Route path="/stocks/:symbol" element={<StockDetailPage />} />

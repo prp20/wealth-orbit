@@ -52,7 +52,20 @@ export default function FundListPage() {
 
   return (
     <>
-      <PageHeader title="Mutual funds" subtitle="Browse, filter, and open a decision-ready fund view." />
+      <PageHeader
+        title="Mutual funds"
+        subtitle="Browse, filter, and open a decision-ready fund view."
+        actions={
+          <div className="page-header-actions-row">
+            <Link className="text-link" to="/mutualfunds/screen">
+              Screener
+            </Link>
+            <Link className="text-link" to="/mutualfunds/compare">
+              Compare
+            </Link>
+          </div>
+        }
+      />
       <section className="panel fund-list-panel">
         <div className="fund-toolbar">
           <label className="stock-field">
