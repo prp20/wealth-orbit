@@ -2,19 +2,64 @@ from fastapi import APIRouter, Query, HTTPException
 from datetime import date
 
 from .portfolio_backend import (filter_values, mutual_funds, mutual_fund_detail,
-    mutual_fund_detail_by_name, mutual_fund_history, stock_categories, stock_detail,
+    mutual_fund_detail_by_name, mutual_fund_detail_enriched, mutual_fund_history,
+    stock_categories, stock_detail,
     stock_detail_enriched, stock_peers, stock_compare, stock_fundamentals_summary,
     mutual_fund_metric_snapshots, mutual_fund_enrichment,
     mutual_fund_benchmark, mutual_fund_benchmark_history,
     benchmark_list, benchmark_history,
     stock_history, stocks, stock_daily_metrics, stock_fundamentals,
-    stock_shareholding, stock_technical_indicators, sync_stock_fundamentals, mutual_fund_similar,
+    stock_shareholding, stock_technical_indicators, sync_stock_fundamentals,
+    mutual_fund_similar_enriched,
     compute_metrics, has_nav_history, sync_nav, recompute_metrics, sync_benchmark, sync_enrichment)
 from .sync_queue import enqueue, get_job, list_jobs, latest_job, latest_jobs_by_kind
 
 STOCK_SYNC_KINDS = ("PRICES", "TECHNICAL", "FUNDAMENTALS", "DAILY_METRICS", "SHAREHOLDING")
+MF_SYNC_KINDS = ("MF_NAV", "MF_METRICS", "MF_BENCHMARK", "MF_ENRICHMENT")
+MF_KIND_ALIASES = {
+    "nav": "MF_NAV",
+    "metrics": "MF_METRICS",
+    "benchmark": "MF_BENCHMARK",
+    "enrichment": "MF_ENRICHMENT",
+}
 
 router = APIRouter(prefix="/market-data", tags=["market-data"])
+
+
+def _mf_sync_type(kind: str) -> str:
+    key = kind.lower().strip()
+    if key not in MF_KIND_ALIASES:
+        raise HTTPException(status_code=422, detail="invalid sync kind")
+    return MF_KIND_ALIASES[key]
+
+
+def _enqueue_mf_sync(
+    scheme_code: str,
+    kind: str,
+    force: bool,
+    from_date: date | None = None,
+    to_date: date | None = None,
+):
+    if mutual_fund_detail(scheme_code) is None:
+        raise HTTPException(status_code=404, detail="Mutual fund not found")
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(status_code=422, detail="from_date must be on or before to_date")
+    sync_type = _mf_sync_type(kind)
+    if sync_type == "MF_NAV":
+        work = lambda: sync_nav(scheme_code, force, from_date, to_date)
+    elif sync_type == "MF_METRICS":
+        if not has_nav_history(scheme_code):
+            raise HTTPException(
+                status_code=409,
+                detail="NAV history is not available. Complete a successful NAV sync before queuing metrics.",
+            )
+        work = lambda: recompute_metrics(scheme_code, force)
+    elif sync_type == "MF_BENCHMARK":
+        work = lambda: sync_benchmark(scheme_code, force)
+    else:
+        work = lambda: sync_enrichment(scheme_code, force)
+    job, created = enqueue("MUTUAL_FUND", scheme_code, sync_type, force, work)
+    return {**job, "duplicate": not created}
 
 @router.get("/sync/queue")
 def sync_queue(include_history: bool = Query(False)):
@@ -60,20 +105,24 @@ def sync_stock_status(symbol: str, kind: str = Query("fundamentals"), force: boo
     return {"status": job.get("status", "idle").lower(), "kind": kind, "job": job}
 
 @router.post("/mutual-funds/{scheme_code}/sync")
-def sync_mutual_fund(scheme_code: str, force: bool = Query(False), from_date: date | None = None, to_date: date | None = None):
-    if mutual_fund_detail(scheme_code) is None:
-        raise HTTPException(status_code=404, detail="Mutual fund not found")
-    job, created = enqueue("MUTUAL_FUND", scheme_code, "NAV", force, lambda: sync_nav(scheme_code, force, from_date, to_date))
-    return {**job, "duplicate": not created}
+def sync_mutual_fund(
+    scheme_code: str,
+    kind: str = Query("nav"),
+    force: bool = Query(False),
+    from_date: date | None = None,
+    to_date: date | None = None,
+):
+    return _enqueue_mf_sync(scheme_code, kind, force, from_date, to_date)
 
 @router.get("/mutual-funds/{scheme_code}/sync/status")
-def sync_mutual_fund_status(scheme_code: str, force: bool = Query(False)):
+def sync_mutual_fund_status(scheme_code: str, kind: str = Query("nav"), force: bool = Query(False)):
     if mutual_fund_detail(scheme_code) is None:
         raise HTTPException(status_code=404, detail="Mutual fund not found")
-    job = latest_job("MUTUAL_FUND", scheme_code, "NAV")
+    sync_type = _mf_sync_type(kind)
+    job = latest_job("MUTUAL_FUND", scheme_code, sync_type)
     if not job:
-        return {"status": "idle", "kind": "nav", "job": None}
-    return {"status": job.get("status", "idle").lower(), "kind": "nav", "job": job}
+        return {"status": "idle", "kind": kind.lower(), "job": None}
+    return {"status": job.get("status", "idle").lower(), "kind": kind.lower(), "job": job}
 
 @router.get("/mutual-funds/{scheme_code}/metrics")
 def mutual_fund_metrics(scheme_code: str):
@@ -88,7 +137,7 @@ def mutual_fund_metrics(scheme_code: str):
 @router.get("/mutual-funds/{scheme_code}/similar")
 def mutual_fund_similar_route(scheme_code: str):
     if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
-    return mutual_fund_similar(scheme_code).to_dict(orient="records")
+    return mutual_fund_similar_enriched(scheme_code)
 
 @router.get("/mutual-funds/{scheme_code}/enrichment")
 def mutual_fund_enrichment_route(scheme_code: str):
@@ -101,40 +150,43 @@ def mutual_fund_benchmark_route(scheme_code: str):
     return mutual_fund_benchmark(scheme_code) or {"available": False, "reason": "No benchmark is mapped"}
 
 @router.get("/mutual-funds/{scheme_code}/benchmark/history")
-def mutual_fund_benchmark_history_route(scheme_code: str):
+def mutual_fund_benchmark_history_route(
+    scheme_code: str,
+    from_date: date | None = None,
+    to_date: date | None = None,
+):
     if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
-    return mutual_fund_benchmark_history(scheme_code)
+    rows = mutual_fund_benchmark_history(scheme_code)
+    if from_date or to_date:
+        filtered = []
+        for row in rows:
+            value = row.get("date")
+            if value is None:
+                continue
+            as_date = value if isinstance(value, date) else date.fromisoformat(str(value)[:10])
+            if from_date and as_date < from_date:
+                continue
+            if to_date and as_date > to_date:
+                continue
+            filtered.append(row)
+        return filtered
+    return rows
 
 @router.post("/mutual-funds/{scheme_code}/sync/nav")
 def mutual_fund_nav_sync(scheme_code: str, force: bool = Query(False), from_date: date | None = None, to_date: date | None = None):
-    if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
-    if from_date and to_date and from_date > to_date:
-        raise HTTPException(status_code=422, detail="from_date must be on or before to_date")
-    job, created = enqueue("MUTUAL_FUND", scheme_code, "MF_NAV", force, lambda: sync_nav(scheme_code, force, from_date, to_date))
-    return {**job, "duplicate": not created}
+    return _enqueue_mf_sync(scheme_code, "nav", force, from_date, to_date)
 
 @router.post("/mutual-funds/{scheme_code}/sync/metrics")
 def mutual_fund_metrics_sync(scheme_code: str, force: bool = Query(False)):
-    if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
-    if not has_nav_history(scheme_code):
-        raise HTTPException(
-            status_code=409,
-            detail="NAV history is not available. Complete a successful NAV sync before queuing metrics.",
-        )
-    job, created = enqueue("MUTUAL_FUND", scheme_code, "MF_METRICS", force, lambda: recompute_metrics(scheme_code, force))
-    return {**job, "duplicate": not created}
+    return _enqueue_mf_sync(scheme_code, "metrics", force)
 
 @router.post("/mutual-funds/{scheme_code}/sync/benchmark")
 def mutual_fund_benchmark_sync(scheme_code: str, force: bool = Query(False)):
-    if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
-    job, created = enqueue("MUTUAL_FUND", scheme_code, "MF_BENCHMARK", force, lambda: sync_benchmark(scheme_code, force))
-    return {**job, "duplicate": not created}
+    return _enqueue_mf_sync(scheme_code, "benchmark", force)
 
 @router.post("/mutual-funds/{scheme_code}/sync/enrichment")
 def mutual_fund_enrichment_sync(scheme_code: str, force: bool = Query(False)):
-    if mutual_fund_detail(scheme_code) is None: raise HTTPException(status_code=404, detail="Mutual fund not found")
-    job, created = enqueue("MUTUAL_FUND", scheme_code, "MF_ENRICHMENT", force, lambda: sync_enrichment(scheme_code, force))
-    return {**job, "duplicate": not created}
+    return _enqueue_mf_sync(scheme_code, "enrichment", force)
 
 @router.get("/mutual-funds")
 def mutual_fund_list(search: str = Query(""), amc: str = Query("All"), category: str = Query("All"), subcategory: str = Query("All"), plan_type: str = Query("All"), option_type: str = Query("All")):
@@ -200,14 +252,22 @@ def stock_fundamentals_summary_route(
 
 @router.get("/mutual-funds/{scheme_code}")
 def mutual_fund_item(scheme_code: str):
-    result = mutual_fund_detail(scheme_code)
-    if result is None: return {"detail": "Mutual fund not found"}
+    sync_map = latest_jobs_by_kind("MUTUAL_FUND", scheme_code, MF_SYNC_KINDS)
+    result = mutual_fund_detail_enriched(scheme_code, sync_map)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Mutual fund not found")
     return result
 
 @router.get("/mutual-funds/by-name/{scheme_name:path}")
 def mutual_fund_by_name(scheme_name: str):
-    result = mutual_fund_detail_by_name(scheme_name)
-    if result is None: return {"detail": "Mutual fund not found"}
+    base = mutual_fund_detail_by_name(scheme_name)
+    if base is None:
+        raise HTTPException(status_code=404, detail="Mutual fund not found")
+    scheme_code = base.get("scheme_code")
+    sync_map = latest_jobs_by_kind("MUTUAL_FUND", scheme_code, MF_SYNC_KINDS)
+    result = mutual_fund_detail_enriched(scheme_code, sync_map)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Mutual fund not found")
     return result
 
 @router.get("/stocks/{symbol}/history")

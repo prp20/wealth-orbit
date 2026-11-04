@@ -119,7 +119,20 @@ export const api = {
     ),
   syncJob: (jobId: string) => get<SyncJob>(`/market-data/sync/jobs/${encodeURIComponent(jobId)}`),
   syncFund: (id: string, force: boolean) =>
-    post<any>(`/market-data/mutual-funds/${encodeURIComponent(id)}/sync?force=${force}`),
+    post<SyncJob>(`/market-data/mutual-funds/${encodeURIComponent(id)}/sync?kind=nav&force=${force}`),
+  syncFundKind: (id: string, kind: string, force: boolean) =>
+    post<SyncJob>(
+      `/market-data/mutual-funds/${encodeURIComponent(id)}/sync/${encodeURIComponent(kind)}?force=${force}`,
+    ),
+  syncFundStatus: (id: string, kind: string) =>
+    get<{ status: string; kind: string; job: SyncJob | null }>(
+      `/market-data/mutual-funds/${encodeURIComponent(id)}/sync/status?kind=${encodeURIComponent(kind)}`,
+    ),
+  fundBenchmark: (id: string) => get<any>(`/market-data/mutual-funds/${encodeURIComponent(id)}/benchmark`),
+  fundBenchmarkHistory: (id: string, from = '', to = '') =>
+    get<any[]>(
+      withDates(`/market-data/mutual-funds/${encodeURIComponent(id)}/benchmark/history`, from, to),
+    ),
   sectors: () => get<string[]>('/market-data/sectors'),
   filters: (kind: string) => get<string[]>(`/market-data/filters/${kind}`),
 };

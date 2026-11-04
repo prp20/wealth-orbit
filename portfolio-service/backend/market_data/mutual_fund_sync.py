@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 import psycopg2
@@ -93,13 +93,16 @@ def sync_benchmark(scheme_code: str, force: bool = False) -> dict:
 def sync_enrichment(scheme_code: str, force: bool = False) -> dict:
     """Fetch and persist the provider's current scheme facts.
 
-    mftool exposes stable scheme metadata (fund house, category, launch date,
-    etc.). Optional fields such as AUM/expense ratio are stored when the
-    provider supplies them; missing fields remain NULL rather than fabricated.
+    mftool/MFAPI supply scheme identity (fund house, category, launch date).
+    Optional facts (AUM, expense ratio, fund manager, exit load) come from
+    Kuvera plan details when a name/ISIN match is available. Missing optional
+    fields stay NULL rather than fabricated.
     """
-    from datetime import date
+    from .providers.kuvera_enrichment import fetch_fund_facts
+
     details = None
-    provider_errors = []
+    provider_errors: list[str] = []
+    warnings: list[dict] = []
     try:
         from mftool import Mftool
         details = Mftool().get_scheme_details(scheme_code, as_json=True)
@@ -123,23 +126,106 @@ def sync_enrichment(scheme_code: str, force: bool = False) -> dict:
             provider_errors.append(f"mfapi: {exc}")
     if not isinstance(details, dict):
         raise RuntimeError(f"No fund facts returned for {scheme_code} ({'; '.join(provider_errors)})")
+
+    scheme_name = str(details.get("scheme_name") or details.get("schemeName") or "").strip()
+    kuvera_facts = None
+    try:
+        kuvera_facts = fetch_fund_facts(scheme_name) if scheme_name else None
+        if kuvera_facts is None:
+            warnings.append({"kind": "kuvera_unmatched", "scheme_name": scheme_name or None})
+    except Exception as exc:
+        warnings.append({"kind": "kuvera_error", "error": str(exc)})
+
     with _connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT scheme_id FROM market_data.mutual_fund_reference WHERE scheme_code=%s", (scheme_code,))
+            cur.execute(
+                "SELECT scheme_id, scheme_name FROM market_data.mutual_fund_reference WHERE scheme_code=%s",
+                (scheme_code,),
+            )
             found = cur.fetchone()
             if not found:
                 raise ValueError(f"Unknown mutual-fund scheme: {scheme_code}")
-            cur.execute("SELECT source_id FROM market_data.data_sources WHERE source_name='mftool'")
+            if not scheme_name:
+                scheme_name = str(found[1] or "")
+                if scheme_name and kuvera_facts is None:
+                    try:
+                        kuvera_facts = fetch_fund_facts(scheme_name)
+                    except Exception as exc:
+                        warnings.append({"kind": "kuvera_error", "error": str(exc)})
+
+            source_name = "kuvera" if kuvera_facts else "mftool"
+            cur.execute("SELECT source_id FROM market_data.data_sources WHERE source_name=%s", (source_name,))
             source = cur.fetchone()
             if source:
                 source_id = source[0]
             else:
                 import uuid
                 source_id = uuid.uuid4()
-                cur.execute("INSERT INTO market_data.data_sources(source_id,source_name) VALUES(%s,'mftool')", (source_id,))
+                cur.execute(
+                    "INSERT INTO market_data.data_sources(source_id,source_name) VALUES(%s,%s)",
+                    (source_id, source_name),
+                )
+
             def first(*keys):
                 return next((details.get(key) for key in keys if details.get(key) not in (None, "")), None)
+
+            def as_text(value):
+                if value is None or value == "":
+                    return None
+                if isinstance(value, (dict, list)):
+                    return json.dumps(value, default=str)
+                return str(value)
+
+            def as_number(value):
+                if value is None or value == "":
+                    return None
+                if isinstance(value, (dict, list)):
+                    return None
+                try:
+                    return float(value)
+                except (TypeError, ValueError):
+                    return None
+
+            def as_start_date(value):
+                """mftool returns scheme_start_date as {'date': 'DD-MM-YYYY', 'nav': '...'}."""
+                if isinstance(value, dict):
+                    value = value.get("date") or value.get("scheme_start_date")
+                if value in (None, ""):
+                    return None
+                if isinstance(value, date):
+                    return value
+                text = str(value).strip()
+                for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y"):
+                    try:
+                        return datetime.strptime(text[:10], fmt).date()
+                    except ValueError:
+                        continue
+                return None
+
+            merged = {
+                "aum": as_number(first("aum", "fund_size", "AUM")),
+                "expense_ratio": as_number(first("expense_ratio", "expenseRatio")),
+                "exit_load": as_text(first("exit_load", "exitLoad")),
+                "yield_to_maturity": as_number(first("yield_to_maturity", "yieldToMaturity")),
+                "yield_to_maturity_unit": as_text(first("yield_to_maturity_unit")),
+                "fund_manager": as_text(first("fund_manager", "fundManager", "manager")),
+                "rating": as_text(first("rating", "star_rating")),
+                "fund_house": as_text(first("fund_house", "fundHouse")),
+                "scheme_type": as_text(first("scheme_type", "schemeType")),
+                "scheme_category": as_text(first("scheme_category", "schemeCategory")),
+                "scheme_start_date": as_start_date(first("scheme_start_date", "schemeStartDate")),
+            }
+            if kuvera_facts:
+                for key in ("aum", "expense_ratio", "exit_load", "fund_manager", "fund_house", "scheme_category", "rating"):
+                    value = kuvera_facts.get(key)
+                    if value not in (None, ""):
+                        merged[key] = value
+                start = as_start_date(kuvera_facts.get("scheme_start_date"))
+                if start is not None:
+                    merged["scheme_start_date"] = start
+
             as_of = date.today()
+            raw_payload = {"mftool": details, "kuvera": None if kuvera_facts is None else kuvera_facts.get("raw")}
             cur.execute("""INSERT INTO market_data.mutual_fund_enrichment
                 (scheme_id,as_of_date,aum,expense_ratio,exit_load,yield_to_maturity,
                  yield_to_maturity_unit,fund_manager,rating,fund_house,scheme_type,scheme_category,scheme_start_date,source_id,provider_status,
@@ -154,12 +240,27 @@ def sync_enrichment(scheme_code: str, force: bool = False) -> dict:
                  scheme_category=EXCLUDED.scheme_category,scheme_start_date=EXCLUDED.scheme_start_date,
                  provider_status='AVAILABLE',raw_payload_hash=EXCLUDED.raw_payload_hash,
                  warnings=EXCLUDED.warnings,updated_at=NOW()""",
-                (found[0], as_of, first("aum", "fund_size", "AUM"), first("expense_ratio", "expenseRatio"),
-                 first("exit_load", "exitLoad"), first("yield_to_maturity", "yieldToMaturity"),
-                 first("yield_to_maturity_unit"), first("fund_manager", "fundManager", "manager"),
-                 first("rating", "star_rating"), first("fund_house", "fundHouse"),
-                 first("scheme_type", "schemeType"), first("scheme_category", "schemeCategory"),
-                 first("scheme_start_date", "schemeStartDate"), source_id, json.dumps(details, sort_keys=True, default=str),
-                 json.dumps([], separators=(",", ":"))))
+                (found[0], as_of,
+                 merged["aum"], merged["expense_ratio"], merged["exit_load"],
+                 merged["yield_to_maturity"], merged["yield_to_maturity_unit"],
+                 merged["fund_manager"], merged["rating"], merged["fund_house"],
+                 merged["scheme_type"], merged["scheme_category"], merged["scheme_start_date"],
+                 source_id, json.dumps(raw_payload, sort_keys=True, default=str),
+                 json.dumps(warnings, separators=(",", ":"), default=str)))
         conn.commit()
-    return {"scheme_code": scheme_code, "kind": "enrichment", "status": "completed", "records_processed": 1, "force": force, "as_of_date": as_of.isoformat()}
+    return {
+        "scheme_code": scheme_code,
+        "kind": "enrichment",
+        "status": "completed",
+        "records_processed": 1,
+        "force": force,
+        "as_of_date": as_of.isoformat(),
+        "kuvera_matched": kuvera_facts is not None,
+        "fields_present": {
+            "aum": merged["aum"] is not None,
+            "expense_ratio": merged["expense_ratio"] is not None,
+            "fund_manager": merged["fund_manager"] is not None,
+            "exit_load": merged["exit_load"] is not None,
+        },
+        "warnings": warnings,
+    }
