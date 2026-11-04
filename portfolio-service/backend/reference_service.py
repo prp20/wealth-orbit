@@ -283,7 +283,7 @@ def mutual_fund_detail_enriched(scheme_code: str, last_sync_by_kind: dict | None
             "index_id": bench.get("index_id"),
         }
         latest_bench = _index_history_query(
-            lambda d, c: f"""SELECT h.{quote_identifier(d)} AS date
+            lambda d, c, _volume_expr=None: f"""SELECT h.{quote_identifier(d)} AS date
                 FROM market_data.index_daily_history h
                 JOIN market_data.mutual_fund_reference m ON m.benchmark_index_id=h.index_id
                 WHERE m.scheme_code=%s ORDER BY h.{quote_identifier(d)} DESC LIMIT 1""",
@@ -626,25 +626,37 @@ def mutual_fund_benchmark(scheme_code: str):
     return None if frame.empty else frame.iloc[0].to_dict()
 
 def mutual_fund_benchmark_history(scheme_code: str) -> list[dict]:
-    return _index_history_query(lambda d, c: f'''SELECT h.{quote_identifier(d)} AS date,h.open,h.high,h.low,h.{quote_identifier(c)} AS close,h.volume
+    return _index_history_query(
+        lambda d, c, volume_expr: f'''SELECT h.{quote_identifier(d)} AS date,h.open,h.high,h.low,h.{quote_identifier(c)} AS close,{volume_expr}
         FROM market_data.index_daily_history h
         JOIN market_data.mutual_fund_reference m ON m.benchmark_index_id=h.index_id
-        WHERE m.scheme_code=%s ORDER BY h.{quote_identifier(d)}''', (scheme_code,)).to_dict(orient="records")
+        WHERE m.scheme_code=%s ORDER BY h.{quote_identifier(d)}''',
+        (scheme_code,),
+    ).to_dict(orient="records")
 
 def benchmark_list() -> list[dict]:
     return _query("SELECT index_id,index_code,index_name FROM market_data.index_reference ORDER BY index_name").to_dict(orient="records")
 
 def benchmark_history(index_code: str) -> list[dict]:
-    return _index_history_query(lambda d, c: f'''SELECT h.{quote_identifier(d)} AS date,h.open,h.high,h.low,h.{quote_identifier(c)} AS close,h.volume
+    return _index_history_query(
+        lambda d, c, volume_expr: f'''SELECT h.{quote_identifier(d)} AS date,h.open,h.high,h.low,h.{quote_identifier(c)} AS close,{volume_expr}
         FROM market_data.index_daily_history h JOIN market_data.index_reference i ON i.index_id=h.index_id
-        WHERE i.index_code=%s ORDER BY h.{quote_identifier(d)}''', (index_code,)).to_dict(orient="records")
+        WHERE i.index_code=%s ORDER BY h.{quote_identifier(d)}''',
+        (index_code,),
+    ).to_dict(orient="records")
 
 
 def _index_history_query(sql_builder, params=()) -> pd.DataFrame:
     with psycopg2.connect(os.environ["DATABASE_URL"], connect_timeout=15) as connection:
         with connection.cursor() as cursor:
             date_column, close_column = resolve_index_history_columns(cursor)
-            cursor.execute(sql_builder(date_column, close_column), params)
+            cursor.execute(
+                """SELECT 1 FROM information_schema.columns
+                   WHERE table_schema='market_data' AND table_name='index_daily_history'
+                     AND column_name='volume' LIMIT 1"""
+            )
+            volume_expr = "h.volume" if cursor.fetchone() else "NULL::bigint AS volume"
+            cursor.execute(sql_builder(date_column, close_column, volume_expr), params)
             columns = [item[0] for item in cursor.description]
             frame = pd.DataFrame(cursor.fetchall(), columns=columns)
             return frame.astype(object).where(pd.notnull(frame), None)
