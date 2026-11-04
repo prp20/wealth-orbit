@@ -5,7 +5,6 @@ import { api } from '../../api';
 import SyncJobButton from '../../components/SyncJobButton';
 import ChartToolbar, { ChartRange } from '../../components/ChartToolbar';
 import FundNavChart from '../../components/FundNavChart';
-import InsightsPanel from '../stocks/panels/InsightsPanel';
 import FundHeader from './panels/FundHeader';
 import KeyMetricsPanel from './panels/KeyMetricsPanel';
 import PerformancePanel from './panels/PerformancePanel';
@@ -101,7 +100,6 @@ export default function FundDetailPage() {
 
       {tab === 'overview' && (
         <>
-          <InsightsPanel items={[]} />
           <KeyMetricsPanel schemeId={schemeId} fund={detail} />
           <FundFactsPanel schemeId={schemeId} fund={detail} />
         </>

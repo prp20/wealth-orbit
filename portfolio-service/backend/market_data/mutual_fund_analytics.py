@@ -24,6 +24,16 @@ def _prior(frame: pd.DataFrame, target) -> pd.Series | None:
 PERIOD_DAYS = {"1M": 30, "3M": 91, "6M": 182}
 YEAR_PERIODS = {"1Y": 1, "3Y": 3, "5Y": 5, "10Y": 10}
 METRIC_PERIODS = ("1M", "3M", "6M", "1Y", "3Y", "5Y", "10Y")
+# Prefer standard year periods when picking a single "latest" snapshot row.
+METRIC_PERIOD_RANK = ("1Y", "3Y", "5Y", "10Y", "6M", "3M", "1M")
+
+
+def metric_period_rank_sql(column: str = "x.metric_period") -> str:
+    """SQL CASE expression: lower rank = preferred period for DISTINCT ON / ORDER BY."""
+    whens = " ".join(
+        f"WHEN '{period}' THEN {index}" for index, period in enumerate(METRIC_PERIOD_RANK)
+    )
+    return f"CASE {column} {whens} ELSE 99 END"
 
 
 def trailing_return(frame: pd.DataFrame, years: int) -> float | None:

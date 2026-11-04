@@ -4,9 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api';
 import PageHeader from '../../components/PageHeader';
 import { formatCompactInr, formatPct, formatRatio } from '../../lib/format';
+import { METRIC_PERIODS, SCREEN_SORT_OPTIONS } from '../../lib/fundMetrics';
 
 const PAGE_SIZE = 50;
-const METRIC_PERIODS = ['1M', '3M', '6M', '1Y', '3Y', '5Y', '10Y'] as const;
 const MAX_COMPARE = 10;
 
 function toFraction(percentInput: string): string | undefined {
@@ -32,6 +32,8 @@ export default function FundScreenerPage() {
   const [maxDdPct, setMaxDdPct] = React.useState('');
   const [maxExpensePct, setMaxExpensePct] = React.useState('');
   const [minAumCr, setMinAumCr] = React.useState('');
+  const [sortBy, setSortBy] = React.useState('trailing_return');
+  const [sortDir, setSortDir] = React.useState('desc');
   const [offset, setOffset] = React.useState(0);
   const [selected, setSelected] = React.useState<string[]>([]);
 
@@ -55,6 +57,8 @@ export default function FundScreenerPage() {
     maxDdPct,
     maxExpensePct,
     minAumCr,
+    sortBy,
+    sortDir,
   ]);
 
   const amcs = useQuery({ queryKey: ['filters', 'amc'], queryFn: () => api.filters('amc') });
@@ -73,6 +77,8 @@ export default function FundScreenerPage() {
       plan_type: planType,
       option_type: optionType,
       metric_period: metricPeriod,
+      sort_by: sortBy,
+      sort_dir: sortDir,
       limit: String(PAGE_SIZE),
       offset: String(offset),
     });
@@ -101,6 +107,8 @@ export default function FundScreenerPage() {
     maxDdPct,
     maxExpensePct,
     minAumCr,
+    sortBy,
+    sortDir,
     offset,
   ]);
 
@@ -268,6 +276,23 @@ export default function FundScreenerPage() {
               value={minAumCr}
               onChange={(event) => setMinAumCr(event.target.value)}
             />
+          </label>
+          <label className="stock-field">
+            <span>Sort by</span>
+            <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+              {SCREEN_SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="stock-field">
+            <span>Sort dir</span>
+            <select value={sortDir} onChange={(event) => setSortDir(event.target.value)}>
+              <option value="desc">Desc</option>
+              <option value="asc">Asc</option>
+            </select>
           </label>
         </div>
 

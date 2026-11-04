@@ -5,9 +5,20 @@ import psycopg2
 from psycopg2.extras import register_uuid
 from dotenv import load_dotenv
 from .market_data.index_history import quote_identifier, resolve_index_history_columns
+from .market_data.mutual_fund_analytics import METRIC_PERIODS, metric_period_rank_sql
 
 load_dotenv()
 register_uuid()
+
+SCREEN_SORT_COLUMNS = {
+    "scheme_name": "scheme_name",
+    "trailing_return": "trailing_return",
+    "cagr": "cagr",
+    "sharpe": "sharpe",
+    "maximum_drawdown": "maximum_drawdown",
+    "aum": "aum",
+    "expense_ratio": "expense_ratio",
+}
 
 
 def _query(sql: str, params=()) -> pd.DataFrame:
@@ -254,13 +265,14 @@ def mutual_fund_detail_enriched(scheme_code: str, last_sync_by_kind: dict | None
         (scheme_code,),
     )
     metrics_frame = _query(
-        """SELECT x.as_of_date, x.metric_period, x.current_nav, x.trailing_return, x.cagr,
+        f"""SELECT x.as_of_date, x.metric_period, x.current_nav, x.trailing_return, x.cagr,
                   x.standard_deviation, x.sharpe, x.sortino, x.maximum_drawdown, x.alpha, x.beta,
-                  x.available, x.reason
+                  x.observations, x.aligned_observations, x.risk_free_rate, x.calculation_version,
+                  x.benchmark_as_of_date, x.available, x.reason
            FROM market_data.mutual_fund_metric_snapshots x
            JOIN market_data.mutual_fund_reference m ON m.scheme_id=x.scheme_id
            WHERE m.scheme_code=%s
-           ORDER BY x.available DESC, x.as_of_date DESC, x.metric_period
+           ORDER BY x.available DESC, x.as_of_date DESC, {metric_period_rank_sql("x.metric_period")}
            LIMIT 1""",
         (scheme_code,),
     )
@@ -323,8 +335,9 @@ def mutual_fund_similar_enriched(scheme_code: str) -> list[dict]:
     """Similar funds with latest metric snapshot columns in one batch query."""
     if mutual_fund_detail(scheme_code) is None:
         return []
+    period_rank = metric_period_rank_sql("x.metric_period")
     frame = _query(
-        """WITH peers AS (
+        f"""WITH peers AS (
               SELECT m2.scheme_id, m2.scheme_code, m2.scheme_name, a.amc_name,
                      c.category_name, s.subcategory_name, m2.plan_type, m2.option_type
               FROM market_data.mutual_fund_reference m1
@@ -340,7 +353,7 @@ def mutual_fund_similar_enriched(scheme_code: str) -> list[dict]:
                      x.scheme_id, x.current_nav, x.cagr, x.trailing_return, x.sharpe
               FROM market_data.mutual_fund_metric_snapshots x
               JOIN peers p ON p.scheme_id=x.scheme_id
-              ORDER BY x.scheme_id, x.available DESC, x.as_of_date DESC, x.metric_period
+              ORDER BY x.scheme_id, x.available DESC, x.as_of_date DESC, {period_rank}
             ),
             latest_nav AS (
               SELECT DISTINCT ON (h.scheme_id)
@@ -362,9 +375,6 @@ def mutual_fund_similar_enriched(scheme_code: str) -> list[dict]:
     return frame.to_dict(orient="records")
 
 
-MF_SCREEN_PERIODS = ("1M", "3M", "6M", "1Y", "3Y", "5Y", "10Y")
-
-
 def mutual_fund_screen(
     search: str = "",
     amc: str = "All",
@@ -381,16 +391,25 @@ def mutual_fund_screen(
     max_aum: float | None = None,
     max_expense_ratio: float | None = None,
     require_metrics: bool = False,
+    sort_by: str = "scheme_name",
+    sort_dir: str = "asc",
     limit: int = 50,
     offset: int = 0,
 ) -> dict:
     """Batch screener over identity + latest enrichment + latest metric snapshot."""
-    if metric_period not in MF_SCREEN_PERIODS:
+    if metric_period not in METRIC_PERIODS:
         raise ValueError(f"invalid metric_period: {metric_period}")
+    sort_column = SCREEN_SORT_COLUMNS.get(sort_by)
+    if not sort_column:
+        raise ValueError(f"invalid sort_by: {sort_by}")
+    direction = "DESC" if str(sort_dir).lower() == "desc" else "ASC"
+    # Numeric sorts put nulls last so ranked results stay useful.
+    nulls = "NULLS LAST" if sort_column != "scheme_name" else ""
+    order_sql = f"{sort_column} {direction} {nulls}".strip()
     limit = max(1, min(int(limit), 100))
     offset = max(0, int(offset))
     frame = _query(
-        """WITH schemes AS (
+        f"""WITH schemes AS (
               SELECT m.scheme_id, m.scheme_code, m.scheme_name, a.amc_name,
                      c.category_name, s.subcategory_name, m.plan_type, m.option_type
               FROM market_data.mutual_fund_reference m
@@ -451,7 +470,7 @@ def mutual_fund_screen(
               AND (%s IS NULL OR aum >= %s)
               AND (%s IS NULL OR aum <= %s)
               AND (%s IS NULL OR expense_ratio <= %s)
-            ORDER BY scheme_name
+            ORDER BY {order_sql}
             LIMIT %s OFFSET %s""",
         (
             search, f"%{search}%", f"%{search}%",
@@ -479,7 +498,7 @@ def mutual_fund_screen(
 
 def mutual_fund_compare(scheme_codes: list[str], metric_period: str = "1Y") -> list[dict]:
     """Batch compare funds for one metric period."""
-    if metric_period not in MF_SCREEN_PERIODS:
+    if metric_period not in METRIC_PERIODS:
         raise ValueError(f"invalid metric_period: {metric_period}")
     codes = [str(code).strip() for code in scheme_codes if str(code).strip()]
     if not codes:
@@ -589,12 +608,17 @@ def mutual_fund_history(scheme_code: str, from_date=None, to_date=None) -> pd.Da
     return _query("SELECT h.nav_date AS date,h.nav FROM market_data.mutual_fund_nav_history h JOIN market_data.mutual_fund_reference m ON m.scheme_id=h.scheme_id WHERE m.scheme_code=%s AND (%s IS NULL OR h.nav_date >= %s) AND (%s IS NULL OR h.nav_date <= %s) ORDER BY h.nav_date", (scheme_code, from_date, from_date, to_date, to_date))
 
 def mutual_fund_metric_snapshots(scheme_code: str) -> list[dict]:
-    frame = _query("""SELECT x.as_of_date,x.metric_period,x.current_nav,x.trailing_return,x.cagr,
+    frame = _query(
+        f"""SELECT x.as_of_date,x.metric_period,x.current_nav,x.trailing_return,x.cagr,
+        x.rolling_latest,x.rolling_min,x.rolling_max,x.rolling_median,
         x.standard_deviation,x.sharpe,x.sortino,x.maximum_drawdown,x.alpha,x.beta,
         x.observations,x.aligned_observations,x.available,x.reason,x.calculation_version
         FROM market_data.mutual_fund_metric_snapshots x
         JOIN market_data.mutual_fund_reference m ON m.scheme_id=x.scheme_id
-        WHERE m.scheme_code=%s ORDER BY x.as_of_date DESC,x.metric_period""", (scheme_code,))
+        WHERE m.scheme_code=%s
+        ORDER BY x.as_of_date DESC, {metric_period_rank_sql("x.metric_period")}""",
+        (scheme_code,),
+    )
     return frame.to_dict(orient="records")
 
 def mutual_fund_enrichment(scheme_code: str) -> list[dict]:

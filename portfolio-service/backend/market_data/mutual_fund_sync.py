@@ -66,11 +66,19 @@ def recompute_metrics(scheme_code: str, force: bool = False, risk_free_rate: flo
                     rolling_median = float(rolling.median()) if not rolling.empty else None
                 available = trailing is not None
                 reason = None if available else f"Insufficient NAV history for {period}"
+                # Short periods store trailing only; do not copy full-history risk onto 1M/3M/6M rows.
+                is_short = period in PERIOD_DAYS
+                risk_std = None if is_short else snapshot["standard_deviation"]
+                risk_sharpe = None if is_short else snapshot["sharpe"]
+                risk_sortino = None if is_short else snapshot["sortino"]
+                risk_dd = None if is_short else snapshot["maximum_drawdown"]
+                risk_alpha = None if is_short else snapshot["alpha"]
+                risk_beta = None if is_short else snapshot["beta"]
                 cur.execute("""INSERT INTO market_data.mutual_fund_metric_snapshots
                     (scheme_id,as_of_date,metric_period,current_nav,trailing_return,cagr,rolling_latest,rolling_min,rolling_max,rolling_median,standard_deviation,sharpe,sortino,maximum_drawdown,alpha,beta,benchmark_index_id,benchmark_as_of_date,observations,aligned_observations,risk_free_rate,available,reason,calculation_version)
                     VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'v1')
                     ON CONFLICT(scheme_id,as_of_date,metric_period,calculation_version) DO UPDATE SET current_nav=EXCLUDED.current_nav,trailing_return=EXCLUDED.trailing_return,cagr=EXCLUDED.cagr,rolling_latest=EXCLUDED.rolling_latest,rolling_min=EXCLUDED.rolling_min,rolling_max=EXCLUDED.rolling_max,rolling_median=EXCLUDED.rolling_median,standard_deviation=EXCLUDED.standard_deviation,sharpe=EXCLUDED.sharpe,sortino=EXCLUDED.sortino,maximum_drawdown=EXCLUDED.maximum_drawdown,alpha=EXCLUDED.alpha,beta=EXCLUDED.beta,benchmark_index_id=EXCLUDED.benchmark_index_id,benchmark_as_of_date=EXCLUDED.benchmark_as_of_date,observations=EXCLUDED.observations,aligned_observations=EXCLUDED.aligned_observations,available=EXCLUDED.available,reason=EXCLUDED.reason,updated_at=NOW()""",
-                    (scheme_id, as_of, period, snapshot["current_nav"], trailing, period_cagr, rolling_latest, rolling_min, rolling_max, rolling_median, snapshot["standard_deviation"], snapshot["sharpe"], snapshot["sortino"], snapshot["maximum_drawdown"], snapshot["alpha"], snapshot["beta"], benchmark_id, benchmark.iloc[-1]["date"] if benchmark is not None and not benchmark.empty else None, snapshot["observations"], snapshot["aligned_observations"], risk_free_rate, available, reason))
+                    (scheme_id, as_of, period, snapshot["current_nav"], trailing, period_cagr, rolling_latest, rolling_min, rolling_max, rolling_median, risk_std, risk_sharpe, risk_sortino, risk_dd, risk_alpha, risk_beta, benchmark_id, benchmark.iloc[-1]["date"] if benchmark is not None and not benchmark.empty else None, snapshot["observations"], snapshot["aligned_observations"], risk_free_rate, available, reason))
         conn.commit()
     return {"scheme_code": scheme_code, "kind": "metrics", "status": "completed", "records_processed": len(periods), "as_of_date": str(as_of), "benchmark_available": benchmark is not None and not benchmark.empty, "force": force}
 

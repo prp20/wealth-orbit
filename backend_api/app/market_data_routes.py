@@ -11,9 +11,8 @@ from .portfolio_backend import (filter_values, mutual_funds, mutual_fund_detail,
     stock_history, stocks, stock_daily_metrics, stock_fundamentals,
     stock_shareholding, stock_technical_indicators, sync_stock_fundamentals,
     mutual_fund_similar_enriched, mutual_fund_screen, mutual_fund_compare,
-    compute_metrics, has_nav_history, sync_nav, recompute_metrics, sync_benchmark, sync_enrichment)
-
-MF_SCREEN_PERIODS = ("1M", "3M", "6M", "1Y", "3Y", "5Y", "10Y")
+    compute_metrics, has_nav_history, sync_nav, recompute_metrics, sync_benchmark, sync_enrichment,
+    METRIC_PERIODS, SCREEN_SORT_COLUMNS)
 from .sync_queue import enqueue, get_job, list_jobs, latest_job, latest_jobs_by_kind
 
 STOCK_SYNC_KINDS = ("PRICES", "TECHNICAL", "FUNDAMENTALS", "DAILY_METRICS", "SHAREHOLDING")
@@ -211,11 +210,18 @@ def mutual_fund_screen_route(
     max_aum: float | None = Query(None),
     max_expense_ratio: float | None = Query(None),
     require_metrics: bool = Query(False),
+    sort_by: str = Query("scheme_name"),
+    sort_dir: str = Query("asc"),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
-    if metric_period not in MF_SCREEN_PERIODS:
-        raise HTTPException(status_code=422, detail=f"metric_period must be one of {', '.join(MF_SCREEN_PERIODS)}")
+    if metric_period not in METRIC_PERIODS:
+        raise HTTPException(status_code=422, detail=f"metric_period must be one of {', '.join(METRIC_PERIODS)}")
+    if sort_by not in SCREEN_SORT_COLUMNS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"sort_by must be one of {', '.join(SCREEN_SORT_COLUMNS)}",
+        )
     try:
         return mutual_fund_screen(
             search=search,
@@ -233,6 +239,8 @@ def mutual_fund_screen_route(
             max_aum=max_aum,
             max_expense_ratio=max_expense_ratio,
             require_metrics=require_metrics,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
             limit=limit,
             offset=offset,
         )
@@ -249,8 +257,8 @@ def mutual_fund_compare_route(
         raise HTTPException(status_code=422, detail="scheme_codes is required")
     if len(parts) > 10:
         raise HTTPException(status_code=422, detail="compare at most 10 schemes")
-    if metric_period not in MF_SCREEN_PERIODS:
-        raise HTTPException(status_code=422, detail=f"metric_period must be one of {', '.join(MF_SCREEN_PERIODS)}")
+    if metric_period not in METRIC_PERIODS:
+        raise HTTPException(status_code=422, detail=f"metric_period must be one of {', '.join(METRIC_PERIODS)}")
     try:
         rows = mutual_fund_compare(parts, metric_period=metric_period)
     except ValueError as exc:

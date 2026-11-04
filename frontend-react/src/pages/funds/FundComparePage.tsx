@@ -4,8 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api';
 import PageHeader from '../../components/PageHeader';
 import { formatCompactInr, formatDate, formatInr, formatPct, formatRatio } from '../../lib/format';
-
-const METRIC_PERIODS = ['1M', '3M', '6M', '1Y', '3Y', '5Y', '10Y'] as const;
+import { METRIC_PERIODS } from '../../lib/fundMetrics';
 
 type MetricRow = {
   label: string;
@@ -33,6 +32,12 @@ export default function FundComparePage() {
   });
 
   const funds = compare.data || [];
+  const planTypes = new Set(funds.map((f: any) => f.plan_type).filter(Boolean));
+  const asOfDates = new Set(
+    funds.map((f: any) => f.metrics?.as_of_date).filter(Boolean).map((d: unknown) => String(d).slice(0, 10)),
+  );
+  const mixedPlans = planTypes.size > 1;
+  const mixedAsOf = asOfDates.size > 1;
 
   const setPeriod = (period: string) => {
     const next = new URLSearchParams(searchParams);
@@ -49,13 +54,14 @@ export default function FundComparePage() {
           ? `${formatInr(f.latest_nav.nav)} (${formatDate(f.latest_nav.date)})`
           : '—',
     },
+    { label: 'Metrics as of', value: (f) => formatDate(f.metrics?.as_of_date) },
     { label: 'Trailing return', value: (f) => formatPct(f.metrics?.trailing_return) },
     { label: 'CAGR', value: (f) => formatPct(f.metrics?.cagr) },
     { label: 'Std deviation', value: (f) => formatPct(f.metrics?.standard_deviation) },
     { label: 'Sharpe', value: (f) => formatRatio(f.metrics?.sharpe) },
     { label: 'Sortino', value: (f) => formatRatio(f.metrics?.sortino) },
     { label: 'Max drawdown', value: (f) => formatPct(f.metrics?.maximum_drawdown) },
-    { label: 'Alpha', value: (f) => formatPct(f.metrics?.alpha) },
+    { label: 'Alpha', value: (f) => formatRatio(f.metrics?.alpha) },
     { label: 'Beta', value: (f) => formatRatio(f.metrics?.beta) },
     { label: 'AUM', value: (f) => formatCompactInr(f.enrichment?.aum) },
     { label: 'Expense ratio', value: (f) => formatPct(f.enrichment?.expense_ratio) },
@@ -120,6 +126,13 @@ export default function FundComparePage() {
         )}
         {codes.length > 0 && !compare.isLoading && !funds.length && (
           <div className="empty">No matching schemes found for the selected codes.</div>
+        )}
+
+        {funds.length > 0 && (mixedPlans || mixedAsOf) && (
+          <div className="empty" style={{ marginBottom: 12 }}>
+            {mixedPlans ? 'Selected schemes mix plan types (e.g. Direct vs Regular) — compare carefully. ' : ''}
+            {mixedAsOf ? 'Metric as-of dates differ across columns — observation windows are not fully aligned.' : ''}
+          </div>
         )}
 
         {funds.length > 0 && (

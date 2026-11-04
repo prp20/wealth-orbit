@@ -1,8 +1,13 @@
 import SyncJobButton from '../../../components/SyncJobButton';
-import { formatPct, formatRatio } from '../../../lib/format';
+import { formatDate, formatPct, formatRatio } from '../../../lib/format';
 
 export default function RiskPanel({ schemeId, fund }: { schemeId: string; fund: any }) {
   const metrics = fund?.latest_metrics;
+  const benchmark = fund?.benchmark;
+  const observations = metrics?.observations;
+  const aligned = metrics?.aligned_observations;
+  const missingAligned =
+    observations != null && aligned != null ? Math.max(0, Number(observations) - Number(aligned)) : null;
 
   return (
     <section className="panel">
@@ -10,9 +15,9 @@ export default function RiskPanel({ schemeId, fund }: { schemeId: string; fund: 
         <div>
           <h2>Risk</h2>
           <p className="panel-subtitle">
-            Risk columns use daily returns over full available NAV history (annualized with √252). Risk-free
-            rate and calculation version come from the latest metrics snapshot. Short periods (1M/3M/6M)
-            store trailing return only — they do not change these risk tiles.
+            Daily NAV returns over the full available history (annualized with √252). Alpha/Beta require a
+            mapped benchmark with aligned index history. Short periods (1M/3M/6M) store trailing return only
+            and do not change these tiles.
           </p>
         </div>
         <SyncJobButton
@@ -49,7 +54,18 @@ export default function RiskPanel({ schemeId, fund }: { schemeId: string; fund: 
         </div>
       </section>
       <p className="panel-subtitle" style={{ marginTop: 12 }}>
-        As of {metrics?.as_of_date || '—'}
+        As of {formatDate(metrics?.as_of_date)}
+        {benchmark?.available
+          ? ` · Benchmark ${benchmark.index_name || benchmark.index_code}`
+          : ' · Benchmark unmapped'}
+        {metrics?.benchmark_as_of_date
+          ? ` (bench as of ${formatDate(metrics.benchmark_as_of_date)})`
+          : ''}
+        {observations != null ? ` · Lookback ${observations} daily obs` : ''}
+        {aligned != null ? ` · Aligned ${aligned}` : ''}
+        {missingAligned != null && missingAligned > 0
+          ? ` · Missing aligned days ${missingAligned} (dropped before alpha/beta)`
+          : ''}
         {metrics?.risk_free_rate != null ? ` · Rf ${formatPct(metrics.risk_free_rate)}` : ''}
         {metrics?.calculation_version != null ? ` · calc ${metrics.calculation_version}` : ''}
         {metrics?.available === false && metrics?.reason ? ` · ${metrics.reason}` : ''}
