@@ -8,6 +8,7 @@ const FAMILIES: { title: string; match: (code: string) => boolean }[] = [
   { title: 'SMA / EMA', match: (code) => code.startsWith('SMA') || code.startsWith('EMA') },
   { title: 'MACD', match: (code) => code.startsWith('MACD') },
   { title: 'Bollinger', match: (code) => code.startsWith('BB') || code.includes('BOLL') },
+  { title: 'ATR', match: (code) => code.startsWith('ATR') },
 ];
 
 function latestBySeries(rows: any[]) {
@@ -35,7 +36,10 @@ export default function TechnicalsPanel({ symbol }: { symbol: string }) {
       <div className="panel-heading">
         <div>
           <h2>Technicals</h2>
-          <p className="panel-subtitle">Latest cached indicator values by family.</p>
+          <p className="panel-subtitle">
+            Core indicators (SMA/EMA, RSI, MACD, Bollinger, ATR) derived from stored OHLCV. Source:
+            derived.
+          </p>
         </div>
         <SyncJobButton
           symbol={symbol}

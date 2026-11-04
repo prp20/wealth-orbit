@@ -51,6 +51,7 @@ from backend.reference_service import (  # noqa: E402
     stock_peers,
     stock_shareholding,
     stock_technical_indicators,
+    stock_valuation,
     stocks,
     sync_stock_fundamentals,
 )
@@ -66,7 +67,7 @@ __all__ = [
     "mutual_funds", "stock_categories",
     "stock_compare", "stock_daily_metrics", "stock_detail", "stock_detail_enriched",
     "stock_fundamentals", "stock_fundamentals_summary", "stock_history", "stock_peers",
-    "stock_shareholding", "stock_technical_indicators", "stocks", "sync_nav",
+    "stock_shareholding", "stock_technical_indicators", "stock_valuation", "stocks", "sync_nav",
     "sync_stock_fundamentals", "recompute_metrics", "sync_benchmark", "sync_enrichment",
     "sync_holdings", "sync_managers",
     "mutual_fund_metric_snapshots", "mutual_fund_enrichment", "mutual_fund_benchmark",

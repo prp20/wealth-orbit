@@ -5,6 +5,7 @@ from .portfolio_backend import (filter_values, mutual_funds, mutual_fund_detail,
     mutual_fund_detail_by_name, mutual_fund_detail_enriched, mutual_fund_history,
     stock_categories, stock_detail,
     stock_detail_enriched, stock_peers, stock_compare, stock_fundamentals_summary,
+    stock_valuation,
     mutual_fund_metric_snapshots, mutual_fund_enrichment,
     mutual_fund_benchmark, mutual_fund_benchmark_history,
     benchmark_list, benchmark_history,
@@ -348,6 +349,13 @@ def stock_item(symbol: str):
 @router.get("/stocks/{symbol}/peers")
 def stock_peers_route(symbol: str, by: str = Query("sector"), limit: int = Query(8, ge=1, le=20)):
     result = stock_peers(symbol, by=by, limit=limit)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Stock not found")
+    return result
+
+@router.get("/stocks/{symbol}/valuation")
+def stock_valuation_route(symbol: str):
+    result = stock_valuation(symbol)
     if result is None:
         raise HTTPException(status_code=404, detail="Stock not found")
     return result
