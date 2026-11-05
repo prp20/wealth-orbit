@@ -1,14 +1,16 @@
 import React from 'react';
-import { Link, NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
+import LoginPage from '../pages/LoginPage';
 import StockListPage from '../pages/stocks/StockListPage';
 import StockDetailPage from '../pages/stocks/StockDetailPage';
 import FundListPage from '../pages/funds/FundListPage';
 import FundDetailPage from '../pages/funds/FundDetailPage';
 import FundScreenerPage from '../pages/funds/FundScreenerPage';
 import FundComparePage from '../pages/funds/FundComparePage';
-import { formatInr } from '../lib/format';
+import DashboardPage from '../pages/DashboardPage';
+import PortfolioPage from '../pages/PortfolioPage';
 
 function Page({ title, subtitle, children }: { title: string; subtitle: string; children?: React.ReactNode }) {
   return (
@@ -62,8 +64,35 @@ function Table({ rows, linkKey, linkBase }: { rows: any[]; linkKey?: string; lin
   );
 }
 
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const account = useQuery({ queryKey: ['auth-me'], queryFn: api.authMe, retry: false });
+  if (account.isLoading) return <div className="loading">Loading account…</div>;
+  if (!account.data?.signed_in) {
+    const next = encodeURIComponent(location.pathname);
+    return <Navigate replace to={`/login?next=${next}`} />;
+  }
+  return <>{children}</>;
+}
+
 function Shell() {
-  const portfolios = useQuery({ queryKey: ['portfolios'], queryFn: api.portfolios });
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  const account = useQuery({ queryKey: ['auth-me'], queryFn: api.authMe, retry: false });
+  const signedIn = account.data?.signed_in === true;
+
+  const logout = async () => {
+    const onLedger = location.pathname === '/portfolio' || location.pathname === '/transactions';
+    await api.authLogout();
+    queryClient.removeQueries({ queryKey: ['auth-me'] });
+    queryClient.removeQueries({ queryKey: ['portfolios'] });
+    queryClient.removeQueries({ queryKey: ['holdings'] });
+    queryClient.removeQueries({ queryKey: ['transactions'] });
+    if (onLedger) {
+      window.location.replace('/ui/');
+    }
+  };
+
   return (
     <div className="shell">
       <aside>
@@ -71,22 +100,31 @@ function Shell() {
           wealth<span>orbit</span>
           <small>Investment workspace</small>
         </div>
-        <div className="owner">
-          {portfolios.data?.[0]?.user_name || 'Portfolio owner'}
-          <small>Personal portfolio</small>
-        </div>
         <nav>
-          <NavLink to="/portfolio">Portfolio</NavLink>
-          <NavLink to="/transactions">Transactions</NavLink>
+          <NavLink to="/" end>Dashboard</NavLink>
+          {signedIn && <NavLink to="/portfolio">Portfolio</NavLink>}
+          {signedIn && <NavLink to="/transactions">Transactions</NavLink>}
           <NavLink to="/mutualfunds">Mutual funds</NavLink>
           <NavLink to="/stocks">Stocks</NavLink>
         </nav>
+        <div className="account-footer">
+          {signedIn ? (
+            <>
+              <strong>{account.data?.full_name || 'Portfolio owner'}</strong>
+              <small>Personal portfolio</small>
+              <button type="button" onClick={logout}>Log out</button>
+            </>
+          ) : (
+            <NavLink to="/login">Sign in</NavLink>
+          )}
+        </div>
       </aside>
       <main>
         <Routes>
-          <Route path="/" element={<Navigate replace to="/portfolio" />} />
-          <Route path="/portfolio" element={<PortfolioPage />} />
-          <Route path="/transactions" element={<TransactionsPage />} />
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/portfolio" element={<RequireAuth><PortfolioPage /></RequireAuth>} />
+          <Route path="/transactions" element={<RequireAuth><TransactionsPage /></RequireAuth>} />
           <Route path="/mutualfunds" element={<FundListPage />} />
           <Route path="/mutualfunds/screen" element={<FundScreenerPage />} />
           <Route path="/mutualfunds/compare" element={<FundComparePage />} />
@@ -101,37 +139,6 @@ function Shell() {
         </Routes>
       </main>
     </div>
-  );
-}
-
-function PortfolioPage() {
-  const portfolios = useQuery({ queryKey: ['portfolios'], queryFn: api.portfolios });
-  const portfolioId = portfolios.data?.[0]?.portfolio_id;
-  const holdings = useQuery({
-    queryKey: ['holdings', portfolioId],
-    queryFn: () => api.holdings(portfolioId),
-    enabled: Boolean(portfolioId),
-  });
-  const invested = (holdings.data || []).reduce((sum, holding) => sum + Number(holding.invested_amount || 0), 0);
-  return (
-    <Page title="Portfolio overview" subtitle="Your positions, cost basis, and allocation at a glance.">
-      <LoadingOrError query={portfolios} />
-      <section className="metrics">
-        <div className="metric">
-          <small>Invested amount</small>
-          <strong>{formatInr(invested)}</strong>
-        </div>
-        <div className="metric">
-          <small>Assets held</small>
-          <strong>{holdings.data?.length || 0}</strong>
-        </div>
-      </section>
-      <section className="panel">
-        <h2>Current holdings</h2>
-        <LoadingOrError query={holdings} />
-        <Table rows={holdings.data || []} />
-      </section>
-    </Page>
   );
 }
 

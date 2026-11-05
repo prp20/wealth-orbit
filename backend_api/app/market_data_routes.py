@@ -8,7 +8,7 @@ from .portfolio_backend import (filter_values, mutual_funds, mutual_fund_detail,
     stock_valuation,
     mutual_fund_metric_snapshots, mutual_fund_enrichment,
     mutual_fund_benchmark, mutual_fund_benchmark_history,
-    benchmark_list, benchmark_history,
+    benchmark_list, benchmark_history, benchmark_snapshot, sync_home_indexes,
     stock_history, stocks, stock_daily_metrics, stock_fundamentals,
     stock_shareholding, stock_technical_indicators, sync_stock_fundamentals,
     mutual_fund_similar_enriched, mutual_fund_screen, mutual_fund_compare,
@@ -313,6 +313,34 @@ def mutual_fund_compare_route(
 @router.get("/benchmarks")
 def benchmark_list_route():
     return benchmark_list()
+
+def _benchmark_codes(codes: str) -> list[str]:
+    parts = [part.strip() for part in codes.split(",") if part.strip()]
+    if len(parts) > 12:
+        raise HTTPException(status_code=422, detail="at most 12 index codes")
+    return parts
+
+@router.get("/benchmarks/summary")
+def benchmark_summary_route(codes: str = Query("")):
+    return benchmark_snapshot(_benchmark_codes(codes))
+
+# The job table only allows STOCK and MUTUAL_FUND. Home indexes share one job row.
+HOME_INDEX_ENTITY = "HOME-INDEXES"
+
+@router.post("/benchmarks/sync")
+def benchmark_sync_route(codes: str = Query("")):
+    parts = _benchmark_codes(codes)
+    if not parts:
+        raise HTTPException(status_code=422, detail="at least one index code is required")
+    job, created = enqueue("STOCK", HOME_INDEX_ENTITY, "PRICES", False, lambda: sync_home_indexes(parts))
+    return {**job, "duplicate": not created}
+
+@router.get("/benchmarks/sync/status")
+def benchmark_sync_status_route():
+    job = latest_job("STOCK", HOME_INDEX_ENTITY, "PRICES")
+    if not job:
+        return {"status": "idle", "job": None}
+    return {"status": str(job.get("status", "idle")).lower(), "job": job}
 
 @router.get("/benchmarks/{index_code}/history")
 def benchmark_history_route(index_code: str):

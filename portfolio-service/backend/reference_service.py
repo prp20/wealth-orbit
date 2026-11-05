@@ -1,5 +1,6 @@
 """Read-only access to Supabase market_data reference tables."""
 import os
+import re
 import pandas as pd
 import psycopg2
 from psycopg2.extras import register_uuid
@@ -442,6 +443,68 @@ def mutual_fund_detail(scheme_code: str):
 def mutual_fund_detail_by_name(name: str):
     frame = _query("""SELECT m.scheme_code, m.scheme_name, a.amc_name, c.category_name, s.subcategory_name, m.plan_type, m.option_type, m.is_active FROM market_data.mutual_fund_reference m JOIN market_data.amc_reference a ON a.amc_id=m.amc_id JOIN market_data.mutual_fund_subcategories s ON s.subcategory_id=m.subcategory_id JOIN market_data.mutual_fund_categories c ON c.category_id=s.category_id WHERE m.scheme_name=%s""", (name,))
     return None if frame.empty else frame.iloc[0].to_dict()
+
+
+def _fund_name_key(name: str) -> str:
+    text = name.lower()
+    for compact, spaced in (
+        ("smallcap", "small cap"),
+        ("flexicap", "flexi cap"),
+        ("midcap", "mid cap"),
+        ("multicap", "multi cap"),
+        ("largemidcap", "large mid cap"),
+    ):
+        text = text.replace(compact, spaced)
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return " ".join(text.split())
+
+
+def _holding_name_core(name: str) -> str:
+    text = _fund_name_key(name)
+    for word in ("direct", "plan", "growth", "option", "bonus", "idcw", "dividend"):
+        text = re.sub(rf"\b{word}\b", " ", text)
+    return " ".join(text.split())
+
+
+def _is_direct_growth(plan: str, option: str, scheme_name: str) -> bool:
+    blob = f"{plan} {option} {scheme_name}".lower()
+    if any(word in blob for word in ("bonus", "idcw", "dividend")):
+        return False
+    return "direct" in blob and "growth" in blob
+
+
+def match_scheme_code(holding_name: str, funds: list[tuple]) -> str | None:
+    """Return a scheme code only when one direct-growth scheme contains the holding name."""
+    core = _holding_name_core(holding_name)
+    if not core:
+        return None
+    hits = []
+    for fund in funds:
+        code, scheme_name = fund[0], fund[1]
+        plan = fund[2] if len(fund) > 2 else ""
+        option = fund[3] if len(fund) > 3 else ""
+        if core in _fund_name_key(str(scheme_name)) and _is_direct_growth(str(plan or ""), str(option or ""), str(scheme_name)):
+            hits.append(str(code))
+    if len(hits) == 1:
+        return hits[0]
+    return None
+
+
+def match_mutual_fund_codes(names: list[str]) -> dict[str, str]:
+    wanted = [name for name in dict.fromkeys(names) if name]
+    if not wanted:
+        return {}
+    frame = _query(
+        """SELECT scheme_code, scheme_name, COALESCE(plan_type, ''), COALESCE(option_type, '')
+           FROM market_data.mutual_fund_reference"""
+    )
+    funds = [] if frame.empty else list(frame.itertuples(index=False, name=None))
+    matched = {}
+    for name in wanted:
+        code = match_scheme_code(name, funds)
+        if code:
+            matched[name] = code
+    return matched
 
 
 def mutual_fund_detail_enriched(scheme_code: str, last_sync_by_kind: dict | None = None):
@@ -1082,6 +1145,63 @@ def benchmark_history(index_code: str) -> list[dict]:
         WHERE i.index_code=%s ORDER BY h.{quote_identifier(d)}''',
         (index_code,),
     ).to_dict(orient="records")
+
+
+def benchmark_snapshot(codes: list[str]) -> list[dict]:
+    """Last two closes per index. Unknown codes are omitted."""
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for code in codes:
+        text = (code or "").strip()
+        if not text or text.upper() in seen:
+            continue
+        seen.add(text.upper())
+        cleaned.append(text)
+    if not cleaned:
+        return []
+    frame = _index_history_query(
+        lambda d, c, _volume: f'''
+        WITH ranked AS (
+          SELECT i.index_code, i.index_name,
+                 h.{quote_identifier(d)} AS as_of,
+                 h.{quote_identifier(c)} AS close,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY i.index_code ORDER BY h.{quote_identifier(d)} DESC
+                 ) AS rn
+          FROM market_data.index_daily_history h
+          JOIN market_data.index_reference i ON i.index_id=h.index_id
+          WHERE upper(i.index_code) = ANY(%s)
+        )
+        SELECT index_code, index_name,
+               MAX(close) FILTER (WHERE rn = 1) AS close,
+               MAX(close) FILTER (WHERE rn = 2) AS previous_close,
+               MAX(as_of) FILTER (WHERE rn = 1) AS as_of
+        FROM ranked
+        WHERE rn <= 2
+        GROUP BY index_code, index_name
+        ''',
+        ([code.upper() for code in cleaned],),
+    )
+    by_code = {} if frame.empty else {str(row["index_code"]).upper(): row for _, row in frame.iterrows()}
+    rows = []
+    for code in cleaned:
+        row = by_code.get(code.upper())
+        if row is None:
+            continue
+        close = row.get("close")
+        previous = row.get("previous_close")
+        change = None
+        if close is not None and previous is not None and float(previous) != 0:
+            change = (float(close) - float(previous)) / float(previous) * 100
+        rows.append({
+            "index_code": row.get("index_code"),
+            "index_name": row.get("index_name"),
+            "close": close,
+            "previous_close": previous,
+            "change_pct": change,
+            "as_of": row.get("as_of"),
+        })
+    return rows
 
 
 def _index_history_query(sql_builder, params=()) -> pd.DataFrame:

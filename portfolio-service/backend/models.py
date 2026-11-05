@@ -45,6 +45,7 @@ class User(TimestampMixin, Base):
     user_id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     full_name: Mapped[str | None] = mapped_column(String(255))
     pan: Mapped[str | None] = mapped_column(String(20), unique=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255))
     account_status: Mapped[AccountStatus] = mapped_column(SAEnum(AccountStatus, name="account_status"), default=AccountStatus.ACTIVE, nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     portfolio: Mapped["Portfolio | None"] = relationship(back_populates="user", uselist=False)

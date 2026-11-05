@@ -65,6 +65,51 @@
 .symbol-cell a:hover{text-decoration:underline}
 .company-cell{font-weight:600;color:#24353b}
 .peer-current{background:#f3faf6;font-weight:600}
+.home{display:grid;gap:18px}
+.home>.page-header{margin-bottom:0}
+.home-split{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,0.85fr);gap:18px;align-items:start}
+.home-split>.panel{display:flex;flex-direction:column}
+.home h2{margin-bottom:0}
+.index-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}
+.index-tile{background:#fbfcfb;border:1px solid #e8eeeb;border-radius:12px;padding:14px 16px;min-width:0}
+.index-tile small{display:block;color:#718089;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.index-tile strong{display:block;margin-top:10px;font-size:clamp(20px,2vw,26px);letter-spacing:-.04em;font-variant-numeric:tabular-nums;color:#17252d}
+.index-tile span{display:block;margin-top:6px;font-variant-numeric:tabular-nums;font-weight:650;color:#24353b}
+.index-tile em{display:block;margin-top:8px;font-style:normal;color:#8a969b;font-size:12px}
+.home-stats{display:grid;grid-template-columns:1.4fr .7fr 1fr;gap:18px;margin-top:20px;padding-top:4px}
+.home-stats small{display:block;color:#8a969b;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.home-stats strong{display:block;margin-top:8px;font-size:clamp(20px,2vw,28px);letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.home-stat-quiet strong{font-size:15px;font-weight:550;letter-spacing:0;color:#8a969b;margin-top:12px}
+.home-cost-note{margin-top:14px}
+.sleeve-list{list-style:none;margin:18px 0 0;padding:16px 0 0;border-top:1px solid #edf1f0;display:grid;gap:14px}
+.sleeve-row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;font-size:14px;font-weight:600;color:#24353b}
+.sleeve-amount{font-variant-numeric:tabular-nums;font-weight:550;color:#39535a}
+.sleeve-amount em{font-style:normal;color:#8a969b;margin-left:8px;font-size:12px}
+.sleeve-track{height:6px;margin-top:8px;border-radius:99px;background:#eef3f1;overflow:hidden}
+.sleeve-track i{display:block;height:100%;border-radius:99px;background:#42a87c}
+.sleeve-track i.sleeve-stock{background:#203746}
+.home-note{margin-top:16px;padding:16px 0 4px;color:#718089;line-height:1.5}
+.home-note p{margin:0}
+.home-note-links{display:flex;gap:16px;margin-top:12px}
+.recent-list{list-style:none;margin:16px 0 0;padding:0;display:grid}
+.recent-list li+li{border-top:1px solid #edf1f0}
+.recent-list a{display:flex;flex-direction:column;gap:4px;padding:12px 2px;text-decoration:none;color:#24353b}
+.recent-list a:hover span{color:#2f6b52}
+.recent-list small{color:#8a969b;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.recent-list span{font-weight:650}
+.home-later{padding:16px 18px;border:1px dashed #d5e3dc;border-radius:12px;background:#f8fbf9}
+.home-later h2{font-size:14px;color:#39535a}
+.home-later p{margin:6px 0 0;color:#6a7d82;font-size:13px;line-height:1.5}
+@media(max-width:900px){.home-split,.index-strip{grid-template-columns:1fr 1fr}.home-stats{grid-template-columns:1fr}}
+@media(max-width:640px){.index-strip{grid-template-columns:1fr}}
+.statement-table-wrap{border:1px solid #e3ebe7;border-radius:10px}
+.statement-table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.statement-table th,.statement-table td{padding:8px 12px;border-bottom:1px solid #eef3f1;white-space:nowrap}
+.statement-table thead th{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#718089;text-align:left;background:#fff}
+.statement-table tbody th{text-align:left;font-weight:600;color:#24353b}
+.statement-table td.num,.statement-table th.num{text-align:right;color:#39535a}
+.statement-table tbody tr:last-child th,.statement-table tbody tr:last-child td{border-bottom:0}
+@media(max-width:900px){.home-split{grid-template-columns:1fr}}
 .fundamentals-group,.technical-family{margin-top:18px}
 .fundamentals-group h3,.technical-family h3{font-size:14px;margin:0 0 10px;color:#39535a}
 .text-button{border:0;background:transparent;color:#3c9d78;cursor:pointer;padding:0 4px}
@@ -105,3 +150,19 @@
   .stock-price-block{text-align:left}
   .stock-toolbar,.fund-toolbar{grid-template-columns:1fr}
 }
+.portfolio-stats{margin-top:0}
+.holdings-wrap{margin-top:22px;border-top:1px solid #edf1f0;padding-top:8px}
+.holdings-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;min-width:760px}
+.holdings-table th,.holdings-table td{padding:12px 10px;border-bottom:1px solid #eef3f1;text-align:left}
+.holdings-table thead th{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#718089;font-weight:650}
+.holdings-table td.num,.holdings-table th.num{text-align:right;color:#39535a;white-space:nowrap}
+.holdings-table .holding-name{font-weight:650;color:#24353b;white-space:normal;min-width:240px;line-height:1.35}
+.holdings-table .holding-name a{color:#2f6b52;text-decoration:none}
+.holdings-table .holding-name a:hover{text-decoration:underline}
+.holdings-table tbody tr:hover{background:#f7fbf9}
+.holdings-table tbody tr:last-child td{border-bottom:0}
+.login-panel input{width:100%;padding:12px 14px;border:1px solid #dbe5e1;border-radius:8px;background:#fff;color:#17252d;font-size:15px}
+.login-switch{margin:16px 0 0}
+.login-switch button{border:0;background:transparent;color:#2f6b52;font-weight:600;padding:0;cursor:pointer;font-size:14px}
+.login-switch button:hover{text-decoration:underline}
+.account-footer strong{overflow-wrap:anywhere}

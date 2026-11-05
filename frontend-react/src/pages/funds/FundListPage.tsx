@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api';
 import PageHeader from '../../components/PageHeader';
@@ -7,7 +7,8 @@ import PageHeader from '../../components/PageHeader';
 const PAGE_SIZE = 25;
 
 export default function FundListPage() {
-  const [query, setQuery] = React.useState('');
+  const [params] = useSearchParams();
+  const [query, setQuery] = React.useState(params.get('search') || '');
   const [debouncedQuery, setDebouncedQuery] = React.useState('');
   const [amc, setAmc] = React.useState('All');
   const [category, setCategory] = React.useState('All');
