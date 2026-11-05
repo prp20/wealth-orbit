@@ -1,5 +1,6 @@
 from logging.config import fileConfig
 from pathlib import Path
+import importlib.util
 import sys
 import os
 
@@ -15,14 +16,11 @@ load_dotenv(PROJECT_ROOT / ".env")
 from backend.models import Base
 
 config = context.config
-database_url = os.getenv("ALEMBIC_DATABASE_URL") or os.getenv("PORTFOLIO_SQLITE_URL", "sqlite:///./portfolio-service/portfolio.db")
-if database_url:
-    database_url = database_url.replace("+aiosqlite", "")
-    if database_url.startswith("postgresql://"):
-        database_url = database_url.replace("postgresql://", "postgresql+psycopg2://", 1)
-    config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
-else:
-    config.set_main_option("sqlalchemy.url", config.get_main_option("sqlalchemy.url").replace("+asyncpg", "+psycopg2"))
+_spec = importlib.util.spec_from_file_location("wealth_orbit_database_url", PROJECT_ROOT / "scripts" / "database_url.py")
+_database_url = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_database_url)
+database_url = _database_url.migration_url(os.environ)
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 # The project keeps a minimal alembic.ini without logging sections.
 target_metadata = Base.metadata
 
