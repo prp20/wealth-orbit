@@ -1,17 +1,37 @@
 const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
+function errorDetail(payload: any, fallback: string) {
+  const detail = payload?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length) return 'Use at least 8 characters.';
+  return fallback;
+}
+
 async function get<T>(path: string): Promise<T> {
-  const response = await fetch(`${base}${path}`);
+  const response = await fetch(`${base}${path}`, { credentials: 'include' });
   if (!response.ok) {
-    throw new Error((await response.json().catch(() => ({}))).detail || 'Could not load data');
+    throw new Error(errorDetail(await response.json().catch(() => ({})), 'Could not load data'));
   }
   return response.json();
 }
 
 async function post<T>(path: string): Promise<T> {
-  const response = await fetch(`${base}${path}`, { method: 'POST' });
+  const response = await fetch(`${base}${path}`, { method: 'POST', credentials: 'include' });
   if (!response.ok) {
-    throw new Error((await response.json().catch(() => ({}))).detail || 'Sync failed');
+    throw new Error(errorDetail(await response.json().catch(() => ({})), 'Sync failed'));
+  }
+  return response.json();
+}
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${base}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(errorDetail(await response.json().catch(() => ({})), 'Could not sign in'));
   }
   return response.json();
 }
@@ -70,7 +90,20 @@ function withDates(path: string, from = '', to = '') {
   return query ? `${path}?${query}` : path;
 }
 
+export type LocalAccount = {
+  signed_in: boolean;
+  full_name: string | null;
+  portfolio_id: string | null;
+};
+
 export const api = {
+  authStatus: () => get<{ password_set: boolean }>('/auth/status'),
+  authMe: () => get<LocalAccount>('/auth/me'),
+  authSignup: (fullName: string, password: string) =>
+    postJson<LocalAccount>('/auth/signup', { full_name: fullName, password }),
+  authLogin: (fullName: string, password: string) =>
+    postJson<LocalAccount>('/auth/login', { full_name: fullName, password }),
+  authLogout: () => post<{ ok: boolean }>('/auth/logout'),
   portfolios: () => get<any[]>('/portfolios'),
   holdings: (id: string) => get<any[]>(`/portfolios/${id}/holdings`),
   transactions: (id: string, from = '', to = '', type = '') => {
@@ -149,6 +182,12 @@ export const api = {
     get<any[]>(
       withDates(`/market-data/mutual-funds/${encodeURIComponent(id)}/benchmark/history`, from, to),
     ),
+  benchmarkSummary: (codes: string[]) =>
+    get<any[]>(`/market-data/benchmarks/summary?codes=${encodeURIComponent(codes.join(','))}`),
+  syncBenchmarks: (codes: string[]) =>
+    post<SyncJob>(`/market-data/benchmarks/sync?codes=${encodeURIComponent(codes.join(','))}`),
+  syncBenchmarkStatus: () =>
+    get<{ status: string; job: SyncJob | null }>('/market-data/benchmarks/sync/status'),
   sectors: () => get<string[]>('/market-data/sectors'),
   filters: (kind: string) => get<string[]>(`/market-data/filters/${kind}`),
 };

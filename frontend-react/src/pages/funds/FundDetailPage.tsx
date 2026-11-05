@@ -14,6 +14,7 @@ import BenchmarkPanel from './panels/BenchmarkPanel';
 import RiskPanel from './panels/RiskPanel';
 import HoldingsPanel from './panels/HoldingsPanel';
 import ManagersPanel from './panels/ManagersPanel';
+import { recordRecent } from '../../lib/recent';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -38,6 +39,16 @@ export default function FundDetailPage() {
   const [range, setRange] = React.useState<ChartRange>('1Y');
   const [overlay, setOverlay] = React.useState(false);
   const fund = useQuery({ queryKey: ['fund', schemeId], queryFn: () => api.fund(schemeId) });
+
+  React.useEffect(() => {
+    if (!fund.data) return;
+    recordRecent({
+      kind: 'fund',
+      id: schemeId,
+      label: fund.data.scheme_name || schemeId,
+      path: `/mutualfunds/${encodeURIComponent(schemeId)}`,
+    });
+  }, [fund.data, schemeId]);
 
   const setTab = (next: TabId) => {
     const params = new URLSearchParams(searchParams);

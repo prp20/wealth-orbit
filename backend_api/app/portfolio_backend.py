@@ -14,16 +14,18 @@ PORTFOLIO_SERVICE_ROOT = Path(__file__).resolve().parents[2] / "portfolio-servic
 if str(PORTFOLIO_SERVICE_ROOT) not in sys.path:
     sys.path.insert(0, str(PORTFOLIO_SERVICE_ROOT))
 
-from backend.models import Holding, Portfolio, Transaction, TransactionType  # noqa: E402
+from backend.models import Holding, Portfolio, Transaction, TransactionType, User  # noqa: E402
 from backend.mutual_fund_service import compute_metrics, has_nav_history, sync_nav  # noqa: E402
 from backend.market_data.mutual_fund_analytics import METRIC_PERIODS  # noqa: E402
 from backend.market_data.mutual_fund_holdings import sync_holdings, sync_managers  # noqa: E402
 from backend.market_data.mutual_fund_sync import recompute_metrics, sync_benchmark, sync_enrichment  # noqa: E402
+from backend.market_data.index_sync import sync_home_indexes  # noqa: E402
 from backend.reference_service import (  # noqa: E402
     SCREEN_SORT_COLUMNS,
     filter_values,
     mutual_fund_detail,
     mutual_fund_detail_by_name,
+    match_mutual_fund_codes,
     mutual_fund_detail_enriched,
     mutual_fund_history,
     mutual_fund_metric_snapshots,
@@ -32,6 +34,7 @@ from backend.reference_service import (  # noqa: E402
     mutual_fund_benchmark_history,
     benchmark_list,
     benchmark_history,
+    benchmark_snapshot,
     mutual_fund_similar,
     mutual_fund_similar_enriched,
     mutual_fund_screen,
@@ -58,9 +61,9 @@ from backend.reference_service import (  # noqa: E402
 from backend.services import InsufficientHoldingsError  # noqa: E402
 
 __all__ = [
-    "Holding", "Portfolio", "Transaction", "TransactionType",
+    "Holding", "Portfolio", "Transaction", "TransactionType", "User",
     "InsufficientHoldingsError", "compute_metrics", "filter_values",
-    "has_nav_history", "mutual_fund_detail", "mutual_fund_detail_by_name",
+    "has_nav_history", "mutual_fund_detail", "mutual_fund_detail_by_name", "match_mutual_fund_codes",
     "mutual_fund_detail_enriched", "mutual_fund_history", "mutual_fund_similar",
     "mutual_fund_similar_enriched", "mutual_fund_screen", "mutual_fund_compare",
     "mutual_fund_holdings_snapshot", "mutual_fund_overlap", "mutual_fund_managers",
@@ -71,6 +74,7 @@ __all__ = [
     "sync_stock_fundamentals", "recompute_metrics", "sync_benchmark", "sync_enrichment",
     "sync_holdings", "sync_managers",
     "mutual_fund_metric_snapshots", "mutual_fund_enrichment", "mutual_fund_benchmark",
-    "mutual_fund_benchmark_history", "benchmark_list", "benchmark_history",
+    "mutual_fund_benchmark_history", "benchmark_list", "benchmark_history", "benchmark_snapshot",
+    "sync_home_indexes",
     "METRIC_PERIODS", "SCREEN_SORT_COLUMNS",
 ]

@@ -14,6 +14,7 @@ import ValuationPanel from './panels/ValuationPanel';
 import PeersPanel from './panels/PeersPanel';
 import ShareholdingPanel from './panels/ShareholdingPanel';
 import TechnicalsPanel from './panels/TechnicalsPanel';
+import { recordRecent } from '../../lib/recent';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -45,6 +46,16 @@ export default function StockDetailPage() {
     else params.set('tab', next);
     setSearchParams(params, { replace: true });
   };
+
+  React.useEffect(() => {
+    if (!stock.data) return;
+    recordRecent({
+      kind: 'stock',
+      id: symbol,
+      label: stock.data.company_name || symbol,
+      path: `/stocks/${encodeURIComponent(symbol)}`,
+    });
+  }, [stock.data, symbol]);
 
   if (stock.isLoading) {
     return (
