@@ -91,6 +91,8 @@
 .fund-tabs{display:flex;gap:4px;margin:8px 0 18px;border-bottom:1px solid #edf1f0;overflow-x:auto}
 .fund-tabs button{border:0;background:transparent;padding:10px 14px;color:#718089;font-weight:600;font-size:14px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
 .fund-tabs button.active{color:#2f6b52;border-bottom-color:#42a87c}
+.panel-notes{margin:12px 0 0;padding-left:18px;color:#55706b;font-size:13px;line-height:1.45}
+.metric-def{display:block;color:#7a8f8a;font-weight:450;font-size:12px;margin-top:2px}
 .fund-risk-metrics{grid-template-columns:repeat(6,minmax(0,1fr))}
 @media(max-width:900px){
   .freshness-badges,.snapshot-metrics,.compact-metrics,.fund-key-metrics,.fund-risk-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}

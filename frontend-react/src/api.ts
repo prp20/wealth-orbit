@@ -124,6 +124,7 @@ export const api = {
     ),
   stockPeers: (id: string, by = 'sector', limit = 8) =>
     get<any>(`/market-data/stocks/${encodeURIComponent(id)}/peers?by=${encodeURIComponent(by)}&limit=${limit}`),
+  stockValuation: (id: string) => get<any>(`/market-data/stocks/${encodeURIComponent(id)}/valuation`),
   stockCompare: (symbols: string[]) =>
     get<any[]>(`/market-data/stocks/compare?symbols=${encodeURIComponent(symbols.join(','))}`),
   syncStock: (id: string, kind: string, force: boolean) =>

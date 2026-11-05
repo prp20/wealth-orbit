@@ -11,6 +11,8 @@ def calculate_indicators(frame: pd.DataFrame, requests: list[dict]) -> pd.DataFr
     if frame.empty: return pd.DataFrame(columns=["date","indicator_code","indicator_period","parameters","component","value"])
     data = frame.sort_values("date").reset_index(drop=True).copy()
     close = pd.to_numeric(data["close"], errors="coerce")
+    high = pd.to_numeric(data["high"], errors="coerce") if "high" in data.columns else close
+    low = pd.to_numeric(data["low"], errors="coerce") if "low" in data.columns else close
     out = []
     for req in requests:
         code = req["code"].upper(); p = req.get("parameters") or {}; period = int(p.get("period", 0))
@@ -28,6 +30,11 @@ def calculate_indicators(frame: pd.DataFrame, requests: list[dict]) -> pd.DataFr
         elif code == "BB":
             period = int(p.get("period",20)); std = float(p.get("std_dev",2)); mid = close.rolling(period).mean(); band = close.rolling(period).std(ddof=0)*std
             series = {"UPPER":mid+band,"MIDDLE":mid,"LOWER":mid-band}
+        elif code == "ATR":
+            period = int(p.get("period", 14))
+            prev_close = close.shift(1)
+            tr = pd.concat([(high - low).abs(), (high - prev_close).abs(), (low - prev_close).abs()], axis=1).max(axis=1)
+            series["VALUE"] = tr.ewm(alpha=1 / period, adjust=False, min_periods=period).mean()
         else: raise ValueError(f"Unsupported indicator: {code}")
         params = normalize_parameters(p)
         for component, values in series.items():

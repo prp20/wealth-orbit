@@ -67,71 +67,160 @@ def stocks(search: str = "", exchange: str = "All", sector: str = "All", industr
     """, (search, f"%{search}%", f"%{search}%", exchange, exchange, sector, sector, industry, industry))
 
 
+_METRIC_SELECT = """m.metric_date AS date, m.market_cap, m.stock_pe, m.price_to_book,
+    m.dividend_yield, m.book_value, m.roce, m.roe, m.calculation_method,
+    m.enterprise_value, m.ebitda_ttm, m.ev_ebitda, m.ev_sales, m.net_debt,
+    m.fcf_yield, m.peg"""
+
+
 def stock_detail(symbol: str):
-    frame = _query("SELECT s.trading_symbol, s.company_name, s.exchange, sr.sector_name, ir.industry_name, s.is_active FROM market_data.stock_reference s LEFT JOIN market_data.sector_reference sr ON sr.sector_id=s.sector_id LEFT JOIN market_data.industry_reference ir ON ir.industry_id=s.industry_id WHERE s.trading_symbol=%s", (symbol,))
+    frame = _query(
+        """SELECT s.stock_id, s.trading_symbol, s.company_name, s.exchange,
+                  s.isin, s.bse_code, s.listing_date, s.listing_status, s.market_cap_class,
+                  sr.sector_name, ir.industry_name, s.is_active
+           FROM market_data.stock_reference s
+           LEFT JOIN market_data.sector_reference sr ON sr.sector_id=s.sector_id
+           LEFT JOIN market_data.industry_reference ir ON ir.industry_id=s.industry_id
+           WHERE s.trading_symbol=%s""",
+        (symbol,),
+    )
     return None if frame.empty else frame.iloc[0].to_dict()
 
 
 CURATED_FUNDAMENTAL_GROUPS = {
-    "profit_and_loss": ["REVENUE", "OPERATING_PROFIT", "OPERATING_MARGIN", "NET_PROFIT", "EPS"],
-    "balance_sheet": ["EQUITY_CAPITAL", "RESERVES", "BORROWINGS", "TOTAL_ASSETS"],
-    "cash_flow": ["CASH_FROM_OPERATING_ACTIVITIES", "NET_CASH_FLOW"],
+    "profit_and_loss": ["REVENUE", "SALES", "OPERATING_PROFIT", "OPERATING_MARGIN", "EBITDA", "NET_PROFIT", "EPS"],
+    "balance_sheet": ["EQUITY_CAPITAL", "RESERVES", "BORROWINGS", "TOTAL_DEBT", "NET_DEBT", "TOTAL_ASSETS"],
+    "cash_flow": ["CASH_FROM_OPERATING_ACTIVITIES", "OPERATING_CASH_FLOW", "FREE_CASH_FLOW", "NET_CASH_FLOW"],
+    "profitability": ["ROE", "ROCE", "PAT_MARGIN"],
+    "growth": ["REVENUE_GROWTH", "EPS_GROWTH"],
+    "leverage": ["DEBT_TO_EQUITY", "INTEREST_COVERAGE"],
+}
+
+FUNDAMENTAL_DEFINITIONS = {
+    "REVENUE": "Top-line sales for the reporting period",
+    "SALES": "Reported sales (alias of revenue when present)",
+    "OPERATING_PROFIT": "Profit from core operations",
+    "OPERATING_MARGIN": "Operating profit as % of revenue",
+    "EBITDA": "Earnings before interest, tax, depreciation and amortisation",
+    "NET_PROFIT": "Profit after tax",
+    "EPS": "Earnings per share",
+    "ROE": "Net profit / average equity",
+    "ROCE": "EBIT / capital employed",
+    "PAT_MARGIN": "Net profit as % of revenue",
+    "REVENUE_GROWTH": "Period-over-period revenue growth",
+    "EPS_GROWTH": "Period-over-period EPS growth",
+    "DEBT_TO_EQUITY": "Total debt / equity",
+    "INTEREST_COVERAGE": "EBIT / interest expense",
+    "FREE_CASH_FLOW": "Cash from operations minus capex (when disclosed)",
+    "NET_DEBT": "Interest-bearing debt minus cash",
 }
 
 
 def stock_detail_enriched(symbol: str, last_sync_by_kind: dict | None = None):
-    """Identity plus latest price, daily metrics, and freshness metadata."""
-    base = stock_detail(symbol)
-    if base is None:
+    """Identity plus latest price, daily metrics, and freshness in one round-trip."""
+    frame = _query(
+        f"""
+        WITH base AS (
+          SELECT s.stock_id, s.trading_symbol, s.company_name, s.exchange,
+                 s.isin, s.bse_code, s.listing_date, s.listing_status, s.market_cap_class,
+                 sr.sector_name, ir.industry_name, s.is_active
+          FROM market_data.stock_reference s
+          LEFT JOIN market_data.sector_reference sr ON sr.sector_id=s.sector_id
+          LEFT JOIN market_data.industry_reference ir ON ir.industry_id=s.industry_id
+          WHERE s.trading_symbol=%s
+        ),
+        latest_price AS (
+          SELECT p.trading_date AS date,
+                 COALESCE(p.adj_close, p.close) AS close,
+                 p.close AS raw_close, p.adj_close, p.volume
+          FROM market_data.stock_daily_prices p
+          JOIN base b ON b.stock_id=p.stock_id
+          ORDER BY p.trading_date DESC LIMIT 1
+        ),
+        latest_metrics AS (
+          SELECT {_METRIC_SELECT}
+          FROM market_data.stock_daily_metrics m
+          JOIN base b ON b.stock_id=m.stock_id
+          ORDER BY m.metric_date DESC LIMIT 1
+        ),
+        freshness AS (
+          SELECT
+            (SELECT MAX(v.period_end_date) FROM market_data.stock_fundamental_values v
+             JOIN base b ON b.stock_id=v.stock_id) AS latest_fundamental_period_end,
+            (SELECT MAX(h.period_end_date) FROM market_data.stock_shareholding_history h
+             JOIN base b ON b.stock_id=h.stock_id) AS latest_shareholding_period_end,
+            (SELECT MAX(t.calculated_at) FROM market_data.stock_technical_indicators t
+             JOIN base b ON b.stock_id=t.stock_id) AS latest_technical_calculated_at
+        )
+        SELECT b.*,
+               lp.date AS price_date, lp.close AS price_close, lp.raw_close, lp.adj_close AS price_adj_close,
+               lp.volume AS price_volume,
+               lm.date AS metrics_date, lm.market_cap, lm.stock_pe, lm.price_to_book, lm.dividend_yield,
+               lm.book_value, lm.roce, lm.roe, lm.calculation_method,
+               lm.enterprise_value, lm.ebitda_ttm, lm.ev_ebitda, lm.ev_sales, lm.net_debt,
+               lm.fcf_yield, lm.peg,
+               f.latest_fundamental_period_end, f.latest_shareholding_period_end,
+               f.latest_technical_calculated_at
+        FROM base b
+        LEFT JOIN latest_price lp ON TRUE
+        LEFT JOIN latest_metrics lm ON TRUE
+        LEFT JOIN freshness f ON TRUE
+        """,
+        (symbol,),
+    )
+    if frame.empty:
         return None
+    row = frame.iloc[0].to_dict()
+    latest_price = None
+    if row.get("price_date") is not None:
+        adj_close = row.pop("price_adj_close", None)
+        latest_price = {
+            "date": row.pop("price_date"),
+            "close": row.pop("price_close"),
+            "raw_close": row.pop("raw_close", None),
+            "adj_close": adj_close,
+            "volume": row.pop("price_volume", None),
+            "adjusted": adj_close is not None,
+        }
+    else:
+        for key in ("price_date", "price_close", "raw_close", "price_adj_close", "price_volume"):
+            row.pop(key, None)
 
-    price_frame = _query(
-        """SELECT p.trading_date AS date, p.close, p.volume
-           FROM market_data.stock_daily_prices p
-           JOIN market_data.stock_reference s ON s.stock_id=p.stock_id
-           WHERE s.trading_symbol=%s ORDER BY p.trading_date DESC LIMIT 1""",
-        (symbol,),
-    )
-    metrics_frame = _query(
-        """SELECT m.metric_date AS date, m.market_cap, m.stock_pe, m.price_to_book,
-                  m.dividend_yield, m.book_value, m.roce, m.roe, m.calculation_method
-           FROM market_data.stock_daily_metrics m
-           JOIN market_data.stock_reference s ON s.stock_id=m.stock_id
-           WHERE s.trading_symbol=%s ORDER BY m.metric_date DESC LIMIT 1""",
-        (symbol,),
-    )
-    fund_frame = _query(
-        """SELECT MAX(v.period_end_date) AS latest_fundamental_period_end
-           FROM market_data.stock_fundamental_values v
-           JOIN market_data.stock_reference s ON s.stock_id=v.stock_id
-           WHERE s.trading_symbol=%s""",
-        (symbol,),
-    )
-    share_frame = _query(
-        """SELECT MAX(h.period_end_date) AS latest_shareholding_period_end
-           FROM market_data.stock_shareholding_history h
-           JOIN market_data.stock_reference s ON s.stock_id=h.stock_id
-           WHERE s.trading_symbol=%s""",
-        (symbol,),
-    )
-    tech_frame = _query(
-        """SELECT MAX(t.calculated_at) AS latest_technical_calculated_at
-           FROM market_data.stock_technical_indicators t
-           JOIN market_data.stock_reference s ON s.stock_id=t.stock_id
-           WHERE s.trading_symbol=%s""",
-        (symbol,),
-    )
+    metric_keys = [
+        "metrics_date", "market_cap", "stock_pe", "price_to_book", "dividend_yield", "book_value",
+        "roce", "roe", "calculation_method", "enterprise_value", "ebitda_ttm", "ev_ebitda",
+        "ev_sales", "net_debt", "fcf_yield", "peg",
+    ]
+    latest_metrics = None
+    if row.get("metrics_date") is not None:
+        latest_metrics = {"date": row["metrics_date"]}
+        for key in metric_keys:
+            if key == "metrics_date":
+                continue
+            latest_metrics[key] = row.get(key)
+        latest_metrics["as_of"] = row["metrics_date"]
+        latest_metrics["source"] = "yfinance"
+    for key in metric_keys:
+        row.pop(key, None)
 
-    latest_price = None if price_frame.empty else price_frame.iloc[0].to_dict()
-    latest_metrics = None if metrics_frame.empty else metrics_frame.iloc[0].to_dict()
-    latest_fund = None if fund_frame.empty else fund_frame.iloc[0].get("latest_fundamental_period_end")
-    latest_share = None if share_frame.empty else share_frame.iloc[0].get("latest_shareholding_period_end")
-    latest_tech = None if tech_frame.empty else tech_frame.iloc[0].get("latest_technical_calculated_at")
+    latest_fund = row.pop("latest_fundamental_period_end", None)
+    latest_share = row.pop("latest_shareholding_period_end", None)
+    latest_tech = row.pop("latest_technical_calculated_at", None)
+    row.pop("stock_id", None)
 
     return {
-        **base,
+        **row,
         "latest_price": latest_price,
         "latest_daily_metrics": latest_metrics,
+        "corporate_actions_available": False,
+        "adjusted_history_available": bool(latest_price and latest_price.get("adj_close") is not None),
+        "data_sources": {
+            "prices": "yfinance",
+            "daily_metrics": "yfinance",
+            "fundamentals": "screener",
+            "technicals": "derived",
+            "master": "seed",
+        },
         "freshness": {
             "latest_price_date": None if latest_price is None else latest_price.get("date"),
             "latest_fundamental_period_end": latest_fund,
@@ -139,6 +228,41 @@ def stock_detail_enriched(symbol: str, last_sync_by_kind: dict | None = None):
             "latest_technical_calculated_at": latest_tech,
             "last_sync_by_kind": last_sync_by_kind or {},
         },
+    }
+
+
+def stock_valuation(symbol: str) -> dict | None:
+    """Trailing valuation snapshot with as_of and source; nulls when inputs missing."""
+    detail = stock_detail_enriched(symbol)
+    if detail is None:
+        return None
+    metrics = detail.get("latest_daily_metrics") or {}
+    return {
+        "trading_symbol": symbol,
+        "company_name": detail.get("company_name"),
+        "as_of": metrics.get("as_of") or metrics.get("date"),
+        "source": metrics.get("source") or "yfinance",
+        "forward_estimates_available": False,
+        "metrics": {
+            "market_cap": metrics.get("market_cap"),
+            "enterprise_value": metrics.get("enterprise_value"),
+            "stock_pe": metrics.get("stock_pe"),
+            "price_to_book": metrics.get("price_to_book"),
+            "ev_ebitda": metrics.get("ev_ebitda"),
+            "ev_sales": metrics.get("ev_sales"),
+            "dividend_yield": metrics.get("dividend_yield"),
+            "fcf_yield": metrics.get("fcf_yield"),
+            "peg": metrics.get("peg"),
+            "ebitda_ttm": metrics.get("ebitda_ttm"),
+            "net_debt": metrics.get("net_debt"),
+            "book_value": metrics.get("book_value"),
+            "roe": metrics.get("roe"),
+            "roce": metrics.get("roce"),
+        },
+        "notes": [
+            "Trailing multiples only; forward PE is unavailable without a licensed estimate source.",
+            "Corporate-action-adjusted valuation inputs remain unavailable until a licensed CA feed is configured.",
+        ],
     }
 
 
@@ -154,63 +278,129 @@ def stock_peers(symbol: str, by: str = "sector", limit: int = 8) -> dict | None:
     if not group:
         return {"symbol": symbol, "by": by, "group": None, "peers": []}
 
-    if by == "sector":
-        peer_frame = stocks(sector=group)
-    else:
-        peer_frame = stocks(industry=group)
-    peer_frame = peer_frame[peer_frame["trading_symbol"] != symbol].head(limit)
+    group_filter = "sr.sector_name=%s" if by == "sector" else "ir.industry_name=%s"
+    frame = _query(
+        f"""
+        WITH peers AS (
+          SELECT s.stock_id, s.trading_symbol, s.company_name
+          FROM market_data.stock_reference s
+          LEFT JOIN market_data.sector_reference sr ON sr.sector_id=s.sector_id
+          LEFT JOIN market_data.industry_reference ir ON ir.industry_id=s.industry_id
+          WHERE {group_filter} AND s.trading_symbol <> %s
+          ORDER BY s.trading_symbol
+          LIMIT %s
+        ),
+        latest_price AS (
+          SELECT DISTINCT ON (p.stock_id) p.stock_id, COALESCE(p.adj_close, p.close) AS close
+          FROM market_data.stock_daily_prices p
+          JOIN peers pe ON pe.stock_id=p.stock_id
+          ORDER BY p.stock_id, p.trading_date DESC
+        ),
+        latest_metrics AS (
+          SELECT DISTINCT ON (m.stock_id) m.stock_id, m.market_cap, m.stock_pe, m.price_to_book, m.roe, m.roce,
+                 m.ev_ebitda, m.enterprise_value
+          FROM market_data.stock_daily_metrics m
+          JOIN peers pe ON pe.stock_id=m.stock_id
+          ORDER BY m.stock_id, m.metric_date DESC
+        )
+        SELECT pe.trading_symbol, pe.company_name, lp.close AS latest_close,
+               lm.market_cap, lm.stock_pe, lm.price_to_book, lm.roe, lm.roce,
+               lm.ev_ebitda, lm.enterprise_value
+        FROM peers pe
+        LEFT JOIN latest_price lp ON lp.stock_id=pe.stock_id
+        LEFT JOIN latest_metrics lm ON lm.stock_id=pe.stock_id
+        ORDER BY pe.trading_symbol
+        """,
+        (group, symbol, limit),
+    )
     peers = []
-    for _, row in peer_frame.iterrows():
-        peer_symbol = row["trading_symbol"]
-        price = _query(
-            """SELECT p.close FROM market_data.stock_daily_prices p
-               JOIN market_data.stock_reference s ON s.stock_id=p.stock_id
-               WHERE s.trading_symbol=%s ORDER BY p.trading_date DESC LIMIT 1""",
-            (peer_symbol,),
-        )
-        metrics = _query(
-            """SELECT m.market_cap, m.stock_pe, m.price_to_book, m.roe, m.roce
-               FROM market_data.stock_daily_metrics m
-               JOIN market_data.stock_reference s ON s.stock_id=m.stock_id
-               WHERE s.trading_symbol=%s ORDER BY m.metric_date DESC LIMIT 1""",
-            (peer_symbol,),
-        )
+    for _, row in frame.iterrows():
+        metrics = {
+            "market_cap": row["market_cap"],
+            "stock_pe": row["stock_pe"],
+            "price_to_book": row["price_to_book"],
+            "roe": row["roe"],
+            "roce": row["roce"],
+            "ev_ebitda": row["ev_ebitda"],
+            "enterprise_value": row["enterprise_value"],
+        }
+        if all(v is None for v in metrics.values()):
+            metrics = None
         peers.append({
-            "trading_symbol": peer_symbol,
+            "trading_symbol": row["trading_symbol"],
             "company_name": row["company_name"],
-            "latest_close": None if price.empty else price.iloc[0]["close"],
-            "latest_metrics": None if metrics.empty else metrics.iloc[0].to_dict(),
+            "latest_close": row["latest_close"],
+            "latest_metrics": metrics,
         })
     return {"symbol": symbol, "by": by, "group": group, "peers": peers}
 
 
 def stock_compare(symbols: list[str]) -> list[dict]:
+    cleaned = [s.strip().upper() for s in symbols if s and s.strip()]
+    if not cleaned:
+        return []
+    frame = _query(
+        """
+        WITH wanted AS (
+          SELECT s.stock_id, s.trading_symbol, s.company_name, sr.sector_name
+          FROM market_data.stock_reference s
+          LEFT JOIN market_data.sector_reference sr ON sr.sector_id=s.sector_id
+          WHERE s.trading_symbol = ANY(%s)
+        ),
+        latest_price AS (
+          SELECT DISTINCT ON (p.stock_id) p.stock_id, p.trading_date AS date,
+                 COALESCE(p.adj_close, p.close) AS close
+          FROM market_data.stock_daily_prices p
+          JOIN wanted w ON w.stock_id=p.stock_id
+          ORDER BY p.stock_id, p.trading_date DESC
+        ),
+        latest_metrics AS (
+          SELECT DISTINCT ON (m.stock_id) m.stock_id, m.metric_date AS date, m.market_cap,
+                 m.stock_pe, m.price_to_book, m.dividend_yield, m.roe, m.roce,
+                 m.enterprise_value, m.ev_ebitda, m.fcf_yield, m.peg
+          FROM market_data.stock_daily_metrics m
+          JOIN wanted w ON w.stock_id=m.stock_id
+          ORDER BY m.stock_id, m.metric_date DESC
+        )
+        SELECT w.trading_symbol, w.company_name, w.sector_name,
+               lp.close AS latest_close, lp.date AS latest_price_date,
+               lm.date AS metrics_date, lm.market_cap, lm.stock_pe, lm.price_to_book,
+               lm.dividend_yield, lm.roe, lm.roce, lm.enterprise_value, lm.ev_ebitda,
+               lm.fcf_yield, lm.peg
+        FROM wanted w
+        LEFT JOIN latest_price lp ON lp.stock_id=w.stock_id
+        LEFT JOIN latest_metrics lm ON lm.stock_id=w.stock_id
+        """,
+        (cleaned,),
+    )
+    by_symbol = {row["trading_symbol"]: row for _, row in frame.iterrows()}
     rows = []
-    for symbol in symbols:
-        detail = stock_detail(symbol)
-        if detail is None:
+    for symbol in cleaned:
+        row = by_symbol.get(symbol)
+        if row is None:
             continue
-        price = _query(
-            """SELECT p.close, p.trading_date AS date FROM market_data.stock_daily_prices p
-               JOIN market_data.stock_reference s ON s.stock_id=p.stock_id
-               WHERE s.trading_symbol=%s ORDER BY p.trading_date DESC LIMIT 1""",
-            (symbol,),
-        )
-        metrics = _query(
-            """SELECT m.metric_date AS date, m.market_cap, m.stock_pe, m.price_to_book,
-                      m.dividend_yield, m.roe, m.roce
-               FROM market_data.stock_daily_metrics m
-               JOIN market_data.stock_reference s ON s.stock_id=m.stock_id
-               WHERE s.trading_symbol=%s ORDER BY m.metric_date DESC LIMIT 1""",
-            (symbol,),
-        )
+        metrics = None
+        if row.get("metrics_date") is not None:
+            metrics = {
+                "date": row["metrics_date"],
+                "market_cap": row["market_cap"],
+                "stock_pe": row["stock_pe"],
+                "price_to_book": row["price_to_book"],
+                "dividend_yield": row["dividend_yield"],
+                "roe": row["roe"],
+                "roce": row["roce"],
+                "enterprise_value": row["enterprise_value"],
+                "ev_ebitda": row["ev_ebitda"],
+                "fcf_yield": row["fcf_yield"],
+                "peg": row["peg"],
+            }
         rows.append({
             "trading_symbol": symbol,
-            "company_name": detail.get("company_name"),
-            "sector_name": detail.get("sector_name"),
-            "latest_close": None if price.empty else price.iloc[0]["close"],
-            "latest_price_date": None if price.empty else price.iloc[0]["date"],
-            "latest_metrics": None if metrics.empty else metrics.iloc[0].to_dict(),
+            "company_name": row.get("company_name"),
+            "sector_name": row.get("sector_name"),
+            "latest_close": row.get("latest_close"),
+            "latest_price_date": row.get("latest_price_date"),
+            "latest_metrics": metrics,
         })
     return rows
 
@@ -239,6 +429,9 @@ def stock_fundamentals_summary(symbol: str, reporting_period: str = "ANNUAL", re
         "reporting_basis": reporting_basis,
         "periods": periods,
         "groups": groups,
+        "definitions": {code: FUNDAMENTAL_DEFINITIONS[code] for code in curated_codes if code in FUNDAMENTAL_DEFINITIONS},
+        "source": "screener",
+        "note": "Standalone and consolidated values are never mixed in one view.",
     }
 
 
@@ -602,7 +795,19 @@ def mutual_fund_compare(scheme_codes: list[str], metric_period: str = "1Y") -> l
 
 
 def stock_history(symbol: str, from_date=None, to_date=None) -> pd.DataFrame:
-    return _query("SELECT p.trading_date AS date,p.open,p.high,p.low,p.close,p.volume FROM market_data.stock_daily_prices p JOIN market_data.stock_reference s ON s.stock_id=p.stock_id WHERE s.trading_symbol=%s AND (%s IS NULL OR p.trading_date >= %s) AND (%s IS NULL OR p.trading_date <= %s) ORDER BY p.trading_date", (symbol, from_date, from_date, to_date, to_date))
+    return _query(
+        """SELECT p.trading_date AS date, p.open, p.high, p.low,
+                  COALESCE(p.adj_close, p.close) AS close, p.close AS raw_close,
+                  p.adj_close, p.volume,
+                  (p.adj_close IS NOT NULL) AS is_adjusted
+           FROM market_data.stock_daily_prices p
+           JOIN market_data.stock_reference s ON s.stock_id=p.stock_id
+           WHERE s.trading_symbol=%s
+             AND (%s IS NULL OR p.trading_date >= %s)
+             AND (%s IS NULL OR p.trading_date <= %s)
+           ORDER BY p.trading_date""",
+        (symbol, from_date, from_date, to_date, to_date),
+    )
 
 def mutual_fund_history(scheme_code: str, from_date=None, to_date=None) -> pd.DataFrame:
     return _query("SELECT h.nav_date AS date,h.nav FROM market_data.mutual_fund_nav_history h JOIN market_data.mutual_fund_reference m ON m.scheme_id=h.scheme_id WHERE m.scheme_code=%s AND (%s IS NULL OR h.nav_date >= %s) AND (%s IS NULL OR h.nav_date <= %s) ORDER BY h.nav_date", (scheme_code, from_date, from_date, to_date, to_date))
@@ -895,25 +1100,26 @@ def _index_history_query(sql_builder, params=()) -> pd.DataFrame:
             return frame.astype(object).where(pd.notnull(frame), None)
 
 def stock_daily_metrics(symbol: str, from_date=None, to_date=None) -> pd.DataFrame:
-    return _query("""SELECT m.metric_date AS date, m.market_cap, m.stock_pe, m.price_to_book,
-        m.dividend_yield, m.book_value, m.roce, m.roe, m.calculation_method
+    return _query(
+        f"""SELECT {_METRIC_SELECT}
         FROM market_data.stock_daily_metrics m
         JOIN market_data.stock_reference s ON s.stock_id=m.stock_id
         WHERE s.trading_symbol=%s AND (%s IS NULL OR m.metric_date >= %s)
           AND (%s IS NULL OR m.metric_date <= %s) ORDER BY m.metric_date""",
-        (symbol, from_date, from_date, to_date, to_date))
+        (symbol, from_date, from_date, to_date, to_date),
+    )
 
 def stock_fundamentals(symbol: str, reporting_period: str = "", reporting_basis: str = "", metric_code: str = "", statement_type: str = "") -> pd.DataFrame:
     return _query("""SELECT v.period_end_date, v.period_start_date, v.reporting_period,
         v.reporting_basis, r.metric_code, r.metric_name, r.statement_type, r.unit,
-        v.metric_value, v.source_id
+        v.metric_value, v.publication_date, v.version, v.source_id
         FROM market_data.stock_fundamental_values v
         JOIN market_data.stock_reference s ON s.stock_id=v.stock_id
         JOIN market_data.fundamental_metric_reference r ON r.metric_id=v.metric_id
         WHERE s.trading_symbol=%s AND (%s='' OR v.reporting_period=%s)
           AND (%s='' OR v.reporting_basis=%s) AND (%s='' OR r.metric_code=%s)
           AND (%s='' OR r.statement_type=%s)
-        ORDER BY v.period_end_date DESC, r.metric_code""",
+        ORDER BY v.period_end_date DESC, r.statement_type, r.metric_code""",
         (symbol, reporting_period, reporting_period, reporting_basis, reporting_basis, metric_code, metric_code, statement_type, statement_type))
 
 def stock_shareholding(symbol: str, from_date=None, to_date=None) -> pd.DataFrame:

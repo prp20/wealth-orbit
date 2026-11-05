@@ -18,6 +18,7 @@ DEFAULT_INDICATORS = [
     {"code": "RSI", "parameters": {"period": 14}},
     {"code": "MACD", "parameters": {"fast": 12, "slow": 26, "signal": 9}},
     {"code": "BB", "parameters": {"period": 20, "std_dev": 2}},
+    {"code": "ATR", "parameters": {"period": 14}},
 ]
 
 
@@ -108,14 +109,41 @@ def sync_daily_metrics(symbol: str, force: bool = False) -> dict:
                 raise RuntimeError(f"No OHLC history for {symbol}; sync prices before daily metrics")
             metric_date = frame.iloc[-1]["date"]
             source_id = _source_id(cur, "yfinance")
-            values = (stock_id, metric_date, info.get("marketCap"), info.get("trailingPE"), info.get("priceToBook"),
-                      (float(info["dividendYield"]) * 100 if info.get("dividendYield") is not None else None),
-                      info.get("bookValue"), info.get("returnOnCapitalEmployed"), info.get("returnOnEquity"), source_id)
+            market_cap = info.get("marketCap")
+            enterprise_value = info.get("enterpriseValue")
+            ebitda_ttm = info.get("ebitda")
+            total_debt = info.get("totalDebt")
+            total_cash = info.get("totalCash")
+            net_debt = None
+            if total_debt is not None or total_cash is not None:
+                net_debt = float(total_debt or 0) - float(total_cash or 0)
+            ev_ebitda = info.get("enterpriseToEbitda")
+            if ev_ebitda is None and enterprise_value and ebitda_ttm and float(ebitda_ttm) != 0:
+                ev_ebitda = float(enterprise_value) / float(ebitda_ttm)
+            revenue = info.get("totalRevenue")
+            ev_sales = info.get("enterpriseToRevenue")
+            if ev_sales is None and enterprise_value and revenue and float(revenue) != 0:
+                ev_sales = float(enterprise_value) / float(revenue)
+            fcf = info.get("freeCashflow")
+            fcf_yield = None
+            if fcf is not None and market_cap and float(market_cap) > 0:
+                fcf_yield = float(fcf) / float(market_cap) * 100
+            peg = info.get("pegRatio")
+            values = (
+                stock_id, metric_date, market_cap, info.get("trailingPE"), info.get("priceToBook"),
+                (float(info["dividendYield"]) * 100 if info.get("dividendYield") is not None else None),
+                info.get("bookValue"), info.get("returnOnCapitalEmployed"), info.get("returnOnEquity"),
+                enterprise_value, ebitda_ttm, ev_ebitda, ev_sales, net_debt, fcf_yield, peg, source_id,
+            )
             cur.execute("""INSERT INTO market_data.stock_daily_metrics
-                (stock_id,metric_date,market_cap,stock_pe,price_to_book,dividend_yield,book_value,roce,roe,calculation_method,source_id)
-                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,'PROVIDER',%s)
+                (stock_id,metric_date,market_cap,stock_pe,price_to_book,dividend_yield,book_value,roce,roe,
+                 enterprise_value,ebitda_ttm,ev_ebitda,ev_sales,net_debt,fcf_yield,peg,calculation_method,source_id)
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'PROVIDER',%s)
                 ON CONFLICT(stock_id,metric_date) DO UPDATE SET market_cap=EXCLUDED.market_cap,stock_pe=EXCLUDED.stock_pe,
                 price_to_book=EXCLUDED.price_to_book,dividend_yield=EXCLUDED.dividend_yield,book_value=EXCLUDED.book_value,
-                roce=EXCLUDED.roce,roe=EXCLUDED.roe,source_id=EXCLUDED.source_id,updated_at=NOW()""", values)
+                roce=EXCLUDED.roce,roe=EXCLUDED.roe,enterprise_value=EXCLUDED.enterprise_value,
+                ebitda_ttm=EXCLUDED.ebitda_ttm,ev_ebitda=EXCLUDED.ev_ebitda,ev_sales=EXCLUDED.ev_sales,
+                net_debt=EXCLUDED.net_debt,fcf_yield=EXCLUDED.fcf_yield,peg=EXCLUDED.peg,
+                source_id=EXCLUDED.source_id,updated_at=NOW()""", values)
         conn.commit()
     return {"symbol": symbol, "kind": "daily_metrics", "status": "completed", "records_processed": 1, "force": force, "metric_date": str(metric_date)}
