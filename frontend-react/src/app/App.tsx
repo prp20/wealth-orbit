@@ -11,6 +11,7 @@ import FundScreenerPage from '../pages/funds/FundScreenerPage';
 import FundComparePage from '../pages/funds/FundComparePage';
 import DashboardPage from '../pages/DashboardPage';
 import PortfolioPage from '../pages/PortfolioPage';
+import { clearRecent } from '../lib/recent';
 
 function Page({ title, subtitle, children }: { title: string; subtitle: string; children?: React.ReactNode }) {
   return (
@@ -83,6 +84,7 @@ function Shell() {
 
   const logout = async () => {
     const onLedger = location.pathname === '/portfolio' || location.pathname === '/transactions';
+    clearRecent();
     await api.authLogout();
     queryClient.removeQueries({ queryKey: ['auth-me'] });
     queryClient.removeQueries({ queryKey: ['portfolios'] });
@@ -101,7 +103,7 @@ function Shell() {
           <small>Investment workspace</small>
         </div>
         <nav>
-          <NavLink to="/" end>Dashboard</NavLink>
+          <NavLink to="/" end>Home</NavLink>
           {signedIn && <NavLink to="/portfolio">Portfolio</NavLink>}
           {signedIn && <NavLink to="/transactions">Transactions</NavLink>}
           <NavLink to="/mutualfunds">Mutual funds</NavLink>

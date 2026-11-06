@@ -74,14 +74,18 @@
 .index-tile{background:#fbfcfb;border:1px solid #e8eeeb;border-radius:12px;padding:14px 16px;min-width:0}
 .index-tile small{display:block;color:#718089;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .index-tile strong{display:block;margin-top:10px;font-size:clamp(20px,2vw,26px);letter-spacing:-.04em;font-variant-numeric:tabular-nums;color:#17252d}
-.index-tile span{display:block;margin-top:6px;font-variant-numeric:tabular-nums;font-weight:650;color:#24353b}
+.index-tile span{display:block;margin-top:6px;font-variant-numeric:tabular-nums;font-weight:650;color:#24353b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.index-tile span.change-down{color:#a33b35}
 .index-tile em{display:block;margin-top:8px;font-style:normal;color:#8a969b;font-size:12px}
+.home .home-stats{grid-template-columns:1.4fr .7fr}
 .home-stats{display:grid;grid-template-columns:1.4fr .7fr 1fr;gap:18px;margin-top:20px;padding-top:4px}
 .home-stats small{display:block;color:#8a969b;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .home-stats strong{display:block;margin-top:8px;font-size:clamp(20px,2vw,28px);letter-spacing:-.04em;font-variant-numeric:tabular-nums}
 .home-stat-quiet strong{font-size:15px;font-weight:550;letter-spacing:0;color:#8a969b;margin-top:12px}
 .home-cost-note{margin-top:14px}
+.sleeve-caption{margin:18px 0 0}
 .sleeve-list{list-style:none;margin:18px 0 0;padding:16px 0 0;border-top:1px solid #edf1f0;display:grid;gap:14px}
+.home .sleeve-list{margin-top:10px}
 .sleeve-row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;font-size:14px;font-weight:600;color:#24353b}
 .sleeve-amount{font-variant-numeric:tabular-nums;font-weight:550;color:#39535a}
 .sleeve-amount em{font-style:normal;color:#8a969b;margin-left:8px;font-size:12px}
@@ -93,14 +97,12 @@
 .home-note-links{display:flex;gap:16px;margin-top:12px}
 .recent-list{list-style:none;margin:16px 0 0;padding:0;display:grid}
 .recent-list li+li{border-top:1px solid #edf1f0}
-.recent-list a{display:flex;flex-direction:column;gap:4px;padding:12px 2px;text-decoration:none;color:#24353b}
+.recent-list a{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"kind when" "name when";gap:4px 12px;align-items:center;padding:12px 2px;text-decoration:none;color:#24353b}
 .recent-list a:hover span{color:#2f6b52}
-.recent-list small{color:#8a969b;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-.recent-list span{font-weight:650}
-.home-later{padding:16px 18px;border:1px dashed #d5e3dc;border-radius:12px;background:#f8fbf9}
-.home-later h2{font-size:14px;color:#39535a}
-.home-later p{margin:6px 0 0;color:#6a7d82;font-size:13px;line-height:1.5}
-@media(max-width:900px){.home-split,.index-strip{grid-template-columns:1fr 1fr}.home-stats{grid-template-columns:1fr}}
+.recent-list small{grid-area:kind;color:#8a969b;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.recent-list span{grid-area:name;font-weight:650}
+.recent-list em{grid-area:when;font-style:normal;color:#8a969b;font-size:12px;white-space:nowrap}
+@media(max-width:900px){.home-split,.index-strip{grid-template-columns:1fr 1fr}.home-stats,.home .home-stats{grid-template-columns:1fr 1fr}}
 @media(max-width:640px){.index-strip{grid-template-columns:1fr}}
 .statement-table-wrap{border:1px solid #e3ebe7;border-radius:10px}
 .statement-table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}

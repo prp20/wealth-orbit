@@ -1,3 +1,5 @@
+import { formatDisplayDate } from './format';
+
 export type RecentItem = {
   kind: 'fund' | 'stock';
   id: string;
@@ -20,6 +22,26 @@ export function readRecent(): RecentItem[] {
   } catch {
     return [];
   }
+}
+
+export function clearRecent() {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    /* private mode should not break logout */
+  }
+}
+
+export function formatRecentWhen(viewedAt: string, now = new Date()): string {
+  const viewed = new Date(viewedAt);
+  if (Number.isNaN(viewed.getTime())) return '';
+  const start = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const days = Math.round((start(now) - start(viewed)) / 86400000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  const month = String(viewed.getMonth() + 1).padStart(2, '0');
+  const day = String(viewed.getDate()).padStart(2, '0');
+  return formatDisplayDate(`${viewed.getFullYear()}-${month}-${day}`);
 }
 
 export function recordRecent(item: Omit<RecentItem, 'viewedAt'>) {
