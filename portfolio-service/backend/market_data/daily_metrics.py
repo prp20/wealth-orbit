@@ -39,6 +39,13 @@ def _metric_number(value: str) -> float | None:
     return normalize_number(cleaned)
 
 
+def net_debt_from_parts(total_debt: float | None, total_cash: float | None) -> float | None:
+    """Net debt is debt minus cash. A missing side stays missing; zero is a real amount."""
+    if total_debt is None or total_cash is None:
+        return None
+    return float(total_debt) - float(total_cash)
+
+
 def calculate_fallback_metrics(
     *, close: float | None, eps: float | None, book_value: float | None, dividend_per_share: float | None,
 ) -> dict[str, float]:

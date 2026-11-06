@@ -5,11 +5,9 @@ import { api } from '../../api';
 import MarketChart from '../../components/MarketChart';
 import SyncJobButton from '../../components/SyncJobButton';
 import ChartToolbar, { ChartRange } from '../../components/ChartToolbar';
-import { formatCompactInr, formatPct, formatRatio } from '../../lib/format';
+import { formatCompactInr, formatPct, formatPercentPoints, formatRatio } from '../../lib/format';
 import StockHeader from './panels/StockHeader';
-import InsightsPanel from './panels/InsightsPanel';
 import FundamentalsPanel from './panels/FundamentalsPanel';
-import StatementsPanel from './panels/StatementsPanel';
 import ValuationPanel from './panels/ValuationPanel';
 import PeersPanel from './panels/PeersPanel';
 import ShareholdingPanel from './panels/ShareholdingPanel';
@@ -18,7 +16,6 @@ import { recordRecent } from '../../lib/recent';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
-  { id: 'statements', label: 'Statements' },
   { id: 'fundamentals', label: 'Fundamentals' },
   { id: 'valuation', label: 'Valuation' },
   { id: 'technicals', label: 'Technicals' },
@@ -34,7 +31,7 @@ export default function StockDetailPage() {
   const { symbol = '' } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const tab: TabId = isTabId(tabParam) ? tabParam : 'overview';
+  const tab: TabId = tabParam === 'statements' ? 'fundamentals' : isTabId(tabParam) ? tabParam : 'overview';
   const [range, setRange] = React.useState<ChartRange>('1Y');
   const [mode, setMode] = React.useState('line');
   const stock = useQuery({ queryKey: ['stock', symbol], queryFn: () => api.stock(symbol) });
@@ -89,7 +86,6 @@ export default function StockDetailPage() {
       <p className="eyebrow detail-eyebrow">Stock research</p>
 
       <StockHeader stock={detail} />
-      <InsightsPanel items={[]} />
 
       <nav className="fund-tabs" aria-label="Stock detail sections">
         {TABS.map((item) => (
@@ -115,6 +111,7 @@ export default function StockDetailPage() {
               <SyncJobButton
                 symbol={symbol}
                 kind="daily_metrics"
+                label="Update ratios"
                 invalidateKeys={[
                   ['stock-daily-metrics', symbol],
                   ['stock', symbol],
@@ -125,28 +122,31 @@ export default function StockDetailPage() {
             </div>
             <section className="metrics compact-metrics snapshot-metrics">
               <div className="metric">
-                <small>PE</small>
+                <small>Trailing P/E</small>
                 <strong>{formatRatio(metrics?.stock_pe)}</strong>
+                {metrics?.stock_pe != null && metrics?.stock_pe !== '' && (
+                  <small>Price is {formatRatio(metrics.stock_pe)} times trailing earnings.</small>
+                )}
               </div>
               <div className="metric">
-                <small>PB</small>
+                <small>Price to book</small>
                 <strong>{formatRatio(metrics?.price_to_book)}</strong>
               </div>
               <div className="metric">
-                <small>EV/EBITDA</small>
+                <small>EV / EBITDA</small>
                 <strong>{formatRatio(metrics?.ev_ebitda)}</strong>
               </div>
               <div className="metric">
-                <small>ROE</small>
+                <small>Return on equity</small>
                 <strong>{formatPct(metrics?.roe)}</strong>
               </div>
               <div className="metric">
-                <small>ROCE</small>
+                <small>Return on capital</small>
                 <strong>{formatPct(metrics?.roce)}</strong>
               </div>
               <div className="metric">
-                <small>Div yield</small>
-                <strong>{formatPct(metrics?.dividend_yield)}</strong>
+                <small>Dividend yield</small>
+                <strong>{formatPercentPoints(metrics?.dividend_yield)}</strong>
               </div>
               <div className="metric">
                 <small>Market cap</small>
@@ -170,6 +170,7 @@ export default function StockDetailPage() {
                 <SyncJobButton
                   symbol={symbol}
                   kind="prices"
+                  label="Update prices"
                   invalidateKeys={[['history', 'stock', symbol], ['stock', symbol]]}
                 />
               </div>
@@ -190,43 +191,9 @@ export default function StockDetailPage() {
         </>
       )}
 
-      {tab === 'statements' && <StatementsPanel symbol={symbol} />}
       {tab === 'fundamentals' && <FundamentalsPanel symbol={symbol} />}
       {tab === 'valuation' && <ValuationPanel symbol={symbol} />}
-      {tab === 'technicals' && (
-        <>
-          <section className="panel">
-            <div className="panel-heading chart-panel-heading">
-              <div>
-                <h2>Price chart</h2>
-                <p className="panel-subtitle">OHLCV with line or candlestick view.</p>
-              </div>
-              <div className="chart-panel-controls">
-                <ChartToolbar range={range} onChange={setRange} />
-                <select value={mode} onChange={(event) => setMode(event.target.value)}>
-                  <option value="line">Line + volume</option>
-                  <option value="candles">Candlesticks + volume</option>
-                </select>
-                <SyncJobButton
-                  symbol={symbol}
-                  kind="prices"
-                  invalidateKeys={[['history', 'stock', symbol], ['stock', symbol]]}
-                />
-              </div>
-            </div>
-            <MarketChart
-              kind="stock"
-              id={symbol}
-              bare
-              range={range}
-              onRangeChange={setRange}
-              mode={mode}
-              onModeChange={setMode}
-            />
-          </section>
-          <TechnicalsPanel symbol={symbol} />
-        </>
-      )}
+      {tab === 'technicals' && <TechnicalsPanel symbol={symbol} />}
     </div>
   );
 }

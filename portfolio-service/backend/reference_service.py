@@ -124,6 +124,7 @@ def stock_detail_enriched(symbol: str, last_sync_by_kind: dict | None = None):
         WITH base AS (
           SELECT s.stock_id, s.trading_symbol, s.company_name, s.exchange,
                  s.isin, s.bse_code, s.listing_date, s.listing_status, s.market_cap_class,
+                 s.business_summary,
                  sr.sector_name, ir.industry_name, s.is_active
           FROM market_data.stock_reference s
           LEFT JOIN market_data.sector_reference sr ON sr.sector_id=s.sector_id
@@ -144,6 +145,15 @@ def stock_detail_enriched(symbol: str, last_sync_by_kind: dict | None = None):
           JOIN base b ON b.stock_id=m.stock_id
           ORDER BY m.metric_date DESC LIMIT 1
         ),
+        price_range AS (
+          SELECT MAX(p.high) AS high_52w, MIN(p.low) AS low_52w
+          FROM market_data.stock_daily_prices p
+          JOIN base b ON b.stock_id=p.stock_id
+          JOIN latest_price lp ON TRUE
+          WHERE p.trading_date >= (lp.date - INTERVAL '365 days')
+            AND p.high IS NOT NULL
+            AND p.low IS NOT NULL
+        ),
         freshness AS (
           SELECT
             (SELECT MAX(v.period_end_date) FROM market_data.stock_fundamental_values v
@@ -155,7 +165,7 @@ def stock_detail_enriched(symbol: str, last_sync_by_kind: dict | None = None):
         )
         SELECT b.*,
                lp.date AS price_date, lp.close AS price_close, lp.raw_close, lp.adj_close AS price_adj_close,
-               lp.volume AS price_volume,
+               lp.volume AS price_volume, pr.high_52w, pr.low_52w,
                lm.date AS metrics_date, lm.market_cap, lm.stock_pe, lm.price_to_book, lm.dividend_yield,
                lm.book_value, lm.roce, lm.roe, lm.calculation_method,
                lm.enterprise_value, lm.ebitda_ttm, lm.ev_ebitda, lm.ev_sales, lm.net_debt,
@@ -166,6 +176,7 @@ def stock_detail_enriched(symbol: str, last_sync_by_kind: dict | None = None):
         LEFT JOIN latest_price lp ON TRUE
         LEFT JOIN latest_metrics lm ON TRUE
         LEFT JOIN freshness f ON TRUE
+        LEFT JOIN price_range pr ON TRUE
         """,
         (symbol,),
     )
@@ -181,10 +192,12 @@ def stock_detail_enriched(symbol: str, last_sync_by_kind: dict | None = None):
             "raw_close": row.pop("raw_close", None),
             "adj_close": adj_close,
             "volume": row.pop("price_volume", None),
+            "high_52w": row.pop("high_52w", None),
+            "low_52w": row.pop("low_52w", None),
             "adjusted": adj_close is not None,
         }
     else:
-        for key in ("price_date", "price_close", "raw_close", "price_adj_close", "price_volume"):
+        for key in ("price_date", "price_close", "raw_close", "price_adj_close", "price_volume", "high_52w", "low_52w"):
             row.pop(key, None)
 
     metric_keys = [
@@ -204,6 +217,9 @@ def stock_detail_enriched(symbol: str, last_sync_by_kind: dict | None = None):
     for key in metric_keys:
         row.pop(key, None)
 
+    summary = row.get("business_summary")
+    if summary is not None and not isinstance(summary, str):
+        row["business_summary"] = None
     latest_fund = row.pop("latest_fundamental_period_end", None)
     latest_share = row.pop("latest_shareholding_period_end", None)
     latest_tech = row.pop("latest_technical_calculated_at", None)
@@ -1249,7 +1265,8 @@ def stock_daily_metrics(symbol: str, from_date=None, to_date=None) -> pd.DataFra
     )
 
 def stock_fundamentals(symbol: str, reporting_period: str = "", reporting_basis: str = "", metric_code: str = "", statement_type: str = "") -> pd.DataFrame:
-    return _query("""SELECT v.period_end_date, v.period_start_date, v.reporting_period,
+    from backend.market_data.providers.screener import canonical_statement_type
+    frame = _query("""SELECT v.period_end_date, v.period_start_date, v.reporting_period,
         v.reporting_basis, r.metric_code, r.metric_name, r.statement_type, r.unit,
         v.metric_value, v.publication_date, v.version, v.source_id
         FROM market_data.stock_fundamental_values v
@@ -1257,9 +1274,18 @@ def stock_fundamentals(symbol: str, reporting_period: str = "", reporting_basis:
         JOIN market_data.fundamental_metric_reference r ON r.metric_id=v.metric_id
         WHERE s.trading_symbol=%s AND (%s='' OR v.reporting_period=%s)
           AND (%s='' OR v.reporting_basis=%s) AND (%s='' OR r.metric_code=%s)
-          AND (%s='' OR r.statement_type=%s)
-        ORDER BY v.period_end_date DESC, r.statement_type, r.metric_code""",
-        (symbol, reporting_period, reporting_period, reporting_basis, reporting_basis, metric_code, metric_code, statement_type, statement_type))
+        ORDER BY v.period_end_date DESC, r.metric_code""",
+        (symbol, reporting_period, reporting_period, reporting_basis, reporting_basis, metric_code, metric_code))
+    if frame.empty:
+        return frame
+    frame = frame.copy()
+    frame["statement_type"] = [
+        canonical_statement_type(code, stored)
+        for code, stored in zip(frame["metric_code"], frame["statement_type"])
+    ]
+    if statement_type:
+        frame = frame[frame["statement_type"] == statement_type]
+    return frame
 
 def stock_shareholding(symbol: str, from_date=None, to_date=None) -> pd.DataFrame:
     return _query("""SELECT h.period_end_date, h.promoter_pct, h.fii_pct, h.dii_pct,
@@ -1282,23 +1308,41 @@ def stock_technical_indicators(symbol: str, indicator: str = "", from_date=None,
         (symbol, indicator, indicator, from_date, from_date, to_date, to_date))
 
 def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
-    """Fetch Screener consolidated data and upsert canonical fundamentals.
+    """Fetch Screener consolidated and standalone statements in one job.
 
     Soft provider failures raise so the sync queue marks the job FAILED instead of
-    SUCCEEDED with an empty/failed payload the UI cannot see.
+    SUCCEEDED with an empty/failed payload the UI cannot see. One missing basis is a
+    warning, not a failure. statement_type is taken from the parsed section and
+    corrected on existing reference rows even when force is false.
     """
-    from backend.market_data.providers.screener import ScreenerParser, build_company_url, fetch_html
+    from backend.market_data.providers.screener import (
+        CONSOLIDATED, STANDALONE, ScreenerParser, build_company_url, fetch_html, metric_statement_types,
+    )
+    user_agent = "Mozilla/5.0 (compatible; WealthOrbit/1.0)"
     with psycopg2.connect(os.environ["DATABASE_URL"], connect_timeout=15) as connection:
         with connection.cursor() as cur:
             cur.execute("SELECT stock_id FROM market_data.stock_reference WHERE trading_symbol=%s AND is_active=TRUE", (symbol,))
             row = cur.fetchone()
             if not row: raise ValueError(f"Active stock not found: {symbol}")
             stock_id = row[0]
-            html = fetch_html(build_company_url(symbol, None), "Mozilla/5.0 (compatible; WealthOrbit/1.0)")
-            if not html:
+            for code, tagged in metric_statement_types().items():
+                cur.execute(
+                    """UPDATE market_data.fundamental_metric_reference
+                       SET statement_type=%s, updated_at=NOW()
+                       WHERE metric_code=%s AND statement_type<>%s""",
+                    (tagged, code, tagged),
+                )
+            parsed_by_basis = {}
+            basis_warnings = []
+            for basis, warning in ((CONSOLIDATED, "consolidated_unavailable"), (STANDALONE, "standalone_unavailable")):
+                html = fetch_html(build_company_url(symbol, None, basis), user_agent)
+                if not html:
+                    basis_warnings.append(warning)
+                    continue
+                parsed_by_basis[basis] = ScreenerParser(basis).parse(html, stock_id)
+            if not parsed_by_basis:
                 raise RuntimeError(f"Screener returned no HTML for {symbol}")
-            parsed = ScreenerParser().parse(html, stock_id)
-            if not parsed.fundamental_values and not parsed.shareholding:
+            if not any(parsed.fundamental_values or parsed.shareholding for parsed in parsed_by_basis.values()):
                 raise RuntimeError(f"Screener parse returned no fundamentals or shareholding for {symbol}")
             # Remove Dec year-ends previously mis-tagged as Oct–Dec quarters.
             cur.execute(
@@ -1318,22 +1362,55 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
             else:
                 import uuid
                 source_id = uuid.uuid4(); cur.execute("INSERT INTO market_data.data_sources(source_id,source_name) VALUES(%s,'screener')", (source_id,))
-            metric_ids = {}
-            for value in parsed.fundamental_values:
-                cur.execute("SELECT metric_id FROM market_data.fundamental_metric_reference WHERE metric_code=%s", (value.metric_code,))
-                metric = cur.fetchone()
-                if not metric:
-                    statement = "PL" if value.metric_code in {"REVENUE","TOTAL_EXPENSES","OPERATING_PROFIT","NET_PROFIT","EPS"} else "BS"
-                    import uuid
-                    metric_id = uuid.uuid4(); cur.execute("INSERT INTO market_data.fundamental_metric_reference(metric_id,metric_code,metric_name,statement_type) VALUES(%s,%s,%s,%s)", (metric_id,value.metric_code,value.metric_code.replace('_',' ').title(),statement))
-                else: metric_id = metric[0]
-                metric_ids[value.metric_code] = metric_id
-                cur.execute("""INSERT INTO market_data.stock_fundamental_values(stock_id,metric_id,reporting_period,period_start_date,period_end_date,reporting_basis,metric_value,source_id)
-                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(stock_id,metric_id,reporting_period,reporting_basis,period_end_date)
-                    DO UPDATE SET metric_value=EXCLUDED.metric_value,source_id=EXCLUDED.source_id,updated_at=NOW()""", (stock_id,metric_id,value.reporting_period,value.period_start,value.period_end,value.reporting_basis,value.value,source_id))
-            for value in parsed.shareholding:
+            counts = {CONSOLIDATED: 0, STANDALONE: 0}
+            parser_warnings = 0
+            for basis, parsed in parsed_by_basis.items():
+                counts[basis] = len(parsed.fundamental_values)
+                parser_warnings += len(parsed.warnings)
+                for value in parsed.fundamental_values:
+                    cur.execute(
+                        "SELECT metric_id, statement_type FROM market_data.fundamental_metric_reference WHERE metric_code=%s",
+                        (value.metric_code,),
+                    )
+                    metric = cur.fetchone()
+                    if not metric:
+                        import uuid
+                        metric_id = uuid.uuid4()
+                        cur.execute(
+                            "INSERT INTO market_data.fundamental_metric_reference(metric_id,metric_code,metric_name,statement_type) VALUES(%s,%s,%s,%s)",
+                            (metric_id, value.metric_code, value.metric_code.replace("_", " ").title(), value.statement_type),
+                        )
+                    else:
+                        metric_id = metric[0]
+                        if metric[1] != value.statement_type:
+                            cur.execute(
+                                "UPDATE market_data.fundamental_metric_reference SET statement_type=%s, updated_at=NOW() WHERE metric_code=%s",
+                                (value.statement_type, value.metric_code),
+                            )
+                    cur.execute("""INSERT INTO market_data.stock_fundamental_values(stock_id,metric_id,reporting_period,period_start_date,period_end_date,reporting_basis,metric_value,source_id)
+                        VALUES(%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(stock_id,metric_id,reporting_period,reporting_basis,period_end_date)
+                        DO UPDATE SET metric_value=EXCLUDED.metric_value,source_id=EXCLUDED.source_id,updated_at=NOW()""",
+                        (stock_id, metric_id, value.reporting_period, value.period_start, value.period_end, value.reporting_basis, value.value, source_id))
+            shareholding = []
+            for basis in (CONSOLIDATED, STANDALONE):
+                parsed = parsed_by_basis.get(basis)
+                if parsed and parsed.shareholding:
+                    shareholding = parsed.shareholding
+                    break
+            for value in shareholding:
                 cur.execute("""INSERT INTO market_data.stock_shareholding_history(stock_id,period_end_date,promoter_pct,fii_pct,dii_pct,government_pct,public_pct,shareholder_count,source_id)
                     VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(stock_id,period_end_date)
                     DO UPDATE SET promoter_pct=EXCLUDED.promoter_pct,fii_pct=EXCLUDED.fii_pct,dii_pct=EXCLUDED.dii_pct,government_pct=EXCLUDED.government_pct,public_pct=EXCLUDED.public_pct,shareholder_count=EXCLUDED.shareholder_count,source_id=EXCLUDED.source_id,updated_at=NOW()""", (stock_id,value.period_end,value.promoter_pct,value.fii_pct,value.dii_pct,value.government_pct,value.public_pct,value.shareholder_count,source_id))
         connection.commit()
-    return {"status":"completed", "symbol":symbol, "fundamental_rows":len(parsed.fundamental_values), "shareholding_rows":len(parsed.shareholding), "warnings":len(parsed.warnings), "force":force}
+    fundamental_rows = counts[CONSOLIDATED] + counts[STANDALONE]
+    return {
+        "status": "completed",
+        "symbol": symbol,
+        "fundamental_rows": fundamental_rows,
+        "fundamental_rows_consolidated": counts[CONSOLIDATED],
+        "fundamental_rows_standalone": counts[STANDALONE],
+        "shareholding_rows": len(shareholding),
+        "warnings": parser_warnings,
+        "basis_warnings": basis_warnings,
+        "force": force,
+    }

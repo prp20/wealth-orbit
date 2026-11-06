@@ -44,6 +44,7 @@ export default function TechnicalsPanel({ symbol }: { symbol: string }) {
         <SyncJobButton
           symbol={symbol}
           kind="technical"
+          label="Update indicators"
           invalidateKeys={[['stock-technical', symbol]]}
         />
       </div>

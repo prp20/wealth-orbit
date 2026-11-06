@@ -3,7 +3,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "portfolio-service"))
 
-from backend.market_data.daily_metrics import calculate_fallback_metrics, provider_metrics_from_ratios
+from backend.market_data.daily_metrics import (
+    calculate_fallback_metrics,
+    net_debt_from_parts,
+    provider_metrics_from_ratios,
+)
 
 
 def test_provider_metrics_normalizes_supported_screener_ratio_labels():
@@ -36,3 +40,10 @@ def test_fallback_metrics_only_uses_reliable_nonzero_inputs():
         "dividend_yield": 2.5,
     }
     assert calculate_fallback_metrics(close=120.0, eps=0.0, book_value=None, dividend_per_share=None) == {}
+
+
+def test_net_debt_requires_both_sides_and_keeps_zero():
+    assert net_debt_from_parts(100, 40) == 60
+    assert net_debt_from_parts(100, None) is None
+    assert net_debt_from_parts(None, 40) is None
+    assert net_debt_from_parts(0, 10) == -10

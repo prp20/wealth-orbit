@@ -110,7 +110,9 @@ export default function StockListPage() {
                           {row.trading_symbol}
                         </Link>
                       </td>
-                      <td className="company-cell">{row.company_name || '—'}</td>
+                      <td className="company-cell">
+                        <Link to={`/stocks/${encodeURIComponent(row.trading_symbol)}`}>{row.company_name || '—'}</Link>
+                      </td>
                       <td>{row.exchange || '—'}</td>
                       <td>{row.sector_name || '—'}</td>
                       <td>{row.industry_name || '—'}</td>
