@@ -3,7 +3,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "003_stock_fundamentals_technical"
-down_revision = "002_identity_and_import_tracking"
+down_revision = "002b_market_data_reference"
 branch_labels = None
 depends_on = None
 
