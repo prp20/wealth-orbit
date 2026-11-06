@@ -1,18 +1,25 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, SyncJob, syncJobFailureMessage } from '../api';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../api';
 import PageHeader from '../components/PageHeader';
-import { formatDate, formatInr, formatRatio } from '../lib/format';
-import { readRecent } from '../lib/recent';
+import SyncJobButton from '../components/SyncJobButton';
+import { formatDisplayDate, formatInr, formatRatio } from '../lib/format';
+import { formatRecentWhen, readRecent } from '../lib/recent';
 
 const HOME_INDEXES = ['NIFTY50', 'SENSEX', 'NIFTYBANK', 'NIFTYIT'];
+const SECTOR_INDEXES = ['NIFTYPHARMA', 'NIFTYAUTO', 'NIFTYFMCG', 'NIFTYMETAL'];
+const SYNC_INDEXES = [...HOME_INDEXES, ...SECTOR_INDEXES];
 
 const INDEX_LABELS: Record<string, string> = {
   NIFTY50: 'Nifty 50',
   SENSEX: 'Sensex',
   NIFTYBANK: 'Nifty Bank',
   NIFTYIT: 'Nifty IT',
+  NIFTYPHARMA: 'Nifty Pharma',
+  NIFTYAUTO: 'Nifty Auto',
+  NIFTYFMCG: 'Nifty FMCG',
+  NIFTYMETAL: 'Nifty Metal',
 };
 
 const SLEEVE_LABELS: Record<string, string> = {
@@ -39,95 +46,71 @@ function indexLabel(row: { index_code?: string; index_name?: string }) {
   return INDEX_LABELS[code] || row.index_name || row.index_code || 'Index';
 }
 
-function MarketSyncButton() {
-  const queryClient = useQueryClient();
-  const [busy, setBusy] = React.useState(false);
-  const [status, setStatus] = React.useState('idle');
-  const [error, setError] = React.useState('');
+function newestDate(rows: any[]) {
+  const dates = rows.map((row) => String(row.as_of || '')).filter(Boolean).sort();
+  return dates[dates.length - 1];
+}
 
-  React.useEffect(() => {
-    let cancelled = false;
-    api.syncBenchmarkStatus()
-      .then((payload) => {
-        if (cancelled) return;
-        const failure = syncJobFailureMessage(payload.job);
-        setStatus(failure ? 'failed' : payload.status || 'idle');
-        setError(failure || '');
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const run = async () => {
-    setBusy(true);
-    setError('');
-    setStatus('queued');
-    try {
-      const job = await api.syncBenchmarks(HOME_INDEXES);
-      const terminal = await pollJob(job.job_id, (current) => {
-        const failure = syncJobFailureMessage(current);
-        setStatus(failure ? 'failed' : String(current.status || '').toLowerCase());
-        if (failure) setError(failure);
-      });
-      const failure = syncJobFailureMessage(terminal);
-      if (failure) {
-        setStatus('failed');
-        setError(failure);
-      } else {
-        setStatus('succeeded');
-        setError('');
-        await queryClient.invalidateQueries({ queryKey: ['benchmark-summary'] });
-      }
-    } catch (err: any) {
-      setStatus('failed');
-      setError(err.message || 'Sync failed');
-    } finally {
-      setBusy(false);
-    }
-  };
-
+function IndexStrip({ rows }: { rows: any[] }) {
+  const newest = formatDisplayDate(newestDate(rows));
   return (
-    <div className="panel-sync">
-      <button type="button" disabled={busy} onClick={run}>
-        {busy ? 'Syncing…' : 'Sync today'}
-      </button>
-      {status !== 'idle' && <span className={`sync-chip status-${status}`}>{status}</span>}
-      {error && <small className="sync-error">{error}</small>}
+    <div className="index-strip">
+      {rows.map((row) => {
+        const asOf = formatDisplayDate(row.as_of);
+        const change = Number(row.change_pct);
+        const down = row.change_pct != null && !Number.isNaN(change) && change < 0;
+        return (
+          <article className="index-tile" key={row.index_code}>
+            <small>{indexLabel(row)}</small>
+            <strong>{formatRatio(row.close)}</strong>
+            <span className={down ? 'change-down' : undefined}>
+              {formatChange(row.change_pct)} vs previous close
+            </span>
+            {asOf !== newest && <em>As of {asOf}</em>}
+          </article>
+        );
+      })}
     </div>
   );
 }
 
-async function pollJob(jobId: string, onUpdate: (job: SyncJob) => void): Promise<SyncJob> {
-  for (let attempt = 0; attempt < 90; attempt += 1) {
-    const job = await api.syncJob(jobId);
-    onUpdate(job);
-    if (['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(String(job.status || '').toUpperCase())) return job;
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-  }
-  throw new Error('Sync is still running. Refresh in a moment.');
-}
-
 export default function DashboardPage() {
-  const recent = React.useMemo(() => readRecent(), []);
+  const [recent, setRecent] = React.useState(() => readRecent());
   const account = useQuery({ queryKey: ['auth-me'], queryFn: api.authMe, retry: false });
   const signedIn = account.data?.signed_in === true;
   const market = useQuery({
     queryKey: ['benchmark-summary', HOME_INDEXES.join(',')],
     queryFn: () => api.benchmarkSummary(HOME_INDEXES),
   });
+  const sectors = useQuery({
+    queryKey: ['benchmark-summary', SECTOR_INDEXES.join(',')],
+    queryFn: () => api.benchmarkSummary(SECTOR_INDEXES),
+  });
   const portfolios = useQuery({ queryKey: ['portfolios'], queryFn: api.portfolios, enabled: signedIn });
-  const portfolioId = portfolios.data?.[0]?.portfolio_id;
+  const portfolioRows = portfolios.data || [];
+  const portfolioId = portfolioRows[0]?.portfolio_id;
   const holdings = useQuery({
     queryKey: ['holdings', portfolioId],
     queryFn: () => api.holdings(portfolioId),
     enabled: Boolean(portfolioId),
   });
 
+  React.useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === 'visible') setRecent(readRecent());
+    };
+    const onFocus = () => setRecent(readRecent());
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
+
   const rows = market.data || [];
-  const dates = rows.map((row: any) => String(row.as_of || '')).filter(Boolean).sort();
-  const newest = dates[dates.length - 1];
+  const sectorRows = sectors.data || [];
+  const newest = newestDate(rows);
   const holdingRows = holdings.data || [];
   const invested = holdingRows.reduce((sum: number, row: any) => sum + Number(row.invested_amount || 0), 0);
   const sleeves = new Map<string, number>();
@@ -146,36 +129,46 @@ export default function DashboardPage() {
           <div>
             <h2>Market</h2>
             <p className="panel-subtitle">
-              {rows.length ? `Delayed · as of ${formatDate(newest)} · index history` : 'Delayed · index history'}
+              {rows.length ? `Delayed · as of ${formatDisplayDate(newest)} · index history` : 'Delayed · index history'}
             </p>
           </div>
-          <MarketSyncButton />
+          <SyncJobButton
+            kind="PRICES"
+            label="Update indexes"
+            hideSucceeded
+            startJob={() => api.syncBenchmarks(SYNC_INDEXES)}
+            loadStatus={() => api.syncBenchmarkStatus()}
+            invalidateKeys={[['benchmark-summary']]}
+          />
         </div>
         {market.isLoading && <div className="home-note">Loading market…</div>}
         {market.error && <div className="home-note">Market data could not be loaded.</div>}
         {!market.isLoading && !market.error && !rows.length && <div className="home-note">No index history yet.</div>}
-        {rows.length > 0 && (
-          <div className="index-strip">
-            {rows.map((row: any) => {
-              const asOf = formatDate(row.as_of);
-              return (
-                <article className="index-tile" key={row.index_code}>
-                  <small>{indexLabel(row)}</small>
-                  <strong>{formatRatio(row.close)}</strong>
-                  <span>{formatChange(row.change_pct)}</span>
-                  {asOf !== formatDate(newest) && <em>As of {asOf}</em>}
-                </article>
-              );
-            })}
-          </div>
-        )}
+        {rows.length > 0 && <IndexStrip rows={rows} />}
       </section>
+
+      {sectorRows.length > 0 && (
+        <section className="panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Sectors</h2>
+              <p className="panel-subtitle">
+                Delayed · as of {formatDisplayDate(newestDate(sectorRows))} · index history
+              </p>
+            </div>
+          </div>
+          <IndexStrip rows={sectorRows} />
+        </section>
+      )}
 
       <div className="home-split">
         <section className="panel">
           <div className="panel-heading">
             <div>
               <h2>Portfolio</h2>
+              {portfolioRows.length > 1 && portfolioRows[0]?.user_name && (
+                <p className="panel-subtitle">{portfolioRows[0].user_name}</p>
+              )}
             </div>
             {signedIn && (
               <Link className="text-link" to="/portfolio">
@@ -207,32 +200,31 @@ export default function DashboardPage() {
                   <small>Holdings</small>
                   <strong>{holdingRows.length}</strong>
                 </div>
-                <div className="home-stat-quiet">
-                  <small>Market gains</small>
-                  <strong>Not available</strong>
-                </div>
               </div>
               <p className="panel-subtitle home-cost-note">Invested is cost. Positions are not marked to market.</p>
               {sleeveRows.length > 0 && (
-                <ul className="sleeve-list">
-                  {sleeveRows.map(([type, amount]) => {
-                    const share = invested ? (amount / invested) * 100 : null;
-                    return (
-                      <li key={type}>
-                        <div className="sleeve-row">
-                          <span>{sleeveLabel(type)}</span>
-                          <span className="sleeve-amount">
-                            {formatInr(amount)}
-                            <em>{share == null ? '—' : `${formatRatio(share, 1)}%`}</em>
-                          </span>
-                        </div>
-                        <div className="sleeve-track" aria-hidden="true">
-                          <i className={type === 'STOCK' ? 'sleeve-stock' : 'sleeve-fund'} style={{ width: `${share ?? 0}%` }} />
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <>
+                  <p className="panel-subtitle sleeve-caption">By invested cost</p>
+                  <ul className="sleeve-list">
+                    {sleeveRows.map(([type, amount]) => {
+                      const share = invested ? (amount / invested) * 100 : null;
+                      return (
+                        <li key={type}>
+                          <div className="sleeve-row">
+                            <span>{sleeveLabel(type)}</span>
+                            <span className="sleeve-amount">
+                              {formatInr(amount)}
+                              <em>{share == null ? '—' : `${formatRatio(share, 1)}%`}</em>
+                            </span>
+                          </div>
+                          <div className="sleeve-track" aria-hidden="true">
+                            <i className={type === 'STOCK' ? 'sleeve-stock' : 'sleeve-fund'} style={{ width: `${share ?? 0}%` }} />
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
               )}
             </>
           )}
@@ -256,6 +248,7 @@ export default function DashboardPage() {
                   <Link to={item.path}>
                     <small>{item.kind === 'fund' ? 'Fund' : 'Stock'}</small>
                     <span>{item.label || item.id}</span>
+                    <em>{formatRecentWhen(item.viewedAt)}</em>
                   </Link>
                 </li>
               ))}
@@ -263,11 +256,6 @@ export default function DashboardPage() {
           )}
         </section>
       </div>
-
-      <section className="home-later">
-        <h2>Watchlists and alerts</h2>
-        <p>Watchlists and alerts are not available yet. They will show changes and notices here when those features exist.</p>
-      </section>
     </div>
   );
 }
