@@ -1,15 +1,21 @@
-import { formatDate, formatInr } from '../../../lib/format';
+import { formatCount, formatDisplayDate, formatInr, firstSentence } from '../../../lib/format';
 
 export default function StockHeader({ stock }: { stock: any }) {
   const price = stock?.latest_price;
   const freshness = stock?.freshness || {};
-  const sources = stock?.data_sources || {};
-  const badges = [
-    { label: 'Price', value: freshness.latest_price_date },
-    { label: 'Fundamentals', value: freshness.latest_fundamental_period_end },
-    { label: 'Shareholding', value: freshness.latest_shareholding_period_end },
-    { label: 'Technicals', value: freshness.latest_technical_calculated_at },
-  ];
+  const summary = firstSentence(stock?.business_summary);
+  const freshnessBits = [
+    freshness.latest_price_date ? `Price ${formatDisplayDate(freshness.latest_price_date)}` : null,
+    freshness.latest_fundamental_period_end
+      ? `Statements ${formatDisplayDate(freshness.latest_fundamental_period_end)}`
+      : null,
+    freshness.latest_shareholding_period_end
+      ? `Shareholding ${formatDisplayDate(freshness.latest_shareholding_period_end)}`
+      : null,
+    freshness.latest_technical_calculated_at
+      ? `Indicators ${formatDisplayDate(freshness.latest_technical_calculated_at)}`
+      : null,
+  ].filter(Boolean);
   const identityBits = [
     stock?.exchange,
     stock?.sector_name,
@@ -26,27 +32,23 @@ export default function StockHeader({ stock }: { stock: any }) {
         <div>
           <p className="eyebrow">{stock?.trading_symbol || '—'}</p>
           <h1 className="stock-title">{stock?.company_name || stock?.trading_symbol || 'Stock'}</h1>
+          {summary ? <p className="panel-subtitle">{summary}</p> : null}
           <p className="subtitle">{identityBits.join(' · ') || '—'}</p>
           {!stock?.adjusted_history_available && (
-            <p className="panel-subtitle">
-              Corporate-action-adjusted history unavailable until a licensed CA feed is configured.
-              Prices source: {sources.prices || 'yfinance'}.
-            </p>
+            <p className="panel-subtitle">Prices are not adjusted for splits or bonuses. Source: yfinance.</p>
           )}
+          {freshnessBits.length > 0 && <p className="panel-subtitle">{freshnessBits.join(' · ')}</p>}
         </div>
         <div className="stock-price-block">
           <small>Last close</small>
           <strong>{formatInr(price?.close)}</strong>
-          <small>{formatDate(price?.date)}</small>
+          <small>{formatDisplayDate(price?.date)}</small>
+          {price?.volume != null && price.volume !== '' && <small>Volume {formatCount(price.volume)}</small>}
+          {price?.high_52w != null && price.high_52w !== '' && (
+            <small>52-week high {formatInr(price.high_52w)}</small>
+          )}
+          {price?.low_52w != null && price.low_52w !== '' && <small>52-week low {formatInr(price.low_52w)}</small>}
         </div>
-      </div>
-      <div className="freshness-badges">
-        {badges.map((badge) => (
-          <div key={badge.label} className={`freshness-badge ${badge.value ? 'fresh' : 'stale'}`}>
-            <small>{badge.label}</small>
-            <strong>{badge.value ? formatDate(badge.value) : 'Not synced'}</strong>
-          </div>
-        ))}
       </div>
     </section>
   );

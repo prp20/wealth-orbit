@@ -20,6 +20,11 @@ def _is_index(row: dict) -> bool:
     return str(row.get("is_index") or "").strip().lower() in {"true", "1", "yes"}
 
 
+def _business_summary(row: dict) -> str | None:
+    text = (row.get("summary") or "").strip()
+    return text or None
+
+
 def seed(data_dir: Path | str | None = None, dry_run: bool = False) -> dict:
     data_dir = resolve_data_dir(data_dir)
     path = data_dir / "stocks.csv"
@@ -49,6 +54,7 @@ def seed(data_dir: Path | str | None = None, dry_run: bool = False) -> dict:
                 (row.get("company_name") or symbol).strip(),
                 sectors[sector],
                 industries[(sector, industry)],
+                _business_summary(row),
             )
         )
 
@@ -108,17 +114,19 @@ def seed(data_dir: Path | str | None = None, dry_run: bool = False) -> dict:
                         (row.get("company_name") or symbol).strip(),
                         sector_ids[sector],
                         industry_ids[(sector, industry)],
+                        _business_summary(row),
                     )
                 )
             execute_values(
                 cur,
                 """INSERT INTO market_data.stock_reference
-                   (stock_id, trading_symbol, exchange, company_name, sector_id, industry_id)
+                   (stock_id, trading_symbol, exchange, company_name, sector_id, industry_id, business_summary)
                    VALUES %s
                    ON CONFLICT (exchange, trading_symbol) DO UPDATE
                    SET company_name = EXCLUDED.company_name,
                        sector_id = EXCLUDED.sector_id,
-                       industry_id = EXCLUDED.industry_id""",
+                       industry_id = EXCLUDED.industry_id,
+                       business_summary = EXCLUDED.business_summary""",
                 resolved_stocks,
                 page_size=500,
             )

@@ -11,6 +11,8 @@ from psycopg2.extras import execute_values
 
 from backend_api.app.technical_indicators import calculate_indicators
 
+from .daily_metrics import net_debt_from_parts
+
 
 DEFAULT_INDICATORS = [
     {"code": "SMA", "parameters": {"period": 20}},
@@ -114,9 +116,7 @@ def sync_daily_metrics(symbol: str, force: bool = False) -> dict:
             ebitda_ttm = info.get("ebitda")
             total_debt = info.get("totalDebt")
             total_cash = info.get("totalCash")
-            net_debt = None
-            if total_debt is not None or total_cash is not None:
-                net_debt = float(total_debt or 0) - float(total_cash or 0)
+            net_debt = net_debt_from_parts(total_debt, total_cash)
             ev_ebitda = info.get("enterpriseToEbitda")
             if ev_ebitda is None and enterprise_value and ebitda_ttm and float(ebitda_ttm) != 0:
                 ev_ebitda = float(enterprise_value) / float(ebitda_ttm)
@@ -128,22 +128,21 @@ def sync_daily_metrics(symbol: str, force: bool = False) -> dict:
             fcf_yield = None
             if fcf is not None and market_cap and float(market_cap) > 0:
                 fcf_yield = float(fcf) / float(market_cap) * 100
-            peg = info.get("pegRatio")
             values = (
                 stock_id, metric_date, market_cap, info.get("trailingPE"), info.get("priceToBook"),
                 (float(info["dividendYield"]) * 100 if info.get("dividendYield") is not None else None),
                 info.get("bookValue"), info.get("returnOnCapitalEmployed"), info.get("returnOnEquity"),
-                enterprise_value, ebitda_ttm, ev_ebitda, ev_sales, net_debt, fcf_yield, peg, source_id,
+                enterprise_value, ebitda_ttm, ev_ebitda, ev_sales, net_debt, fcf_yield, source_id,
             )
             cur.execute("""INSERT INTO market_data.stock_daily_metrics
                 (stock_id,metric_date,market_cap,stock_pe,price_to_book,dividend_yield,book_value,roce,roe,
                  enterprise_value,ebitda_ttm,ev_ebitda,ev_sales,net_debt,fcf_yield,peg,calculation_method,source_id)
-                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'PROVIDER',%s)
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL,'PROVIDER',%s)
                 ON CONFLICT(stock_id,metric_date) DO UPDATE SET market_cap=EXCLUDED.market_cap,stock_pe=EXCLUDED.stock_pe,
                 price_to_book=EXCLUDED.price_to_book,dividend_yield=EXCLUDED.dividend_yield,book_value=EXCLUDED.book_value,
                 roce=EXCLUDED.roce,roe=EXCLUDED.roe,enterprise_value=EXCLUDED.enterprise_value,
                 ebitda_ttm=EXCLUDED.ebitda_ttm,ev_ebitda=EXCLUDED.ev_ebitda,ev_sales=EXCLUDED.ev_sales,
-                net_debt=EXCLUDED.net_debt,fcf_yield=EXCLUDED.fcf_yield,peg=EXCLUDED.peg,
+                net_debt=EXCLUDED.net_debt,fcf_yield=EXCLUDED.fcf_yield,peg=NULL,
                 source_id=EXCLUDED.source_id,updated_at=NOW()""", values)
         conn.commit()
     return {"symbol": symbol, "kind": "daily_metrics", "status": "completed", "records_processed": 1, "force": force, "metric_date": str(metric_date)}

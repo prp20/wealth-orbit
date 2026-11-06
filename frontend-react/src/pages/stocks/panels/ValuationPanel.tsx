@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../api';
 import SyncJobButton from '../../../components/SyncJobButton';
-import { formatCompactInr, formatDate, formatPct, formatRatio } from '../../../lib/format';
+import { formatCompactInr, formatDate, formatPercentPoints, formatRatio } from '../../../lib/format';
 
 const ROWS: { key: string; label: string; format: (v: unknown) => string }[] = [
   { key: 'market_cap', label: 'Market cap', format: formatCompactInr },
@@ -10,9 +10,8 @@ const ROWS: { key: string; label: string; format: (v: unknown) => string }[] = [
   { key: 'price_to_book', label: 'P/B', format: formatRatio },
   { key: 'ev_ebitda', label: 'EV / EBITDA', format: formatRatio },
   { key: 'ev_sales', label: 'EV / Sales', format: formatRatio },
-  { key: 'dividend_yield', label: 'Dividend yield', format: formatPct },
-  { key: 'fcf_yield', label: 'FCF yield', format: formatPct },
-  { key: 'peg', label: 'PEG', format: formatRatio },
+  { key: 'dividend_yield', label: 'Dividend yield', format: formatPercentPoints },
+  { key: 'fcf_yield', label: 'FCF yield', format: formatPercentPoints },
   { key: 'ebitda_ttm', label: 'EBITDA (TTM)', format: formatCompactInr },
   { key: 'net_debt', label: 'Net debt', format: formatCompactInr },
 ];
@@ -38,6 +37,7 @@ export default function ValuationPanel({ symbol }: { symbol: string }) {
         <SyncJobButton
           symbol={symbol}
           kind="daily_metrics"
+          label="Update ratios"
           invalidateKeys={[['stock-valuation', symbol], ['stock', symbol], ['stock-daily-metrics', symbol]]}
         />
       </div>
@@ -57,13 +57,12 @@ export default function ValuationPanel({ symbol }: { symbol: string }) {
               </div>
             ))}
           </div>
-          {(data.notes || []).length > 0 && (
-            <ul className="panel-notes">
-              {data.notes.map((note: string) => (
-                <li key={note}>{note}</li>
-              ))}
-            </ul>
-          )}
+          <ul className="panel-notes">
+            {(data.notes || []).map((note: string) => (
+              <li key={note}>{note}</li>
+            ))}
+            <li>PEG is omitted until it is trailing earnings growth from stored results.</li>
+          </ul>
         </>
       )}
     </section>

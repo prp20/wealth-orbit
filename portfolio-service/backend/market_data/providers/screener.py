@@ -53,6 +53,27 @@ FUNDAMENTAL_METRICS = {
     },
 }
 
+SECTION_STATEMENT_TYPE = {
+    "profit-loss": "PL",
+    "balance-sheet": "BS",
+    "cash-flow": "CF",
+}
+
+
+def metric_statement_types() -> dict[str, str]:
+    """Canonical statement for each Screener metric code, independent of a bad stored tag."""
+    mapping: dict[str, str] = {}
+    for section_id, labels in FUNDAMENTAL_METRICS.items():
+        statement_type = SECTION_STATEMENT_TYPE[section_id]
+        for code in labels.values():
+            mapping[code] = statement_type
+    return mapping
+
+
+def canonical_statement_type(metric_code: str, stored: str | None) -> str:
+    return metric_statement_types().get(str(metric_code), stored or "")
+
+
 SHAREHOLDING_METRICS = {
     "promoters": "promoter_pct",
     "fiis": "fii_pct",
@@ -74,6 +95,7 @@ class FundamentalValue:
     reporting_basis: str
     value: float
     raw_checksum: str
+    statement_type: str
 
 
 @dataclass(frozen=True)
@@ -201,6 +223,7 @@ class ScreenerParser:
                     values.append(FundamentalValue(
                         stock_id, metric_code, reporting_period, start, end, self.reporting_basis,
                         number, checksum({"label": label, "period": periods[index], "value": cell, "basis": self.reporting_basis}),
+                        SECTION_STATEMENT_TYPE[section_id],
                     ))
         shareholding = self._shareholding(soup, stock_id)
         return ScreenerParseResult(values, shareholding, self._ratios(soup), warnings)

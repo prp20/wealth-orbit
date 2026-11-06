@@ -170,3 +170,5 @@
 .login-switch button{border:0;background:transparent;color:#2f6b52;font-weight:600;padding:0;cursor:pointer;font-size:14px}
 .login-switch button:hover{text-decoration:underline}
 .account-footer strong{overflow-wrap:anywhere}
+.statement-table .num{text-align:right;font-variant-numeric:tabular-nums}
+.statement-table th[scope=row]{text-align:left;font-weight:600}

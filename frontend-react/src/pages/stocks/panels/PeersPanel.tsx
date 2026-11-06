@@ -20,6 +20,9 @@ export default function PeersPanel({ symbol }: { symbol: string }) {
           <h2>Peers</h2>
           <p className="panel-subtitle">
             Side-by-side latest metrics vs {peers.data?.group || by} peers.
+            {String(current.data?.sector_name || '').toLowerCase().includes('financial')
+              ? ' These ratios are not a bank or lender model.'
+              : ''}
           </p>
         </div>
         <label className="stock-field inline-field">
@@ -52,8 +55,12 @@ export default function PeersPanel({ symbol }: { symbol: string }) {
             </thead>
             <tbody>
               <tr className="peer-current">
-                <td className="symbol-cell">{symbol}</td>
-                <td className="company-cell">{current.data?.company_name || '—'}</td>
+                <td className="symbol-cell">
+                  <Link to={`/stocks/${encodeURIComponent(symbol)}`}>{symbol}</Link>
+                </td>
+                <td className="company-cell">
+                  <Link to={`/stocks/${encodeURIComponent(symbol)}`}>{current.data?.company_name || '—'}</Link>
+                </td>
                 <td>{formatInr(current.data?.latest_price?.close)}</td>
                 <td>{formatRatio(currentMetrics?.stock_pe)}</td>
                 <td>{formatRatio(currentMetrics?.price_to_book)}</td>
@@ -68,7 +75,9 @@ export default function PeersPanel({ symbol }: { symbol: string }) {
                       {peer.trading_symbol}
                     </Link>
                   </td>
-                  <td className="company-cell">{peer.company_name || '—'}</td>
+                  <td className="company-cell">
+                    <Link to={`/stocks/${encodeURIComponent(peer.trading_symbol)}`}>{peer.company_name || '—'}</Link>
+                  </td>
                   <td>{formatInr(peer.latest_close)}</td>
                   <td>{formatRatio(peer.latest_metrics?.stock_pe)}</td>
                   <td>{formatRatio(peer.latest_metrics?.price_to_book)}</td>

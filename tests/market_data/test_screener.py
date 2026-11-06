@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "portfolio-service"
 from backend.market_data.providers.screener import (
     ScreenerParser,
     build_company_url,
+    canonical_statement_type,
     normalize_number,
     parse_period,
 )
@@ -23,6 +24,8 @@ def test_normalize_number_handles_screener_cells():
 def test_build_company_url_uses_slug_then_symbol_without_exchange_suffix():
     assert build_company_url("HDFCBANK.NS", "hdfc-bank") == "https://www.screener.in/company/hdfc-bank/consolidated/"
     assert build_company_url("HDFCBANK.NS", None) == "https://www.screener.in/company/HDFCBANK/consolidated/"
+    assert build_company_url("HDFCBANK", None, "STANDALONE") == "https://www.screener.in/company/HDFCBANK/"
+    assert build_company_url("HDFCBANK", None, "CONSOLIDATED").endswith("consolidated/")
 
 
 def test_parser_maps_annual_and_quarterly_values_and_reports_unknown_labels():
@@ -50,6 +53,7 @@ def test_parser_maps_annual_and_quarterly_values_and_reports_unknown_labels():
     assert parsed.fundamental_values[0].period_start == date(2023, 4, 1)
     assert parsed.fundamental_values[0].period_end == date(2024, 3, 31)
     assert parsed.fundamental_values[0].reporting_period == "ANNUAL"
+    assert parsed.fundamental_values[0].statement_type == "PL"
     assert parsed.fundamental_values[1].period_start == date(2024, 4, 1)
     assert parsed.fundamental_values[1].period_end == date(2024, 6, 30)
     assert parsed.fundamental_values[1].reporting_period == "QUARTERLY"
@@ -81,6 +85,38 @@ def test_parser_maps_december_year_end_statements_as_annual():
     assert all(item.reporting_period == "ANNUAL" for item in parsed.fundamental_values)
     assert parsed.fundamental_values[0].period_start == date(2023, 1, 1)
     assert parsed.fundamental_values[0].period_end == date(2023, 12, 31)
+
+
+def test_parser_tags_statement_type_from_section():
+    parsed = ScreenerParser().parse(
+        """
+        <section id="profit-loss"><table class="data-table">
+          <thead><tr><th>Particulars</th><th>Mar 2024</th></tr></thead>
+          <tbody><tr><td>Sales</td><td>100</td></tr></tbody>
+        </table></section>
+        <section id="balance-sheet"><table class="data-table">
+          <thead><tr><th>Particulars</th><th>Mar 2024</th></tr></thead>
+          <tbody><tr><td>Total Assets</td><td>500</td></tr></tbody>
+        </table></section>
+        <section id="cash-flow"><table class="data-table">
+          <thead><tr><th>Particulars</th><th>Mar 2024</th></tr></thead>
+          <tbody><tr><td>Cash from Operating Activity</td><td>40</td></tr></tbody>
+        </table></section>
+        """,
+        stock_id=uuid4(),
+    )
+    by_code = {item.metric_code: item.statement_type for item in parsed.fundamental_values}
+    assert by_code["REVENUE"] == "PL"
+    assert by_code["TOTAL_ASSETS"] == "BS"
+    assert by_code["CASH_FROM_OPERATING_ACTIVITIES"] == "CF"
+
+
+def test_canonical_statement_type_moves_mistagged_cash_flow_off_the_balance_sheet():
+    assert canonical_statement_type("CASH_FROM_OPERATING_ACTIVITIES", "BS") == "CF"
+    assert canonical_statement_type("NET_CASH_FLOW", "BS") == "CF"
+    assert canonical_statement_type("TOTAL_ASSETS", "BS") == "BS"
+    assert canonical_statement_type("REVENUE", "BS") == "PL"
+    assert canonical_statement_type("UNMAPPED_CODE", "BS") == "BS"
 
 
 def test_parser_maps_shareholding_and_leaves_absent_categories_null():
