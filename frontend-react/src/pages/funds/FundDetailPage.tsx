@@ -2,7 +2,6 @@ import React from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api';
-import SyncJobButton from '../../components/SyncJobButton';
 import ChartToolbar, { ChartRange } from '../../components/ChartToolbar';
 import FundNavChart from '../../components/FundNavChart';
 import FundHeader from './panels/FundHeader';
@@ -98,7 +97,7 @@ export default function FundDetailPage() {
       </div>
       <p className="eyebrow detail-eyebrow">Fund research</p>
 
-      <FundHeader fund={detail} />
+      <FundHeader schemeId={schemeId} fund={detail} />
 
       <nav className="fund-tabs" aria-label="Fund detail sections">
         {TABS.map((item) => (
@@ -130,12 +129,6 @@ export default function FundDetailPage() {
               </div>
               <div className="chart-panel-controls">
                 <ChartToolbar range={range} onChange={setRange} />
-                <SyncJobButton
-                  entity="fund"
-                  id={schemeId}
-                  kind="nav"
-                  invalidateKeys={[['history', 'fund', schemeId], ['fund', schemeId]]}
-                />
               </div>
             </div>
             <FundNavChart
@@ -176,12 +169,6 @@ export default function FundDetailPage() {
                   />
                   vs benchmark
                 </label>
-                <SyncJobButton
-                  entity="fund"
-                  id={schemeId}
-                  kind="nav"
-                  invalidateKeys={[['history', 'fund', schemeId], ['fund', schemeId]]}
-                />
               </div>
             </div>
             <FundNavChart

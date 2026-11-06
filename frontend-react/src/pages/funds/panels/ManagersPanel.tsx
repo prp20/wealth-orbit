@@ -25,6 +25,7 @@ export default function ManagersPanel({ schemeId }: { schemeId: string }) {
           entity="fund"
           id={schemeId}
           kind="managers"
+          label="Update managers"
           invalidateKeys={[['fund-managers', schemeId]]}
         />
       </div>

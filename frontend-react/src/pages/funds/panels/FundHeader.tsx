@@ -1,14 +1,21 @@
-import { formatDate, formatInr } from '../../../lib/format';
+import SyncJobButton from '../../../components/SyncJobButton';
+import { formatDisplayDate } from '../../../lib/format';
+import { planOptionLabel } from '../../../lib/fundMetrics';
 
-export default function FundHeader({ fund }: { fund: any }) {
-  const nav = fund?.latest_nav;
+export default function FundHeader({ schemeId, fund }: { schemeId: string; fund: any }) {
   const freshness = fund?.freshness || {};
-  const badges = [
-    { label: 'NAV', value: freshness.latest_nav_date },
-    { label: 'Metrics', value: freshness.latest_metrics_as_of },
-    { label: 'Enrichment', value: freshness.latest_enrichment_as_of },
-    { label: 'Benchmark', value: freshness.latest_benchmark_history_date },
-  ];
+  const subtitle = [
+    fund?.amc_name,
+    fund?.category_name,
+    fund?.subcategory_name,
+    planOptionLabel(fund?.plan_type),
+    planOptionLabel(fund?.option_type),
+  ].filter(Boolean).join(' · ');
+  const dates = [
+    freshness.latest_nav_date ? `NAV ${formatDisplayDate(freshness.latest_nav_date)}` : '',
+    freshness.latest_metrics_as_of ? `Returns ${formatDisplayDate(freshness.latest_metrics_as_of)}` : '',
+    freshness.latest_enrichment_as_of ? `Facts ${formatDisplayDate(freshness.latest_enrichment_as_of)}` : '',
+  ].filter(Boolean);
 
   return (
     <section className="stock-header panel">
@@ -16,24 +23,26 @@ export default function FundHeader({ fund }: { fund: any }) {
         <div>
           <p className="eyebrow">{fund?.scheme_code || '—'}</p>
           <h1 className="stock-title">{fund?.scheme_name || fund?.scheme_code || 'Fund'}</h1>
-          <p className="subtitle">
-            {[fund?.amc_name, fund?.category_name, fund?.subcategory_name].filter(Boolean).join(' · ') || '—'}
-          </p>
+          <p className="subtitle">{subtitle || '—'}</p>
         </div>
-        <div className="stock-price-block">
-          <small>Last NAV</small>
-          <strong>{formatInr(nav?.nav)}</strong>
-          <small>{formatDate(nav?.date)}</small>
-        </div>
+        <SyncJobButton
+          entity="fund"
+          id={schemeId}
+          kind="nav"
+          thenKind="metrics"
+          label="Update returns"
+          hideSucceeded
+          invalidateKeys={[
+            ['fund', schemeId],
+            ['fund-metrics', schemeId],
+            ['history', 'fund', schemeId],
+            ['fund-similar', schemeId],
+          ]}
+        />
       </div>
-      <div className="freshness-badges">
-        {badges.map((badge) => (
-          <div key={badge.label} className={`freshness-badge ${badge.value ? 'fresh' : 'stale'}`}>
-            <small>{badge.label}</small>
-            <strong>{badge.value ? formatDate(badge.value) : 'Not synced'}</strong>
-          </div>
-        ))}
-      </div>
+      <p className="panel-subtitle fund-freshness">
+        {dates.length ? dates.join(' · ') : 'No NAV, returns, or facts loaded yet.'}
+      </p>
     </section>
   );
 }

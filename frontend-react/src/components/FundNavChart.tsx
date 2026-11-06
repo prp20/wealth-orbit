@@ -66,7 +66,7 @@ export default function FundNavChart({ schemeId, range, overlay, benchmarkAvaila
     return (
       <div className="chart-plot">
         <div className="empty">
-          Benchmark history is not aligned yet. Sync benchmark history or turn overlay off.
+          Benchmark history is not aligned yet. Turn the overlay off.
         </div>
         <MarketChart kind="fund" id={schemeId} bare range={range} />
       </div>

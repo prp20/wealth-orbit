@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../api';
-import { formatInr, formatPct, formatRatio } from '../../../lib/format';
+import { formatInr, formatPct } from '../../../lib/format';
+import { periodReturnLabel, periodReturnValue } from '../../../lib/fundMetrics';
 
 export default function SimilarFundsPanel({ schemeId }: { schemeId: string }) {
   const similar = useQuery({
@@ -9,13 +10,17 @@ export default function SimilarFundsPanel({ schemeId }: { schemeId: string }) {
     queryFn: () => api.fundSimilar(schemeId),
   });
   const rows = similar.data || [];
+  const period = rows.find((row: any) => row.metric_period)?.metric_period;
 
   return (
     <section className="panel">
       <div className="panel-heading">
         <div>
           <h2>Similar funds</h2>
-          <p className="panel-subtitle">Peers in the same subcategory with latest metrics.</p>
+          <p className="panel-subtitle">
+            Same subcategory, plan, and option.
+            {period ? ` ${periodReturnLabel(period)}.` : ''}
+          </p>
         </div>
       </div>
       {similar.isLoading && <div className="loading">Loading similar funds…</div>}
@@ -26,27 +31,25 @@ export default function SimilarFundsPanel({ schemeId }: { schemeId: string }) {
           <table className="stock-table">
             <thead>
               <tr>
-                <th>Code</th>
                 <th>Name</th>
+                <th>Code</th>
                 <th>AMC</th>
                 <th>NAV</th>
-                <th>CAGR</th>
-                <th>Trailing</th>
-                <th>Sharpe</th>
+                <th>{periodReturnLabel(period)}</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row: any) => (
                 <tr key={row.scheme_code}>
-                  <td className="symbol-cell">
-                    <Link to={`/mutualfunds/${encodeURIComponent(row.scheme_code)}`}>{row.scheme_code}</Link>
+                  <td className="company-cell">
+                    <Link to={`/mutualfunds/${encodeURIComponent(row.scheme_code)}`}>
+                      {row.scheme_name || row.scheme_code}
+                    </Link>
                   </td>
-                  <td className="company-cell">{row.scheme_name || '—'}</td>
+                  <td className="scheme-code">{row.scheme_code}</td>
                   <td>{row.amc_name || '—'}</td>
                   <td>{formatInr(row.latest_nav)}</td>
-                  <td>{formatPct(row.cagr)}</td>
-                  <td>{formatPct(row.trailing_return)}</td>
-                  <td>{formatRatio(row.sharpe)}</td>
+                  <td>{formatPct(periodReturnValue(row))}</td>
                 </tr>
               ))}
             </tbody>

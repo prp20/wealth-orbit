@@ -238,7 +238,7 @@ export default function FundScreenerPage() {
             />
           </label>
           <label className="stock-field">
-            <span>Min Sharpe</span>
+            <span>Min Sharpe, full history</span>
             <input
               type="number"
               step="0.1"
@@ -248,7 +248,7 @@ export default function FundScreenerPage() {
             />
           </label>
           <label className="stock-field">
-            <span>Max loss % (DD)</span>
+            <span>Max loss, full history</span>
             <input
               type="number"
               step="0.1"
@@ -310,14 +310,14 @@ export default function FundScreenerPage() {
                 <thead>
                   <tr>
                     <th aria-label="Select" />
-                    <th>Scheme code</th>
                     <th>Scheme name</th>
+                    <th>Scheme code</th>
                     <th>AMC</th>
                     <th>Category</th>
                     <th>Trailing</th>
                     <th>CAGR</th>
-                    <th>Sharpe</th>
-                    <th>Max DD</th>
+                    <th>Sharpe, full history</th>
+                    <th>Max DD, full history</th>
                     <th>AUM</th>
                     <th>Expense</th>
                   </tr>
@@ -334,15 +334,15 @@ export default function FundScreenerPage() {
                             checked={checked}
                             disabled={disabled}
                             onChange={() => toggleCode(row.scheme_code)}
-                            aria-label={`Select ${row.scheme_code}`}
+                            aria-label={`Select ${row.scheme_name || row.scheme_code}`}
                           />
                         </td>
-                        <td className="symbol-cell">
+                        <td className="company-cell">
                           <Link to={`/mutualfunds/${encodeURIComponent(row.scheme_code)}`}>
-                            {row.scheme_code}
+                            {row.scheme_name || row.scheme_code}
                           </Link>
                         </td>
-                        <td className="company-cell">{row.scheme_name || '—'}</td>
+                        <td className="scheme-code">{row.scheme_code}</td>
                         <td>{row.amc_name || '—'}</td>
                         <td>{row.category_name || '—'}</td>
                         <td>{formatPct(row.trailing_return)}</td>
