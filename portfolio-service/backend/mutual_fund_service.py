@@ -1,12 +1,13 @@
 """Native mutual-fund sync logic inspired by the Nivesh pipeline contracts."""
 import os
-import uuid
 import logging
 import json
 from datetime import date, datetime
 import psycopg2
 import pandas as pd
 from psycopg2.extras import execute_values
+
+from backend.market_data.sources import ensure_data_source
 
 logger = logging.getLogger("wealth_orbit.mutual_fund")
 
@@ -97,19 +98,7 @@ def sync_nav(scheme_code: str, force: bool = False, from_date: date | None = Non
         with conn.cursor() as cur:
             cur.execute("SELECT scheme_id FROM market_data.mutual_fund_reference WHERE scheme_code=%s",(scheme_code,)); found=cur.fetchone()
             if not found: raise RuntimeError(f"Unknown mutual-fund scheme: {scheme_code}")
-            # NAV history requires provenance. Reuse the canonical MFAPI source,
-            # creating it once for installations that have not seeded sources yet.
-            cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"wealth-orbit:source:{source_name}",))
-            cur.execute("SELECT source_id FROM market_data.data_sources WHERE source_name=%s", (source_name,))
-            source = cur.fetchone()
-            if source:
-                source_id = source[0]
-            else:
-                source_id = uuid.uuid4()
-                cur.execute(
-                    "INSERT INTO market_data.data_sources(source_id, source_name) VALUES(%s, %s)",
-                    (source_id, source_name),
-                )
+            source_id = ensure_data_source(cur, source_name)
             if not force:
                 cur.execute("SELECT max(h.nav_date) FROM market_data.mutual_fund_nav_history h WHERE h.scheme_id=%s",(found[0],)); watermark=cur.fetchone()[0]
                 rows=[r for r in rows if watermark is None or r[1]>watermark]

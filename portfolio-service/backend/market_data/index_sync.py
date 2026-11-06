@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import uuid
 from datetime import date, timedelta
 
 import pandas as pd
@@ -10,6 +9,7 @@ import psycopg2
 from psycopg2.extras import execute_values
 
 from .index_history import quote_identifier, resolve_index_history_columns
+from .sources import ensure_data_source
 
 
 def rows_from_yahoo_frame(frame: pd.DataFrame) -> list[tuple]:
@@ -154,10 +154,4 @@ def sync_home_indexes(codes: list[str]) -> dict:
 
 
 def _source_id(cursor, name: str):
-    cursor.execute("SELECT source_id FROM market_data.data_sources WHERE source_name=%s", (name,))
-    row = cursor.fetchone()
-    if row:
-        return row[0]
-    value = uuid.uuid4()
-    cursor.execute("INSERT INTO market_data.data_sources(source_id, source_name) VALUES(%s, %s)", (value, name))
-    return value
+    return ensure_data_source(cursor, name)

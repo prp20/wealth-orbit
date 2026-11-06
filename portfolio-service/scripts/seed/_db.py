@@ -48,16 +48,6 @@ def resolve_data_dir(data_dir: Path | str | None) -> Path:
 
 
 def get_or_create_source(cur, source_name: str) -> uuid.UUID:
-    cur.execute(
-        "SELECT source_id FROM market_data.data_sources WHERE source_name=%s",
-        (source_name,),
-    )
-    found = cur.fetchone()
-    if found:
-        return found[0]
-    source_id = uuid.uuid4()
-    cur.execute(
-        "INSERT INTO market_data.data_sources(source_id, source_name) VALUES (%s, %s)",
-        (source_id, source_name),
-    )
-    return source_id
+    from backend.market_data.sources import ensure_data_source
+
+    return ensure_data_source(cur, source_name)

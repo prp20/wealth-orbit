@@ -1,0 +1,816 @@
+[
+  {
+    "kind": "meta",
+    "title": "[Meta] Nivesh PRD \u2014 feature & story tracking",
+    "labels": [
+      "documentation",
+      "source-nivesh-prd",
+      "epic"
+    ],
+    "body": "## Source\n[`docs/Nivesh_Product_Requirements_and_Roadmap.md`](../blob/feature/mutual-fund-parity/docs/Nivesh_Product_Requirements_and_Roadmap.md)\n\n## Purpose\nParent tracker for features and stories extracted from the Nivesh PRD (v1.0, 4 Nov 2026).\n\n## Product pillars\n- **Nivesh Research** \u2014 funds and companies\n- **Nivesh Intelligence** \u2014 screeners, signals, AI\n- **Nivesh Portfolio** \u2014 transactions, exposure, goals\n- **Nivesh Trading** \u2014 broker / paper trading (later)\n\n## Modules (epics)\n- M01 Dashboard\n- M02 Mutual Fund Research\n- M03 Equity Research\n- M04 Market Intelligence\n- M05 Comparison engine\n- M06 Screening engine\n- M07 Portfolio management\n- M08 Watchlists\n- M09 Alerts and signals\n- M10 AI research\n- M11 Strategy Lab\n- M12 Trading integration\n- M13 Administration\n\n## MVP workstreams\nW1 Foundation \u2192 W2 MF data \u2192 W3 Equity data \u2192 W4 Analytics \u2192 W5 Research UI \u2192 W6 Discovery \u2192 W7 Quality/ops\n\n## Priority legend\n- **P0** MVP required\n- **P1** Core expansion\n- **P2** Advanced\n- **P3** Later / compliance-dependent\n\nChild issues are created for each feature ID and roadmap phase."
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic][M01] Dashboard",
+    "labels": [
+      "epic",
+      "module-m01",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd"
+    ],
+    "body": "## Objective\nProvide a consolidated view of the market, portfolio and research activity.\n\n## Stories\n- Basic dashboard: major indices, portfolio summary when present, freshness/as-of\n- Watchlist changes and recent alerts\n- Recently viewed funds/stocks\n- Corporate announcements strip\n- Configurable widgets (P1)\n\n## Priority\nP0 basic dashboard; P1 configurable widgets.\n\n## Source\nPRD \u00a74.1 M01"
+  },
+  {
+    "kind": "story",
+    "title": "[M01][P0] Basic research dashboard",
+    "labels": [
+      "story",
+      "module-m01",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs an investor, I want a home overview of markets and my research activity so I can decide what to investigate next.\n\n## Requirements\n- Major Indian index performance\n- Portfolio value / invested / gains when a portfolio exists\n- Asset allocation summary when portfolio exists\n- Watchlist changes and recent alerts\n- Recently viewed funds and stocks\n- Data as-of dates and delayed/live status\n\n## Acceptance\n- Dashboard loads without requiring all widgets to have data\n- Missing portfolio shows research/market widgets only\n- Freshness visible for market figures\n\n## Source\nPRD \u00a74.1, \u00a75.1 Shared capabilities"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic][M02] Mutual Fund Research",
+    "labels": [
+      "epic",
+      "module-m02",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd"
+    ],
+    "body": "## Objective\nEnd-to-end mutual fund research: master data, NAV, performance/risk, holdings, comparison, screener, detail page.\n\n## Features\n- MF-01 Scheme master (P0)\n- MF-02 NAV history (P0)\n- MF-03 Performance analytics (P0/P1)\n- MF-04 Risk analytics (P0/P1)\n- MF-05 Portfolio holdings (P1)\n- MF-06 Fund overlap (P1)\n- MF-07 Fund manager analysis (P1)\n- MF-08 Fund comparison (P0/P1)\n- MF-09 Fund screener (P0/P1)\n- MF-10 Fund detail page (P0)\n\n## Source\nPRD \u00a74.2"
+  },
+  {
+    "kind": "story",
+    "title": "[M02][P0] MF-01 Scheme master",
+    "labels": [
+      "story",
+      "module-m02",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher, I need a canonical scheme record so Direct/Regular and Growth/IDCW plans stay distinct and historically traceable.\n\n## Requirements\nScheme code/identifiers, name, AMC, category/subcategory, plan/option, status, launch date, benchmark mappings with effective dates, manager assignments, AUM/TER/exit load/riskometer with as-of dates, source + last-updated.\n\n## Rules\n- Direct vs regular distinct\n- Growth vs IDCW distinct\n- Mergers/changes traceable\n- Historical classifications/benchmarks not silently overwritten\n\n## Acceptance\n- Identity uniqueness enforced for plan/option combinations\n- Benchmark mapping history retained\n\n## Source\nPRD \u00a74.2 MF-01"
+  },
+  {
+    "kind": "story",
+    "title": "[M02][P0] MF-02 NAV history ingestion",
+    "labels": [
+      "story",
+      "module-m02",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher, I need daily NAV history with provenance so performance metrics are reproducible.\n\n## Requirements\n- Daily NAV observations with source timestamps\n- Duplicate / abnormal movement validation\n- Missing expected observations detection\n- Immutable raw NAVs; corrections via audit/version trail\n- Distinguish non-business days from missing data\n\n## Acceptance\n- Historical NAV queryable by date range\n- Failed ingestion retryable without duplicates\n\n## Source\nPRD \u00a74.2 MF-02, \u00a75.3 AC1"
+  },
+  {
+    "kind": "story",
+    "title": "[M02][P0] MF-03 Performance analytics (basic)",
+    "labels": [
+      "story",
+      "module-m02",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a fund investor, I want absolute returns, CAGR, rolling returns and benchmark outperformance for standard periods.\n\n## MVP scope\nAbsolute return, CAGR, rolling returns (summary), benchmark returns/outperformance for 1M\u201310Y / since inception where meaningful.\n\n## Later (P1)\nCalendar/monthly returns, SIP XIRR, category average/median, return distribution, quartile ranking, rolling consistency charts.\n\n## Acceptance\n- Metrics reproducible from stored NAV\n- Insufficient history \u2192 null + reason (never silent zero)\n- Calculation version recorded\n\n## Source\nPRD \u00a74.2 MF-03, \u00a75.1 Mutual funds"
+  },
+  {
+    "kind": "story",
+    "title": "[M02][P0] MF-04 Risk analytics (core)",
+    "labels": [
+      "story",
+      "module-m02",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a fund investor, I want core risk metrics (volatility, Sharpe/Sortino, alpha/beta, max drawdown) with documented methodology.\n\n## MVP metrics\nStdev, Sharpe, Sortino, beta, alpha, max drawdown.\n\n## Later (P1)\nR\u00b2, current drawdown, downside deviation, up/down capture, Calmar, recovery duration.\n\n## Acceptance\nEvery metric documents frequency, benchmark, risk-free rate, annualization, lookback, missing-obs treatment, calculation version.\n\n## Source\nPRD \u00a74.2 MF-04"
+  },
+  {
+    "kind": "story",
+    "title": "[M02][P1] MF-05 Fund portfolio holdings",
+    "labels": [
+      "story",
+      "module-m02",
+      "priority-p1",
+      "phase-2",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a fund investor, I want monthly portfolio disclosures so I can see concentration, sector mix and holding changes.\n\n## Requirements\nTop 10/20 holdings, sector & market-cap allocation, cash, new/exited/increased/reduced holdings, concentration/HHI, disclosure date + source.\n\n## Source\nPRD \u00a74.2 MF-05"
+  },
+  {
+    "kind": "story",
+    "title": "[M02][P1] MF-06 Fund overlap analysis",
+    "labels": [
+      "story",
+      "module-m02",
+      "priority-p1",
+      "phase-2",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a portfolio-oriented investor, I want overlap across schemes (and vs direct equities) so I can spot concentration.\n\n## Requirements\nCommon securities, documented weighting method, common weights, sector overlap, consolidated exposure, stale disclosure warnings.\n\n## Source\nPRD \u00a74.2 MF-06"
+  },
+  {
+    "kind": "story",
+    "title": "[M02][P1] MF-07 Fund manager analysis",
+    "labels": [
+      "story",
+      "module-m02",
+      "priority-p1",
+      "phase-2",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a fund investor, I want manager tenure-aware performance so I do not attribute full scheme history to a recent manager.\n\n## Requirements\nManager profile, assignment history with start/end, tenure-adjusted performance vs benchmark/category, risk-adjusted tenure metrics, change dates.\n\n## Source\nPRD \u00a74.2 MF-07"
+  },
+  {
+    "kind": "story",
+    "title": "[M02][P0] MF-08 Fund comparison (basic)",
+    "labels": [
+      "story",
+      "module-m02",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher, I want to compare up to ~10 schemes on aligned dates for returns, risk, AUM, TER and benchmark.\n\n## MVP\nReturns, risk, AUM, TER, exit load, benchmark with aligned observation dates and comparable plan types.\n\n## Later (P1)\nHoldings, sector allocation, manager/tenure, concentration/overlap.\n\n## Source\nPRD \u00a74.2 MF-08, \u00a75.1"
+  },
+  {
+    "kind": "story",
+    "title": "[M02][P0] MF-09 Fund screener (basic)",
+    "labels": [
+      "story",
+      "module-m02",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher, I want configurable fund filters (category, AUM, returns, risk, TER, drawdown) and saved screens.\n\n## MVP\nCategory/subcategory, AUM, returns, core risk, TER, drawdown filters; sort/rank; export optional.\n\n## Later (P1)\nRolling consistency, manager tenure, portfolio characteristics, custom scoring.\n\n## Source\nPRD \u00a74.2 MF-09, \u00a74.6"
+  },
+  {
+    "kind": "story",
+    "title": "[M02][P0] MF-10 Fund detail page (core tabs)",
+    "labels": [
+      "story",
+      "module-m02",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher, I want a fund detail page with Overview, Performance, Risk, Benchmark/peers and freshness so I can complete a research pass.\n\n## Core tabs (P0)\nOverview, Performance, Risk, Benchmark and peers.\n\n## Later tabs\nPortfolio, Fund manager, Documents, AI research.\n\n## Acceptance\nMissing sections show unavailable + reason; metrics show as-of/source.\n\n## Source\nPRD \u00a74.2 MF-10"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic][M03] Equity Research",
+    "labels": [
+      "epic",
+      "module-m03",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd"
+    ],
+    "body": "## Objective\nCompany master, market data, statements, fundamentals, valuation, technicals, ownership, governance, peers, detail page.\n\n## Features\nEQ-01\u2026EQ-11 (see child stories).\n\n## Source\nPRD \u00a74.3"
+  },
+  {
+    "kind": "story",
+    "title": "[M03][P0] EQ-01 Company master",
+    "labels": [
+      "story",
+      "module-m03",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a stock researcher, I need a canonical company identity (NSE/BSE/ISIN, sector/industry, listing events).\n\n## Requirements\nCompany name, NSE symbol, BSE code, ISIN, sector/industry, listing status/dates, mcap classification, identity event history (mergers, symbol changes, delistings).\n\n## Source\nPRD \u00a74.3 EQ-01"
+  },
+  {
+    "kind": "story",
+    "title": "[M03][P0] EQ-02 Daily market data (OHLCV)",
+    "labels": [
+      "story",
+      "module-m03",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a stock researcher, I need daily OHLCV and corporate-action-aware adjusted history with freshness metadata.\n\n## Requirements\nDaily OHLCV, adjusted history, corporate actions, index history, source/freshness. Intraday out of MVP.\n\n## Acceptance\nAC2/AC3: ingest+validate daily prices; corporate actions reflected in adjusted history.\n\n## Source\nPRD \u00a74.3 EQ-02, \u00a75.3"
+  },
+  {
+    "kind": "story",
+    "title": "[M03][P0] EQ-03 Financial statements ingestion",
+    "labels": [
+      "story",
+      "module-m03",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a stock researcher, I need annual/quarterly P&L, BS, CF with standalone vs consolidated kept distinct.\n\n## Requirements\nAnnual/quarterly P&L, BS, CF; standalone & consolidated; TTM; restatements/versions; period end + publication date + source.\n\n## Rules\nNever mix standalone with consolidated in one calculation; never silently overwrite restatements.\n\n## Source\nPRD \u00a74.3 EQ-03, \u00a76.4"
+  },
+  {
+    "kind": "story",
+    "title": "[M03][P0] EQ-04 Fundamental analytics (core ratios)",
+    "labels": [
+      "story",
+      "module-m03",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a long-term equity investor, I want core profitability, growth, leverage and cash-flow ratios with definitions and trends.\n\n## MVP\nROE/ROCE, margins, revenue/PAT/EPS growth, D/E, interest coverage, CFO/FCF basics.\n\n## Later (P1)\nExtended efficiency ratios and trend diagnostics.\n\n## Source\nPRD \u00a74.3 EQ-04"
+  },
+  {
+    "kind": "story",
+    "title": "[M03][P0] EQ-05 Trailing valuation metrics",
+    "labels": [
+      "story",
+      "module-m03",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a stock researcher, I want trailing P/E, P/B, EV/EBITDA, dividend yield and mcap/EV with as-of context.\n\n## Later (P1)\nHistorical valuation percentiles, peer comparison bands; forward only with licensed estimates.\n\n## Source\nPRD \u00a74.3 EQ-05"
+  },
+  {
+    "kind": "story",
+    "title": "[M03][P1] EQ-06 DCF calculator",
+    "labels": [
+      "story",
+      "module-m03",
+      "priority-p1",
+      "phase-2",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs an advanced investor, I want a transparent DCF model with sensitivity (WACC / terminal growth) that is clearly a model, not fair value.\n\n## Source\nPRD \u00a74.3 EQ-06"
+  },
+  {
+    "kind": "story",
+    "title": "[M03][P0] EQ-07 Technical charts and core indicators",
+    "labels": [
+      "story",
+      "module-m03",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs an active investor, I want candlestick/line charts with volume and selected indicators (SMA/EMA, RSI, MACD, Bollinger, ATR).\n\n## Later (P1)\nBroader indicator set, candlestick pattern engine with historical evaluation.\n\n## Source\nPRD \u00a74.3 EQ-07"
+  },
+  {
+    "kind": "story",
+    "title": "[M03][P1] EQ-08 Ownership / shareholding analysis",
+    "labels": [
+      "story",
+      "module-m03",
+      "priority-p1",
+      "phase-2",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher, I want promoter/FII/DII/MF ownership, pledging and quarterly changes with reporting dates.\n\n## Source\nPRD \u00a74.3 EQ-08"
+  },
+  {
+    "kind": "story",
+    "title": "[M03][P1] EQ-09 Governance and red flags",
+    "labels": [
+      "story",
+      "module-m03",
+      "priority-p1",
+      "phase-2",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher, I want investigation flags (auditor changes, pledging, dilution, delayed filings, etc.) with source, date, severity and status \u2014 never auto-accusations.\n\n## Source\nPRD \u00a74.3 EQ-09"
+  },
+  {
+    "kind": "story",
+    "title": "[M03][P1] EQ-10 Peer and sector analysis",
+    "labels": [
+      "story",
+      "module-m03",
+      "priority-p1",
+      "phase-2",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher, I want sector-appropriate peer comparisons for growth, profitability, leverage, cash flow and valuation.\n\n## Rule\nDo not use one universal scoring model across banks, insurers, manufacturers and software.\n\n## Source\nPRD \u00a74.3 EQ-10"
+  },
+  {
+    "kind": "story",
+    "title": "[M03][P0] EQ-11 Stock detail page (core sections)",
+    "labels": [
+      "story",
+      "module-m03",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher, I want a stock detail page covering overview, statements, fundamentals, valuation and technicals with freshness.\n\n## Later tabs\nOwnership, governance, peers, announcements, AI research.\n\n## Source\nPRD \u00a74.3 EQ-11, \u00a75.1"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic][M04] Market Intelligence",
+    "labels": [
+      "epic",
+      "module-m04",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd"
+    ],
+    "body": "## Objective\nIndices, sector performance, breadth, macro, announcements \u2014 starting with major Indian indices and MF benchmarks.\n\n## P0\nMajor index tracking + history needed for fund benchmarks (prefer TRI where appropriate).\n\n## P1\nBreadth (A/D, % above DMAs, 52w highs/lows), sector rotation, macro, news.\n\n## Source\nPRD \u00a74.4, \u00a76.3"
+  },
+  {
+    "kind": "story",
+    "title": "[M04][P0] Major indices and benchmark history",
+    "labels": [
+      "story",
+      "module-m04",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher, I need major Indian index history and scheme-benchmark mappings with effective dates for fair fund comparisons.\n\n## Requirements\nIndex master (PRI/TRI classification), historical values, constituents with effective dates, scheme benchmark mappings, freshness.\n\n## Rule\nDo not compare dividend-inclusive fund returns to price-only indices without disclosure.\n\n## Source\nPRD \u00a74.4, \u00a76.3"
+  },
+  {
+    "kind": "story",
+    "title": "[M04][P1] Market breadth and sector intelligence",
+    "labels": [
+      "story",
+      "module-m04",
+      "priority-p1",
+      "phase-2",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs an active investor, I want sector performance, advance/decline, % above key DMAs and 52-week extremes.\n\n## Source\nPRD \u00a74.4"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic][M05] Comparison engine",
+    "labels": [
+      "epic",
+      "module-m05",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd"
+    ],
+    "body": "## Objective\nCompare funds, stocks, investments vs benchmarks with aligned periods; later templates and saved comparisons.\n\n## Source\nPRD \u00a74.5"
+  },
+  {
+    "kind": "story",
+    "title": "[M05][P0] Basic comparison (fund/stock/benchmark)",
+    "labels": [
+      "story",
+      "module-m05",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher, I want side-by-side comparisons with aligned observation periods and configurable metrics.\n\n## Acceptance\nAC9: comparisons use aligned date ranges.\n\n## Source\nPRD \u00a74.5, \u00a75.3"
+  },
+  {
+    "kind": "story",
+    "title": "[M05][P1] Comparison templates and saved comparisons",
+    "labels": [
+      "story",
+      "module-m05",
+      "priority-p1",
+      "phase-2",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher, I want saved comparisons and templates (growth/value/quality/dividend/momentum/consistent MF/risk-adjusted MF).\n\n## Source\nPRD \u00a74.5"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic][M06] Screening engine",
+    "labels": [
+      "epic",
+      "module-m06",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd"
+    ],
+    "body": "## Objective\nPredefined + custom screens for equities and mutual funds; point-in-time backtests later.\n\n## Source\nPRD \u00a74.6"
+  },
+  {
+    "kind": "story",
+    "title": "[M06][P0] Basic multi-condition screener",
+    "labels": [
+      "story",
+      "module-m06",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher, I want AND/OR numeric and categorical filters with sort/rank and saved screens.\n\n## Acceptance\nAC10: screeners support multiple conditions.\n\n## Source\nPRD \u00a74.6, \u00a75.3"
+  },
+  {
+    "kind": "story",
+    "title": "[M06][P1] Predefined screens and screen alerts",
+    "labels": [
+      "story",
+      "module-m06",
+      "priority-p1",
+      "phase-4",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher, I want curated equity/MF screens and alerts when instruments enter/exit a screen.\n\n## Source\nPRD \u00a74.6"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic][M07] Portfolio management",
+    "labels": [
+      "epic",
+      "module-m07",
+      "priority-p1",
+      "phase-3",
+      "source-nivesh-prd"
+    ],
+    "body": "## Objective\nMulti-portfolio transactions, XIRR, allocation/exposure, rebalancing, goals \u2014 after research MVP.\n\n## Source\nPRD \u00a74.7, Phase 3"
+  },
+  {
+    "kind": "story",
+    "title": "[M07][P1] Portfolio transactions and holdings model",
+    "labels": [
+      "story",
+      "module-m07",
+      "priority-p1",
+      "phase-3",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a portfolio investor, I want multiple portfolios with buys/sells, MF purchase/redemption, SIPs, dividends, splits/bonus, switches and opening balances.\n\n## Acceptance\nPortfolio value reconciles to holdings and transactions; corporate actions do not duplicate economic exposure.\n\n## Source\nPRD \u00a74.7, Phase 3"
+  },
+  {
+    "kind": "story",
+    "title": "[M07][P1] Portfolio analytics (XIRR, allocation, exposure)",
+    "labels": [
+      "story",
+      "module-m07",
+      "priority-p1",
+      "phase-3",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a portfolio investor, I want invested/current value, XIRR, realized/unrealized gains, allocation, underlying MF exposure, drawdown and benchmark comparison.\n\n## Source\nPRD \u00a74.7"
+  },
+  {
+    "kind": "story",
+    "title": "[M07][P1] Goals, targets and rebalancing analysis",
+    "labels": [
+      "story",
+      "module-m07",
+      "priority-p1",
+      "phase-3",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a portfolio investor, I want target allocations, rebalancing analysis, concentration alerts and goal tracking.\n\n## Source\nPRD \u00a74.7"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic][M08] Watchlists",
+    "labels": [
+      "epic",
+      "module-m08",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd"
+    ],
+    "body": "## Objective\nUser-owned watchlists for funds and stocks with notes and thresholds.\n\n## Source\nPRD \u00a74.8"
+  },
+  {
+    "kind": "story",
+    "title": "[M08][P0] Basic multi-watchlists for funds and stocks",
+    "labels": [
+      "story",
+      "module-m08",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher, I want multiple private watchlists with notes that persist across sessions.\n\n## Acceptance\nAC11: watchlists persist across sessions; user isolation (AC15).\n\n## Source\nPRD \u00a74.8, \u00a75.3"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic][M09] Alerts and signals",
+    "labels": [
+      "epic",
+      "module-m09",
+      "priority-p1",
+      "phase-4",
+      "source-nivesh-prd"
+    ],
+    "body": "## Objective\nVersioned, explainable alerts across price, valuation, technicals, filings, fund changes and portfolio rules.\n\n## Source\nPRD \u00a74.9"
+  },
+  {
+    "kind": "story",
+    "title": "[M09][P1] Alert engine with versioned explainable rules",
+    "labels": [
+      "story",
+      "module-m09",
+      "priority-p1",
+      "phase-4",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs an investor, I want alerts that show the rule and values that triggered them, with in-app (and later email) delivery.\n\n## Requirements\nRecord instrument, rule id/version, trigger values, timestamps, source data timestamp, expiry/invalidation, optional subsequent outcomes.\n\n## Source\nPRD \u00a74.9"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic][M10] AI research",
+    "labels": [
+      "epic",
+      "module-m10",
+      "priority-p2",
+      "phase-4",
+      "source-nivesh-prd"
+    ],
+    "body": "## Objective\nEvidence-based AI analysts (MF, equity, filings), thesis monitor and research reports \u2014 figures only from deterministic APIs.\n\n## Source\nPRD \u00a74.10"
+  },
+  {
+    "kind": "story",
+    "title": "[M10][P2] AI mutual fund and equity analysts",
+    "labels": [
+      "story",
+      "module-m10",
+      "priority-p2",
+      "phase-4",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a research-oriented investor, I want AI summaries grounded in approved data tools with citations and uncertainty disclosure.\n\n## Rules\nAI must not invent values or replace tested financial calculations.\n\n## Source\nPRD \u00a74.10"
+  },
+  {
+    "kind": "story",
+    "title": "[M10][P2] Filing analyst, thesis monitor and research reports",
+    "labels": [
+      "story",
+      "module-m10",
+      "priority-p2",
+      "phase-4",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs an advanced investor, I want filing extraction with page references, thesis monitoring and structured research reports with limitations/as-of.\n\n## Source\nPRD \u00a74.10"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic][M11] Strategy Lab",
+    "labels": [
+      "epic",
+      "module-m11",
+      "priority-p2",
+      "phase-5",
+      "source-nivesh-prd"
+    ],
+    "body": "## Objective\nPoint-in-time strategy builder and backtesting without look-ahead/survivorship bias.\n\n## Source\nPRD \u00a74.11"
+  },
+  {
+    "kind": "story",
+    "title": "[M11][P2] Point-in-time strategy backtesting",
+    "labels": [
+      "story",
+      "module-m11",
+      "priority-p2",
+      "phase-5",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs an advanced investor, I want rule-based backtests with costs, benchmark comparison and bias controls.\n\n## Prevent\nLook-ahead, survivorship, data snooping, unavailable-at-the-time financials, ignoring corporate actions/costs.\n\n## Source\nPRD \u00a74.11"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic][M12] Trading integration",
+    "labels": [
+      "epic",
+      "module-m12",
+      "priority-p3",
+      "phase-5",
+      "source-nivesh-prd"
+    ],
+    "body": "## Objective\nIsolated trading domain: paper trading first, then broker sandbox/live with explicit confirmation.\n\n## Source\nPRD \u00a74.12; MVP non-goal for live trading"
+  },
+  {
+    "kind": "story",
+    "title": "[M12][P3] Paper trading and broker sandbox",
+    "labels": [
+      "story",
+      "module-m12",
+      "priority-p3",
+      "phase-5",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs an advanced investor, I want paper orders with full lifecycle audit before live broker execution.\n\n## Source\nPRD \u00a74.12, Phase 5"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic][M13] Administration and operations",
+    "labels": [
+      "epic",
+      "module-m13",
+      "priority-p0",
+      "phase-0",
+      "source-nivesh-prd"
+    ],
+    "body": "## Objective\nIngestion monitoring, data quality exceptions, methodology registry, auth/roles, audit, health.\n\n## Source\nPRD \u00a74.13"
+  },
+  {
+    "kind": "story",
+    "title": "[M13][P0] Ingestion monitoring and data quality ops",
+    "labels": [
+      "story",
+      "module-m13",
+      "priority-p0",
+      "phase-0",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs an operator, I want to monitor ingestion jobs, freshness and quality exceptions, and safely retry failures.\n\n## Acceptance\nAC12: failed ingestion jobs can be retried safely.\n\n## Source\nPRD \u00a74.13, \u00a76.5, \u00a75.3"
+  },
+  {
+    "kind": "story",
+    "title": "[M13][P0] Auth, user isolation and API foundation",
+    "labels": [
+      "story",
+      "module-m13",
+      "priority-p0",
+      "phase-0",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a future multi-user product, I need authentication and user-owned data isolation from day one.\n\n## Acceptance\nAC15: user-owned data isolated between users.\n\n## Source\nPRD \u00a75.1 Shared, W1 Foundation, principles \u00a71.2"
+  },
+  {
+    "kind": "story",
+    "title": "[M13][P0] Calculation methodology registry and versions",
+    "labels": [
+      "story",
+      "module-m13",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## User story\nAs a researcher/operator, I need every displayed metric to expose methodology docs, as-of/source and calculation version.\n\n## Acceptance\nAC13/AC14: source/as-of context; calculation versions identifiable.\n\n## Source\nPRD \u00a75.3, \u00a77, \u00a74.13"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic] Phase 0 \u2014 Product and data foundation",
+    "labels": [
+      "epic",
+      "phase-0",
+      "priority-p0",
+      "source-nivesh-prd"
+    ],
+    "body": "## Deliverables\nConfirm providers/rights, entity IDs, core schema, calculation methodology, API conventions, authz, FE/BE skeletons, ingestion framework, DQ checks, test infra.\n\n## Exit criteria\nSample fund + stock end-to-end; raw sources retained; idempotent retries; calculation reproducible from stored inputs.\n\n## Source\nPRD \u00a710 Phase 0, W1"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic] Phase 1 \u2014 Core research MVP",
+    "labels": [
+      "epic",
+      "phase-1",
+      "priority-p0",
+      "source-nivesh-prd"
+    ],
+    "body": "## Deliverables\nMF scheme+NAV, equity company+OHLC+statements, core MF/equity analytics, benchmarks, fund/stock detail, dashboard, basic comparison/screener, watchlists, ingestion monitoring.\n\n## Exit criteria\nEnd-to-end research workflows; reconciliation tests; visible freshness; missing \u2260 zero.\n\n## Source\nPRD \u00a710 Phase 1, \u00a75, W2\u2013W7"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic] Phase 2 \u2014 Advanced analytics",
+    "labels": [
+      "epic",
+      "phase-2",
+      "priority-p1",
+      "source-nivesh-prd"
+    ],
+    "body": "## Deliverables\nRolling distributions, advanced risk, holdings, overlap, manager tenure, valuation bands, DCF, shareholding, governance flags, advanced technicals/patterns, peer/sector.\n\n## Source\nPRD \u00a710 Phase 2"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic] Phase 3 \u2014 Portfolio management",
+    "labels": [
+      "epic",
+      "phase-3",
+      "priority-p1",
+      "source-nivesh-prd"
+    ],
+    "body": "## Deliverables\nPortfolio/TX model, corporate actions, XIRR, allocation/exposure, correlation/risk, rebalancing, goals.\n\n## Source\nPRD \u00a710 Phase 3"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic] Phase 4 \u2014 Intelligence and AI",
+    "labels": [
+      "epic",
+      "phase-4",
+      "priority-p2",
+      "source-nivesh-prd"
+    ],
+    "body": "## Deliverables\nAlert engine, custom screens, filing ingestion, AI analysts/reports, thesis monitoring.\n\n## Source\nPRD \u00a710 Phase 4"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic] Phase 5 \u2014 Strategy Lab and paper trading",
+    "labels": [
+      "epic",
+      "phase-5",
+      "priority-p2",
+      "source-nivesh-prd"
+    ],
+    "body": "## Deliverables\nStrategy builder, PIT backtests, costs, paper trading, broker sandbox.\n\n## Source\nPRD \u00a710 Phase 5"
+  },
+  {
+    "kind": "epic",
+    "title": "[Epic] Phase 6 \u2014 Public launch and live trading readiness",
+    "labels": [
+      "epic",
+      "phase-6",
+      "priority-p3",
+      "source-nivesh-prd"
+    ],
+    "body": "## Deliverables\nPublic multi-user onboarding, permissions, metering/billing if needed, licence/security/regulatory readiness, live trading controls, production ops.\n\n## Source\nPRD \u00a710 Phase 6"
+  },
+  {
+    "kind": "story",
+    "title": "[W2][P0] Mutual fund data pipeline (scheme, NAV, benchmark)",
+    "labels": [
+      "story",
+      "module-m02",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## Workstream\nW2 \u2014 MF data (depends on W1).\n\n## Deliverables\nScheme master, NAV pipeline, benchmark mappings/history.\n\n## Source\nPRD \u00a711"
+  },
+  {
+    "kind": "story",
+    "title": "[W3][P0] Equity data pipeline (company, OHLC, statements)",
+    "labels": [
+      "story",
+      "module-m03",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## Workstream\nW3 \u2014 Equity data (depends on W1; parallel with W2).\n\n## Deliverables\nCompany master, daily OHLC, financial statements ingestion.\n\n## Source\nPRD \u00a711"
+  },
+  {
+    "kind": "story",
+    "title": "[W4][P0] Shared analytics engine (returns, risk, ratios, valuation)",
+    "labels": [
+      "story",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## Workstream\nW4 \u2014 Analytics (depends on W2, W3).\n\n## Deliverables\nDeterministic, versioned calculations for MF and equity metrics with reconciliation tests.\n\n## Source\nPRD \u00a77, \u00a711, \u00a713"
+  },
+  {
+    "kind": "story",
+    "title": "[W7][P0] Quality, reconciliation tests and observability",
+    "labels": [
+      "story",
+      "module-m13",
+      "priority-p0",
+      "phase-1",
+      "source-nivesh-prd",
+      "enhancement"
+    ],
+    "body": "## Workstream\nW7 \u2014 Quality and operations.\n\n## Deliverables\nUnit/integration/reconciliation/DQ tests; monitoring of jobs and freshness; dashboards for exceptions.\n\n## Source\nPRD \u00a711\u2013\u00a713"
+  }
+]

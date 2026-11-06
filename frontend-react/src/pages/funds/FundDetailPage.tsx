@@ -11,7 +11,6 @@ import FundFactsPanel from './panels/FundFactsPanel';
 import SimilarFundsPanel from './panels/SimilarFundsPanel';
 import BenchmarkPanel from './panels/BenchmarkPanel';
 import RiskPanel from './panels/RiskPanel';
-import HoldingsPanel from './panels/HoldingsPanel';
 import ManagersPanel from './panels/ManagersPanel';
 import { recordRecent } from '../../lib/recent';
 
@@ -19,7 +18,6 @@ const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'performance', label: 'Performance' },
   { id: 'risk', label: 'Risk' },
-  { id: 'portfolio', label: 'Portfolio' },
   { id: 'manager', label: 'Manager' },
   { id: 'benchmark', label: 'Benchmark' },
 ] as const;
@@ -143,8 +141,6 @@ export default function FundDetailPage() {
       )}
 
       {tab === 'risk' && <RiskPanel schemeId={schemeId} fund={detail} />}
-
-      {tab === 'portfolio' && <HoldingsPanel schemeId={schemeId} />}
 
       {tab === 'manager' && <ManagersPanel schemeId={schemeId} />}
 

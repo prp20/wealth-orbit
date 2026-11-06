@@ -20,6 +20,7 @@ from .mutual_fund_analytics import (
     trailing_return_days,
 )
 from .index_history import quote_identifier, resolve_index_history_columns
+from .sources import ensure_data_source
 
 
 def _connection():
@@ -102,13 +103,7 @@ def sync_benchmark(scheme_code: str, force: bool = False) -> dict:
                 start = watermark + timedelta(days=1)
             end = date.today()
             candles = GrowwIndexProvider().fetch_candles(row[2], start, end)
-            source_id = None
-            cur.execute("SELECT source_id FROM market_data.data_sources WHERE source_name='groww'")
-            source = cur.fetchone()
-            if source: source_id = source[0]
-            else:
-                import uuid
-                source_id = uuid.uuid4(); cur.execute("INSERT INTO market_data.data_sources(source_id,source_name) VALUES(%s,'groww')", (source_id,))
+            source_id = ensure_data_source(cur, "groww")
             values = [(row[1], c["date"], c.get("open"), c.get("high"), c.get("low"), c["close"], c.get("volume"), source_id) for c in candles]
             if values:
                 date_identifier = quote_identifier(date_col)
@@ -183,17 +178,7 @@ def sync_enrichment(scheme_code: str, force: bool = False) -> dict:
                         warnings.append({"kind": "kuvera_error", "error": str(exc)})
 
             source_name = "kuvera" if kuvera_facts else "mftool"
-            cur.execute("SELECT source_id FROM market_data.data_sources WHERE source_name=%s", (source_name,))
-            source = cur.fetchone()
-            if source:
-                source_id = source[0]
-            else:
-                import uuid
-                source_id = uuid.uuid4()
-                cur.execute(
-                    "INSERT INTO market_data.data_sources(source_id,source_name) VALUES(%s,%s)",
-                    (source_id, source_name),
-                )
+            source_id = ensure_data_source(cur, source_name)
 
             def first(*keys):
                 return next((details.get(key) for key in keys if details.get(key) not in (None, "")), None)

@@ -12,6 +12,7 @@ from psycopg2.extras import execute_values
 from backend_api.app.technical_indicators import calculate_indicators
 
 from .daily_metrics import net_debt_from_parts
+from .sources import ensure_data_source
 
 
 DEFAULT_INDICATORS = [
@@ -53,13 +54,7 @@ def sync_prices(symbol: str, force: bool = False, from_date: date | None = None,
 
 
 def _source_id(cur, name: str) -> uuid.UUID:
-    cur.execute("SELECT source_id FROM market_data.data_sources WHERE source_name=%s", (name,))
-    row = cur.fetchone()
-    if row:
-        return row[0]
-    value = uuid.uuid4()
-    cur.execute("INSERT INTO market_data.data_sources(source_id,source_name) VALUES(%s,%s)", (value, name))
-    return value
+    return ensure_data_source(cur, name)
 
 
 def _prices(cur, symbol: str) -> tuple[uuid.UUID, pd.DataFrame]:

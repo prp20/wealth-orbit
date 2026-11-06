@@ -1355,13 +1355,9 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
             if force:
                 cur.execute("DELETE FROM market_data.stock_fundamental_values WHERE stock_id=%s", (stock_id,))
                 cur.execute("DELETE FROM market_data.stock_shareholding_history WHERE stock_id=%s", (stock_id,))
-            source_id = None
-            cur.execute("SELECT source_id FROM market_data.data_sources WHERE source_name='screener'")
-            found = cur.fetchone()
-            if found: source_id = found[0]
-            else:
-                import uuid
-                source_id = uuid.uuid4(); cur.execute("INSERT INTO market_data.data_sources(source_id,source_name) VALUES(%s,'screener')", (source_id,))
+            from .market_data.sources import ensure_data_source
+
+            source_id = ensure_data_source(cur, "screener")
             counts = {CONSOLIDATED: 0, STANDALONE: 0}
             parser_warnings = 0
             for basis, parsed in parsed_by_basis.items():

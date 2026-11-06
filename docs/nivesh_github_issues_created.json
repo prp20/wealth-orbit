@@ -1,0 +1,330 @@
+{
+  "created": [
+    {
+      "title": "[Meta] Nivesh PRD \u2014 feature & story tracking",
+      "url": "https://github.com/prp20/wealth-orbit/issues/4",
+      "kind": "meta"
+    },
+    {
+      "title": "[Epic][M01] Dashboard",
+      "url": "https://github.com/prp20/wealth-orbit/issues/5",
+      "kind": "epic"
+    },
+    {
+      "title": "[M01][P0] Basic research dashboard",
+      "url": "https://github.com/prp20/wealth-orbit/issues/6",
+      "kind": "story"
+    },
+    {
+      "title": "[Epic][M02] Mutual Fund Research",
+      "url": "https://github.com/prp20/wealth-orbit/issues/7",
+      "kind": "epic"
+    },
+    {
+      "title": "[M02][P0] MF-01 Scheme master",
+      "url": "https://github.com/prp20/wealth-orbit/issues/8",
+      "kind": "story"
+    },
+    {
+      "title": "[M02][P0] MF-02 NAV history ingestion",
+      "url": "https://github.com/prp20/wealth-orbit/issues/9",
+      "kind": "story"
+    },
+    {
+      "title": "[M02][P0] MF-03 Performance analytics (basic)",
+      "url": "https://github.com/prp20/wealth-orbit/issues/10",
+      "kind": "story"
+    },
+    {
+      "title": "[M02][P0] MF-04 Risk analytics (core)",
+      "url": "https://github.com/prp20/wealth-orbit/issues/11",
+      "kind": "story"
+    },
+    {
+      "title": "[M02][P1] MF-05 Fund portfolio holdings",
+      "url": "https://github.com/prp20/wealth-orbit/issues/12",
+      "kind": "story"
+    },
+    {
+      "title": "[M02][P1] MF-06 Fund overlap analysis",
+      "url": "https://github.com/prp20/wealth-orbit/issues/13",
+      "kind": "story"
+    },
+    {
+      "title": "[M02][P1] MF-07 Fund manager analysis",
+      "url": "https://github.com/prp20/wealth-orbit/issues/14",
+      "kind": "story"
+    },
+    {
+      "title": "[M02][P0] MF-08 Fund comparison (basic)",
+      "url": "https://github.com/prp20/wealth-orbit/issues/15",
+      "kind": "story"
+    },
+    {
+      "title": "[M02][P0] MF-09 Fund screener (basic)",
+      "url": "https://github.com/prp20/wealth-orbit/issues/16",
+      "kind": "story"
+    },
+    {
+      "title": "[M02][P0] MF-10 Fund detail page (core tabs)",
+      "url": "https://github.com/prp20/wealth-orbit/issues/17",
+      "kind": "story"
+    },
+    {
+      "title": "[Epic][M03] Equity Research",
+      "url": "https://github.com/prp20/wealth-orbit/issues/18",
+      "kind": "epic"
+    },
+    {
+      "title": "[M03][P0] EQ-01 Company master",
+      "url": "https://github.com/prp20/wealth-orbit/issues/19",
+      "kind": "story"
+    },
+    {
+      "title": "[M03][P0] EQ-02 Daily market data (OHLCV)",
+      "url": "https://github.com/prp20/wealth-orbit/issues/20",
+      "kind": "story"
+    },
+    {
+      "title": "[M03][P0] EQ-03 Financial statements ingestion",
+      "url": "https://github.com/prp20/wealth-orbit/issues/21",
+      "kind": "story"
+    },
+    {
+      "title": "[M03][P0] EQ-04 Fundamental analytics (core ratios)",
+      "url": "https://github.com/prp20/wealth-orbit/issues/22",
+      "kind": "story"
+    },
+    {
+      "title": "[M03][P0] EQ-05 Trailing valuation metrics",
+      "url": "https://github.com/prp20/wealth-orbit/issues/23",
+      "kind": "story"
+    },
+    {
+      "title": "[M03][P1] EQ-06 DCF calculator",
+      "url": "https://github.com/prp20/wealth-orbit/issues/24",
+      "kind": "story"
+    },
+    {
+      "title": "[M03][P0] EQ-07 Technical charts and core indicators",
+      "url": "https://github.com/prp20/wealth-orbit/issues/25",
+      "kind": "story"
+    },
+    {
+      "title": "[M03][P1] EQ-08 Ownership / shareholding analysis",
+      "url": "https://github.com/prp20/wealth-orbit/issues/26",
+      "kind": "story"
+    },
+    {
+      "title": "[M03][P1] EQ-09 Governance and red flags",
+      "url": "https://github.com/prp20/wealth-orbit/issues/27",
+      "kind": "story"
+    },
+    {
+      "title": "[M03][P1] EQ-10 Peer and sector analysis",
+      "url": "https://github.com/prp20/wealth-orbit/issues/28",
+      "kind": "story"
+    },
+    {
+      "title": "[M03][P0] EQ-11 Stock detail page (core sections)",
+      "url": "https://github.com/prp20/wealth-orbit/issues/29",
+      "kind": "story"
+    },
+    {
+      "title": "[Epic][M04] Market Intelligence",
+      "url": "https://github.com/prp20/wealth-orbit/issues/30",
+      "kind": "epic"
+    },
+    {
+      "title": "[M04][P0] Major indices and benchmark history",
+      "url": "https://github.com/prp20/wealth-orbit/issues/31",
+      "kind": "story"
+    },
+    {
+      "title": "[M04][P1] Market breadth and sector intelligence",
+      "url": "https://github.com/prp20/wealth-orbit/issues/32",
+      "kind": "story"
+    },
+    {
+      "title": "[Epic][M05] Comparison engine",
+      "url": "https://github.com/prp20/wealth-orbit/issues/33",
+      "kind": "epic"
+    },
+    {
+      "title": "[M05][P0] Basic comparison (fund/stock/benchmark)",
+      "url": "https://github.com/prp20/wealth-orbit/issues/34",
+      "kind": "story"
+    },
+    {
+      "title": "[M05][P1] Comparison templates and saved comparisons",
+      "url": "https://github.com/prp20/wealth-orbit/issues/35",
+      "kind": "story"
+    },
+    {
+      "title": "[Epic][M06] Screening engine",
+      "url": "https://github.com/prp20/wealth-orbit/issues/36",
+      "kind": "epic"
+    },
+    {
+      "title": "[M06][P0] Basic multi-condition screener",
+      "url": "https://github.com/prp20/wealth-orbit/issues/37",
+      "kind": "story"
+    },
+    {
+      "title": "[M06][P1] Predefined screens and screen alerts",
+      "url": "https://github.com/prp20/wealth-orbit/issues/38",
+      "kind": "story"
+    },
+    {
+      "title": "[Epic][M07] Portfolio management",
+      "url": "https://github.com/prp20/wealth-orbit/issues/39",
+      "kind": "epic"
+    },
+    {
+      "title": "[M07][P1] Portfolio transactions and holdings model",
+      "url": "https://github.com/prp20/wealth-orbit/issues/40",
+      "kind": "story"
+    },
+    {
+      "title": "[M07][P1] Portfolio analytics (XIRR, allocation, exposure)",
+      "url": "https://github.com/prp20/wealth-orbit/issues/41",
+      "kind": "story"
+    },
+    {
+      "title": "[M07][P1] Goals, targets and rebalancing analysis",
+      "url": "https://github.com/prp20/wealth-orbit/issues/42",
+      "kind": "story"
+    },
+    {
+      "title": "[Epic][M08] Watchlists",
+      "url": "https://github.com/prp20/wealth-orbit/issues/43",
+      "kind": "epic"
+    },
+    {
+      "title": "[M08][P0] Basic multi-watchlists for funds and stocks",
+      "url": "https://github.com/prp20/wealth-orbit/issues/44",
+      "kind": "story"
+    },
+    {
+      "title": "[Epic][M09] Alerts and signals",
+      "url": "https://github.com/prp20/wealth-orbit/issues/45",
+      "kind": "epic"
+    },
+    {
+      "title": "[M09][P1] Alert engine with versioned explainable rules",
+      "url": "https://github.com/prp20/wealth-orbit/issues/46",
+      "kind": "story"
+    },
+    {
+      "title": "[Epic][M10] AI research",
+      "url": "https://github.com/prp20/wealth-orbit/issues/47",
+      "kind": "epic"
+    },
+    {
+      "title": "[M10][P2] AI mutual fund and equity analysts",
+      "url": "https://github.com/prp20/wealth-orbit/issues/48",
+      "kind": "story"
+    },
+    {
+      "title": "[M10][P2] Filing analyst, thesis monitor and research reports",
+      "url": "https://github.com/prp20/wealth-orbit/issues/49",
+      "kind": "story"
+    },
+    {
+      "title": "[Epic][M11] Strategy Lab",
+      "url": "https://github.com/prp20/wealth-orbit/issues/50",
+      "kind": "epic"
+    },
+    {
+      "title": "[M11][P2] Point-in-time strategy backtesting",
+      "url": "https://github.com/prp20/wealth-orbit/issues/51",
+      "kind": "story"
+    },
+    {
+      "title": "[Epic][M12] Trading integration",
+      "url": "https://github.com/prp20/wealth-orbit/issues/52",
+      "kind": "epic"
+    },
+    {
+      "title": "[M12][P3] Paper trading and broker sandbox",
+      "url": "https://github.com/prp20/wealth-orbit/issues/53",
+      "kind": "story"
+    },
+    {
+      "title": "[Epic][M13] Administration and operations",
+      "url": "https://github.com/prp20/wealth-orbit/issues/54",
+      "kind": "epic"
+    },
+    {
+      "title": "[M13][P0] Ingestion monitoring and data quality ops",
+      "url": "https://github.com/prp20/wealth-orbit/issues/55",
+      "kind": "story"
+    },
+    {
+      "title": "[M13][P0] Auth, user isolation and API foundation",
+      "url": "https://github.com/prp20/wealth-orbit/issues/56",
+      "kind": "story"
+    },
+    {
+      "title": "[M13][P0] Calculation methodology registry and versions",
+      "url": "https://github.com/prp20/wealth-orbit/issues/57",
+      "kind": "story"
+    },
+    {
+      "title": "[Epic] Phase 0 \u2014 Product and data foundation",
+      "url": "https://github.com/prp20/wealth-orbit/issues/58",
+      "kind": "epic"
+    },
+    {
+      "title": "[Epic] Phase 1 \u2014 Core research MVP",
+      "url": "https://github.com/prp20/wealth-orbit/issues/59",
+      "kind": "epic"
+    },
+    {
+      "title": "[Epic] Phase 2 \u2014 Advanced analytics",
+      "url": "https://github.com/prp20/wealth-orbit/issues/60",
+      "kind": "epic"
+    },
+    {
+      "title": "[Epic] Phase 3 \u2014 Portfolio management",
+      "url": "https://github.com/prp20/wealth-orbit/issues/61",
+      "kind": "epic"
+    },
+    {
+      "title": "[Epic] Phase 4 \u2014 Intelligence and AI",
+      "url": "https://github.com/prp20/wealth-orbit/issues/62",
+      "kind": "epic"
+    },
+    {
+      "title": "[Epic] Phase 5 \u2014 Strategy Lab and paper trading",
+      "url": "https://github.com/prp20/wealth-orbit/issues/63",
+      "kind": "epic"
+    },
+    {
+      "title": "[Epic] Phase 6 \u2014 Public launch and live trading readiness",
+      "url": "https://github.com/prp20/wealth-orbit/issues/64",
+      "kind": "epic"
+    },
+    {
+      "title": "[W2][P0] Mutual fund data pipeline (scheme, NAV, benchmark)",
+      "url": "https://github.com/prp20/wealth-orbit/issues/65",
+      "kind": "story"
+    },
+    {
+      "title": "[W3][P0] Equity data pipeline (company, OHLC, statements)",
+      "url": "https://github.com/prp20/wealth-orbit/issues/66",
+      "kind": "story"
+    },
+    {
+      "title": "[W4][P0] Shared analytics engine (returns, risk, ratios, valuation)",
+      "url": "https://github.com/prp20/wealth-orbit/issues/67",
+      "kind": "story"
+    },
+    {
+      "title": "[W7][P0] Quality, reconciliation tests and observability",
+      "url": "https://github.com/prp20/wealth-orbit/issues/68",
+      "kind": "story"
+    }
+  ],
+  "failed": []
+}

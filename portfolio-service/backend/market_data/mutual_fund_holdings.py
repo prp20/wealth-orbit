@@ -29,29 +29,44 @@ def load_holdings_seed(scheme_code: str) -> dict | None:
     return json.loads(path.read_text())
 
 
-def _scheme_id(cur, scheme_code: str):
+def _scheme_row(cur, scheme_code: str):
     cur.execute(
-        "SELECT scheme_id FROM market_data.mutual_fund_reference WHERE scheme_code=%s",
+        "SELECT scheme_id, scheme_name FROM market_data.mutual_fund_reference WHERE scheme_code=%s",
         (scheme_code,),
     )
     row = cur.fetchone()
     if not row:
         raise ValueError(f"Unknown mutual-fund scheme: {scheme_code}")
-    return row[0]
+    return row[0], row[1]
 
 
-def sync_holdings(scheme_code: str, force: bool = False) -> dict:
-    """Upsert portfolio disclosures + holdings from seed JSON (provider hook later)."""
-    payload = load_holdings_seed(scheme_code)
+def _scheme_id(cur, scheme_code: str):
+    scheme_id, _scheme_name = _scheme_row(cur, scheme_code)
+    return scheme_id
+
+
+def _live_holdings_payload(cur, scheme_code: str) -> dict:
+    _scheme_id, scheme_name = _scheme_row(cur, scheme_code)
+    from .providers.groww_portfolio import fetch_groww_portfolio
+
+    payload = fetch_groww_portfolio(scheme_name, scheme_code)
     if payload is None:
         raise RuntimeError(
             f"No holdings seed for {scheme_code}. Add data/seed/mf_holdings/{scheme_code}.json "
             "or wire a live portfolio provider."
         )
-    disclosures = payload.get("disclosures") or []
-    managers = payload.get("managers") or []
+    return payload
+
+
+def sync_holdings(scheme_code: str, force: bool = False) -> dict:
+    """Upsert portfolio disclosures from a seed file, otherwise the Groww portfolio."""
+    payload = load_holdings_seed(scheme_code)
     with _connection() as conn:
         with conn.cursor() as cur:
+            if payload is None:
+                payload = _live_holdings_payload(cur, scheme_code)
+            disclosures = payload.get("disclosures") or []
+            managers = payload.get("managers") or []
             scheme_id = _scheme_id(cur, scheme_code)
             disclosure_count = 0
             holding_count = 0
