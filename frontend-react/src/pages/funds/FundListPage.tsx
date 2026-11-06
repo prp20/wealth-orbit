@@ -126,8 +126,8 @@ export default function FundListPage() {
               <table className="stock-table">
                 <thead>
                   <tr>
-                    <th>Scheme code</th>
                     <th>Scheme name</th>
+                    <th>Scheme code</th>
                     <th>AMC</th>
                     <th>Category</th>
                     <th>Subcategory</th>
@@ -138,12 +138,12 @@ export default function FundListPage() {
                 <tbody>
                   {pageRows.map((row: any) => (
                     <tr key={row.scheme_code}>
-                      <td className="symbol-cell">
+                      <td className="company-cell">
                         <Link to={`/mutualfunds/${encodeURIComponent(row.scheme_code)}`}>
-                          {row.scheme_code}
+                          {row.scheme_name || row.scheme_code}
                         </Link>
                       </td>
-                      <td className="company-cell">{row.scheme_name || '—'}</td>
+                      <td className="scheme-code">{row.scheme_code}</td>
                       <td>{row.amc_name || '—'}</td>
                       <td>{row.category_name || '—'}</td>
                       <td>{row.subcategory_name || '—'}</td>

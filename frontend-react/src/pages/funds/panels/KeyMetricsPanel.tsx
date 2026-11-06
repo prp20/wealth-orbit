@@ -1,57 +1,38 @@
-import SyncJobButton from '../../../components/SyncJobButton';
-import { formatCompactInr, formatInr, formatPct, formatRatio } from '../../../lib/format';
+import { formatCompactInr, formatDisplayDate, formatInr, formatPct } from '../../../lib/format';
+import { periodReturnLabel, periodReturnValue } from '../../../lib/fundMetrics';
 
-export default function KeyMetricsPanel({ schemeId, fund }: { schemeId: string; fund: any }) {
+export default function KeyMetricsPanel({ fund }: { schemeId: string; fund: any }) {
   const metrics = fund?.latest_metrics;
   const enrichment = fund?.latest_enrichment;
-  const nav = fund?.latest_nav?.nav ?? metrics?.current_nav;
-  const returnValue = metrics?.cagr ?? metrics?.trailing_return;
+  const nav = fund?.latest_nav;
+  const navValue = nav?.nav ?? metrics?.current_nav;
+  const navDate = nav?.date;
 
   return (
     <section className="panel key-ratios-panel">
       <div className="panel-heading">
-        <div>
-          <h2>Key metrics</h2>
-          <p className="panel-subtitle">
-            Latest snapshot. Alpha/Beta need Benchmark history + Metrics sync; AUM/Expense need Enrichment
-            sync.
-          </p>
-        </div>
-        <SyncJobButton
-          entity="fund"
-          id={schemeId}
-          kind="metrics"
-          invalidateKeys={[['fund-metrics', schemeId], ['fund', schemeId], ['fund-similar', schemeId]]}
-        />
+        <h2>Key metrics</h2>
       </div>
       <section className="metrics compact-metrics snapshot-metrics fund-key-metrics">
         <div className="metric">
-          <small>NAV</small>
-          <strong>{formatInr(nav)}</strong>
+          <small>{navDate ? `NAV · ${formatDisplayDate(navDate)}` : 'NAV'}</small>
+          <strong>{formatInr(navValue)}</strong>
         </div>
         <div className="metric">
-          <small>{metrics?.cagr != null ? 'CAGR' : 'Trailing'}</small>
-          <strong>{formatPct(returnValue)}</strong>
+          <small>{periodReturnLabel(metrics?.metric_period)}</small>
+          <strong>{formatPct(periodReturnValue(metrics))}</strong>
         </div>
         <div className="metric">
-          <small>Sharpe</small>
-          <strong>{formatRatio(metrics?.sharpe)}</strong>
-        </div>
-        <div className="metric">
-          <small>Alpha</small>
-          <strong>{formatRatio(metrics?.alpha)}</strong>
-        </div>
-        <div className="metric">
-          <small>Beta</small>
-          <strong>{formatRatio(metrics?.beta)}</strong>
+          <small>Expense</small>
+          <strong>{formatPct(enrichment?.expense_ratio)}</strong>
         </div>
         <div className="metric">
           <small>AUM</small>
           <strong>{formatCompactInr(enrichment?.aum)}</strong>
         </div>
         <div className="metric">
-          <small>Expense</small>
-          <strong>{formatPct(enrichment?.expense_ratio)}</strong>
+          <small>Max drawdown, full history</small>
+          <strong>{formatPct(metrics?.maximum_drawdown)}</strong>
         </div>
       </section>
     </section>

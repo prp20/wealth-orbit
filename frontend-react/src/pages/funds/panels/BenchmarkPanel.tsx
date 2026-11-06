@@ -26,6 +26,7 @@ export default function BenchmarkPanel({ schemeId, fund }: { schemeId: string; f
           entity="fund"
           id={schemeId}
           kind="benchmark"
+          label="Update benchmark"
           invalidateKeys={[
             ['fund-benchmark', schemeId],
             ['fund-benchmark-history', schemeId],
@@ -37,7 +38,7 @@ export default function BenchmarkPanel({ schemeId, fund }: { schemeId: string; f
       {benchmark.error && !mapped && <div className="empty">{(benchmark.error as Error).message}</div>}
       {!available && (
         <div className="empty">
-          {mapped?.reason || 'No benchmark is mapped for this scheme. Sync benchmark after a mapping exists.'}
+          {mapped?.reason || 'No benchmark is mapped for this scheme.'}
         </div>
       )}
       {available && (

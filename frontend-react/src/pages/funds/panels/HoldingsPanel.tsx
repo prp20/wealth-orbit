@@ -17,13 +17,14 @@ export default function HoldingsPanel({ schemeId }: { schemeId: string }) {
           <h2>Portfolio</h2>
           <p className="panel-subtitle">
             Latest monthly disclosure with top holdings, sector/market-cap mix, concentration, and changes vs
-            prior month. Sync loads seed/provider disclosures.
+            prior month.
           </p>
         </div>
         <SyncJobButton
           entity="fund"
           id={schemeId}
           kind="holdings"
+          label="Update holdings"
           invalidateKeys={[['fund-holdings', schemeId]]}
         />
       </div>

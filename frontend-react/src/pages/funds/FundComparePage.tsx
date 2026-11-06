@@ -58,12 +58,12 @@ export default function FundComparePage() {
     { label: 'Metrics as of', value: (f) => formatDate(f.metrics?.as_of_date) },
     { label: 'Trailing return', value: (f) => formatPct(f.metrics?.trailing_return) },
     { label: 'CAGR', value: (f) => formatPct(f.metrics?.cagr) },
-    { label: 'Std deviation', value: (f) => formatPct(f.metrics?.standard_deviation) },
-    { label: 'Sharpe', value: (f) => formatRatio(f.metrics?.sharpe) },
-    { label: 'Sortino', value: (f) => formatRatio(f.metrics?.sortino) },
-    { label: 'Max drawdown', value: (f) => formatPct(f.metrics?.maximum_drawdown) },
-    { label: 'Alpha', value: (f) => formatRatio(f.metrics?.alpha) },
-    { label: 'Beta', value: (f) => formatRatio(f.metrics?.beta) },
+    { label: 'Std deviation, full history', value: (f) => formatPct(f.metrics?.standard_deviation) },
+    { label: 'Sharpe, full history', value: (f) => formatRatio(f.metrics?.sharpe) },
+    { label: 'Sortino, full history', value: (f) => formatRatio(f.metrics?.sortino) },
+    { label: 'Max drawdown, full history', value: (f) => formatPct(f.metrics?.maximum_drawdown) },
+    { label: 'Alpha, full history', value: (f) => formatRatio(f.metrics?.alpha) },
+    { label: 'Beta, full history', value: (f) => formatRatio(f.metrics?.beta) },
     { label: 'AUM', value: (f) => formatCompactInr(f.enrichment?.aum) },
     { label: 'Expense ratio', value: (f) => formatPct(f.enrichment?.expense_ratio) },
     { label: 'Exit load', value: (f) => f.enrichment?.exit_load || '—' },
@@ -145,9 +145,9 @@ export default function FundComparePage() {
                   {funds.map((fund: any) => (
                     <th key={fund.scheme_code}>
                       <Link to={`/mutualfunds/${encodeURIComponent(fund.scheme_code)}`}>
-                        {fund.scheme_code}
+                        {fund.scheme_name || fund.scheme_code}
                       </Link>
-                      <div className="fund-compare-name">{fund.scheme_name || '—'}</div>
+                      <div className="scheme-code">{fund.scheme_code}</div>
                     </th>
                   ))}
                 </tr>

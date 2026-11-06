@@ -28,6 +28,7 @@ export default function SyncJobButton({
   startJob,
   loadStatus,
   hideSucceeded = false,
+  thenKind,
 }: {
   entity?: 'stock' | 'fund';
   id?: string;
@@ -39,6 +40,8 @@ export default function SyncJobButton({
   startJob?: () => Promise<SyncJob>;
   loadStatus?: () => Promise<{ status: string; job: SyncJob | null }>;
   hideSucceeded?: boolean;
+  /** After this fund job succeeds, enqueue and poll a second kind. */
+  thenKind?: string;
 }) {
   const queryClient = useQueryClient();
   const entityId = id || symbol || '';
@@ -97,13 +100,24 @@ export default function SyncJobButton({
           ? await api.syncFundKind(entityId, kind, force)
           : await api.syncStock(entityId, kind, force);
       setStatus(quietStatus(String(job.status || 'QUEUED').toLowerCase(), hideSucceeded));
-      const terminal = await pollJob(job.job_id, (current) => {
+      let terminal = await pollJob(job.job_id, (current) => {
         const failure = syncJobFailureMessage(current);
         const next = failure ? 'failed' : String(current.status || '').toLowerCase();
         setStatus(quietStatus(next, hideSucceeded));
         if (failure) setError(failure);
       });
-      const failure = syncJobFailureMessage(terminal);
+      let failure = syncJobFailureMessage(terminal);
+      if (!failure && thenKind && !custom && entity === 'fund') {
+        const follow = await api.syncFundKind(entityId, thenKind, force);
+        setStatus(quietStatus(String(follow.status || 'QUEUED').toLowerCase(), hideSucceeded));
+        terminal = await pollJob(follow.job_id, (current) => {
+          const followFailure = syncJobFailureMessage(current);
+          const next = followFailure ? 'failed' : String(current.status || '').toLowerCase();
+          setStatus(quietStatus(next, hideSucceeded));
+          if (followFailure) setError(followFailure);
+        });
+        failure = syncJobFailureMessage(terminal);
+      }
       if (failure) {
         setStatus('failed');
         setError(failure);

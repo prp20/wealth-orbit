@@ -1,7 +1,6 @@
-import SyncJobButton from '../../../components/SyncJobButton';
 import { formatDate, formatPct, formatRatio } from '../../../lib/format';
 
-export default function RiskPanel({ schemeId, fund }: { schemeId: string; fund: any }) {
+export default function RiskPanel({ fund }: { schemeId: string; fund: any }) {
   const metrics = fund?.latest_metrics;
   const benchmark = fund?.benchmark;
   const observations = metrics?.observations;
@@ -20,12 +19,6 @@ export default function RiskPanel({ schemeId, fund }: { schemeId: string; fund: 
             and do not change these tiles.
           </p>
         </div>
-        <SyncJobButton
-          entity="fund"
-          id={schemeId}
-          kind="metrics"
-          invalidateKeys={[['fund-metrics', schemeId], ['fund', schemeId]]}
-        />
       </div>
       <section className="metrics compact-metrics snapshot-metrics fund-risk-metrics">
         <div className="metric">

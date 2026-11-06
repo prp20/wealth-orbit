@@ -1,10 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../api';
-import SyncJobButton from '../../../components/SyncJobButton';
-import { formatDate, formatInr, formatPct, formatRatio } from '../../../lib/format';
-import { SHORT_METRIC_PERIODS } from '../../../lib/fundMetrics';
+import { formatDate, formatInr, formatPct } from '../../../lib/format';
 
-const COLUMNS: { key: string; label: string; format: (value: unknown, row?: any) => string }[] = [
+const COLUMNS: { key: string; label: string; format: (value: unknown) => string }[] = [
   { key: 'metric_period', label: 'Period', format: (v) => String(v ?? '—') },
   { key: 'as_of_date', label: 'As of', format: (v) => formatDate(v) },
   { key: 'current_nav', label: 'NAV', format: (v) => formatInr(v) },
@@ -14,31 +12,6 @@ const COLUMNS: { key: string; label: string; format: (value: unknown, row?: any)
   { key: 'rolling_median', label: 'Rolling median', format: (v) => formatPct(v) },
   { key: 'rolling_min', label: 'Rolling min', format: (v) => formatPct(v) },
   { key: 'rolling_max', label: 'Rolling max', format: (v) => formatPct(v) },
-  {
-    key: 'sharpe',
-    label: 'Sharpe',
-    format: (v, row) => (SHORT_METRIC_PERIODS.has(String(row?.metric_period)) ? '—' : formatRatio(v)),
-  },
-  {
-    key: 'sortino',
-    label: 'Sortino',
-    format: (v, row) => (SHORT_METRIC_PERIODS.has(String(row?.metric_period)) ? '—' : formatRatio(v)),
-  },
-  {
-    key: 'maximum_drawdown',
-    label: 'Max DD',
-    format: (v, row) => (SHORT_METRIC_PERIODS.has(String(row?.metric_period)) ? '—' : formatPct(v)),
-  },
-  {
-    key: 'alpha',
-    label: 'Alpha',
-    format: (v, row) => (SHORT_METRIC_PERIODS.has(String(row?.metric_period)) ? '—' : formatRatio(v)),
-  },
-  {
-    key: 'beta',
-    label: 'Beta',
-    format: (v, row) => (SHORT_METRIC_PERIODS.has(String(row?.metric_period)) ? '—' : formatRatio(v)),
-  },
 ];
 
 export default function PerformancePanel({ schemeId }: { schemeId: string }) {
@@ -53,23 +26,12 @@ export default function PerformancePanel({ schemeId }: { schemeId: string }) {
       <div className="panel-heading">
         <div>
           <h2>Performance</h2>
-          <p className="panel-subtitle">
-            Trailing, CAGR, and rolling windows by period. Risk columns on 1M/3M/6M are blank — full-history
-            risk lives on the Risk tab.
-          </p>
+          <p className="panel-subtitle">Trailing return, CAGR, and rolling windows by period.</p>
         </div>
-        <SyncJobButton
-          entity="fund"
-          id={schemeId}
-          kind="metrics"
-          invalidateKeys={[['fund-metrics', schemeId], ['fund', schemeId]]}
-        />
       </div>
       {metrics.isLoading && <div className="loading">Loading performance…</div>}
       {metrics.error && <div className="empty">{(metrics.error as Error).message}</div>}
-      {!metrics.isLoading && !rows.length && (
-        <div className="empty">No metric snapshots yet. Sync metrics after NAV history is available.</div>
-      )}
+      {!metrics.isLoading && !rows.length && <div className="empty">No returns for this fund yet.</div>}
       {rows.length > 0 && (
         <div className="table-wrap">
           <table className="stock-table">
@@ -84,7 +46,7 @@ export default function PerformancePanel({ schemeId }: { schemeId: string }) {
               {rows.map((row: any, index: number) => (
                 <tr key={`${row.metric_period}-${row.as_of_date}-${index}`}>
                   {COLUMNS.map((column) => (
-                    <td key={column.key}>{column.format(row[column.key], row)}</td>
+                    <td key={column.key}>{column.format(row[column.key])}</td>
                   ))}
                 </tr>
               ))}

@@ -37,13 +37,14 @@ export default function FundFactsPanel({ schemeId, fund }: { schemeId: string; f
           entity="fund"
           id={schemeId}
           kind="enrichment"
+          label="Update facts"
           invalidateKeys={[['fund-enrichment', schemeId], ['fund', schemeId]]}
         />
       </div>
       {enrichment.isLoading && !latest && <div className="loading">Loading fund facts…</div>}
       {enrichment.error && !latest && <div className="empty">{(enrichment.error as Error).message}</div>}
       {!latest && !enrichment.isLoading && (
-        <div className="empty">No enrichment facts yet. Sync enrichment to populate this panel.</div>
+        <div className="empty">No facts loaded yet.</div>
       )}
       {latest && (
         <div className="detail-grid fund-facts-grid">

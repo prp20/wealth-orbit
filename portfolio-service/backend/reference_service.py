@@ -588,28 +588,46 @@ def mutual_fund_similar(scheme_code: str) -> pd.DataFrame:
 
 
 def mutual_fund_similar_enriched(scheme_code: str) -> list[dict]:
-    """Similar funds with latest metric snapshot columns in one batch query."""
+    """Peers in the same subcategory, plan, and option, on the source scheme's period."""
     if mutual_fund_detail(scheme_code) is None:
         return []
     period_rank = metric_period_rank_sql("x.metric_period")
     frame = _query(
-        f"""WITH peers AS (
+        f"""WITH source AS (
+              SELECT scheme_id, scheme_code, subcategory_id, plan_type, option_type
+              FROM market_data.mutual_fund_reference
+              WHERE scheme_code=%s
+            ),
+            source_period AS (
+              SELECT x.metric_period
+              FROM market_data.mutual_fund_metric_snapshots x
+              JOIN source s ON s.scheme_id=x.scheme_id
+              ORDER BY x.available DESC, x.as_of_date DESC, {period_rank}
+              LIMIT 1
+            ),
+            peers AS (
               SELECT m2.scheme_id, m2.scheme_code, m2.scheme_name, a.amc_name,
                      c.category_name, s.subcategory_name, m2.plan_type, m2.option_type
-              FROM market_data.mutual_fund_reference m1
-              JOIN market_data.mutual_fund_reference m2 ON m2.subcategory_id=m1.subcategory_id
+              FROM source src
+              JOIN market_data.mutual_fund_reference m2
+                ON m2.subcategory_id=src.subcategory_id
+               AND m2.scheme_code<>src.scheme_code
+               AND m2.is_active=TRUE
+               AND m2.plan_type IS NOT DISTINCT FROM src.plan_type
+               AND m2.option_type IS NOT DISTINCT FROM src.option_type
               JOIN market_data.amc_reference a ON a.amc_id=m2.amc_id
               JOIN market_data.mutual_fund_subcategories s ON s.subcategory_id=m2.subcategory_id
               JOIN market_data.mutual_fund_categories c ON c.category_id=s.category_id
-              WHERE m1.scheme_code=%s AND m2.scheme_code<>%s AND m2.is_active=TRUE
-              ORDER BY m2.scheme_name LIMIT 20
+              ORDER BY m2.scheme_name
+              LIMIT 20
             ),
             latest_metrics AS (
               SELECT DISTINCT ON (x.scheme_id)
                      x.scheme_id, x.current_nav, x.cagr, x.trailing_return, x.sharpe
               FROM market_data.mutual_fund_metric_snapshots x
               JOIN peers p ON p.scheme_id=x.scheme_id
-              ORDER BY x.scheme_id, x.available DESC, x.as_of_date DESC, {period_rank}
+              WHERE x.metric_period = (SELECT metric_period FROM source_period)
+              ORDER BY x.scheme_id, x.available DESC, x.as_of_date DESC
             ),
             latest_nav AS (
               SELECT DISTINCT ON (h.scheme_id)
@@ -620,13 +638,14 @@ def mutual_fund_similar_enriched(scheme_code: str) -> list[dict]:
             )
             SELECT p.scheme_code, p.scheme_name, p.amc_name, p.category_name, p.subcategory_name,
                    p.plan_type, p.option_type,
+                   (SELECT metric_period FROM source_period) AS metric_period,
                    COALESCE(lm.current_nav, ln.latest_nav) AS latest_nav,
                    lm.cagr, lm.trailing_return, lm.sharpe
             FROM peers p
             LEFT JOIN latest_metrics lm ON lm.scheme_id=p.scheme_id
             LEFT JOIN latest_nav ln ON ln.scheme_id=p.scheme_id
             ORDER BY p.scheme_name""",
-        (scheme_code, scheme_code),
+        (scheme_code,),
     )
     return frame.to_dict(orient="records")
 
