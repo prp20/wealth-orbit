@@ -6,9 +6,12 @@ from uuid import uuid4
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "portfolio-service"))
 
 from backend.market_data.providers.screener import (
+    CONSOLIDATED,
+    STANDALONE,
     ScreenerParser,
     build_company_url,
     canonical_statement_type,
+    metric_statement_types,
     normalize_number,
     parse_period,
 )
@@ -113,10 +116,46 @@ def test_parser_tags_statement_type_from_section():
 
 def test_canonical_statement_type_moves_mistagged_cash_flow_off_the_balance_sheet():
     assert canonical_statement_type("CASH_FROM_OPERATING_ACTIVITIES", "BS") == "CF"
+    assert canonical_statement_type("CASH_FROM_INVESTING_ACTIVITIES", "BS") == "CF"
+    assert canonical_statement_type("CASH_FROM_FINANCING_ACTIVITIES", "BS") == "CF"
     assert canonical_statement_type("NET_CASH_FLOW", "BS") == "CF"
     assert canonical_statement_type("TOTAL_ASSETS", "BS") == "BS"
     assert canonical_statement_type("REVENUE", "BS") == "PL"
     assert canonical_statement_type("UNMAPPED_CODE", "BS") == "BS"
+    for code in (
+        "CASH_FROM_OPERATING_ACTIVITIES",
+        "CASH_FROM_INVESTING_ACTIVITIES",
+        "CASH_FROM_FINANCING_ACTIVITIES",
+        "NET_CASH_FLOW",
+    ):
+        assert metric_statement_types()[code] == "CF"
+
+
+def test_parser_keeps_consolidated_and_standalone_rows_distinct():
+    html = """
+        <section id="cash-flow"><table class="data-table">
+          <thead><tr><th>Particulars</th><th>Mar 2024</th></tr></thead>
+          <tbody>
+            <tr><td>Cash from Operating Activity</td><td>40</td></tr>
+            <tr><td>Cash from Investing Activity</td><td>(10)</td></tr>
+            <tr><td>Cash from Financing Activity</td><td>5</td></tr>
+            <tr><td>Net Cash Flow</td><td>35</td></tr>
+          </tbody>
+        </table></section>
+        """
+    stock_id = uuid4()
+    consolidated = ScreenerParser(CONSOLIDATED).parse(html, stock_id=stock_id)
+    standalone = ScreenerParser(STANDALONE).parse(html, stock_id=stock_id)
+    assert {item.reporting_basis for item in consolidated.fundamental_values} == {CONSOLIDATED}
+    assert {item.reporting_basis for item in standalone.fundamental_values} == {STANDALONE}
+    assert {item.metric_code for item in consolidated.fundamental_values} == {
+        "CASH_FROM_OPERATING_ACTIVITIES",
+        "CASH_FROM_INVESTING_ACTIVITIES",
+        "CASH_FROM_FINANCING_ACTIVITIES",
+        "NET_CASH_FLOW",
+    }
+    assert all(item.statement_type == "CF" for item in consolidated.fundamental_values)
+    assert all(item.statement_type == "CF" for item in standalone.fundamental_values)
 
 
 def test_parser_maps_shareholding_and_leaves_absent_categories_null():

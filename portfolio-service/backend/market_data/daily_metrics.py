@@ -46,6 +46,64 @@ def net_debt_from_parts(total_debt: float | None, total_cash: float | None) -> f
     return float(total_debt) - float(total_cash)
 
 
+def normalize_yahoo_dividend_yield(raw) -> float | None:
+    """Store Yahoo dividendYield once as percent points.
+
+    Yahoo may return a fraction (0.015) or already-percent (1.5). Values already
+    in a sane percent range stay as-is. Nonsense outside 0–100 is rejected.
+    """
+    if raw is None or raw == "":
+        return None
+    try:
+        number = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if number < 0:
+        return None
+    if number < 1.0:
+        number = number * 100
+    if number > 100:
+        return None
+    return number
+
+
+def yahoo_daily_metric_fields(info: dict) -> dict:
+    """Map Yahoo info to stored daily-metric columns. Never reads forward PEG."""
+    market_cap = info.get("marketCap")
+    enterprise_value = info.get("enterpriseValue")
+    ebitda_ttm = info.get("ebitda")
+    total_debt = info.get("totalDebt")
+    total_cash = info.get("totalCash")
+    net_debt = net_debt_from_parts(total_debt, total_cash)
+    ev_ebitda = info.get("enterpriseToEbitda")
+    if ev_ebitda is None and enterprise_value and ebitda_ttm and float(ebitda_ttm) != 0:
+        ev_ebitda = float(enterprise_value) / float(ebitda_ttm)
+    revenue = info.get("totalRevenue")
+    ev_sales = info.get("enterpriseToRevenue")
+    if ev_sales is None and enterprise_value and revenue and float(revenue) != 0:
+        ev_sales = float(enterprise_value) / float(revenue)
+    fcf = info.get("freeCashflow")
+    fcf_yield = None
+    if fcf is not None and market_cap and float(market_cap) > 0:
+        fcf_yield = float(fcf) / float(market_cap) * 100
+    return {
+        "market_cap": market_cap,
+        "stock_pe": info.get("trailingPE"),
+        "price_to_book": info.get("priceToBook"),
+        "dividend_yield": normalize_yahoo_dividend_yield(info.get("dividendYield")),
+        "book_value": info.get("bookValue"),
+        "roce": info.get("returnOnCapitalEmployed"),
+        "roe": info.get("returnOnEquity"),
+        "enterprise_value": enterprise_value,
+        "ebitda_ttm": ebitda_ttm,
+        "ev_ebitda": ev_ebitda,
+        "ev_sales": ev_sales,
+        "net_debt": net_debt,
+        "fcf_yield": fcf_yield,
+        "peg": None,
+    }
+
+
 def calculate_fallback_metrics(
     *, close: float | None, eps: float | None, book_value: float | None, dividend_per_share: float | None,
 ) -> dict[str, float]:
