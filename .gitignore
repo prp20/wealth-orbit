@@ -28,3 +28,6 @@ frontend-react/dist/*
 !frontend-react/dist/index.html
 !frontend-react/dist/assets/
 !frontend-react/dist/assets/*
+
+# Zerodha Varsity PDFs — local research copies only (do not push)
+docs/varsity_docs/*.pdf
