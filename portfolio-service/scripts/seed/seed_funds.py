@@ -8,7 +8,7 @@ from pathlib import Path
 
 from psycopg2.extras import execute_values
 
-from _db import connect, resolve_data_dir  # noqa: E402
+from _db import connect, normalize_limit, resolve_data_dir  # noqa: E402
 
 FUNDS_CSV = "new_equity_only_updated.csv"
 
@@ -34,7 +34,7 @@ def seed(data_dir: Path | str | None = None, dry_run: bool = False, limit: int |
     path = data_dir / FUNDS_CSV
     if not path.exists():
         print(f"  WARNING: {path.name} not found — skipping funds")
-        return {"funds": 0, "amcs": 0, "categories": 0, "indexes": 0}
+        return {"funds": 0, "amcs": 0, "categories": 0, "indexes": 0, "scheme_codes": []}
 
     rows = _load_rows(path)
     amcs: dict[str, uuid.UUID] = {}
@@ -71,8 +71,9 @@ def seed(data_dir: Path | str | None = None, dry_run: bool = False, limit: int |
             )
         )
 
+    limit = normalize_limit(limit)
     if limit is not None:
-        fund_preview = fund_preview[: max(0, int(limit))]
+        fund_preview = fund_preview[:limit]
         # Rebuild supporting sets from the capped preview so dry-run counts match.
         amcs = {}
         categories = {}
@@ -86,6 +87,7 @@ def seed(data_dir: Path | str | None = None, dry_run: bool = False, limit: int |
                 indexes.setdefault(benchmark, uuid.uuid4())
 
     print(f"  Loaded {len(fund_preview)} fund rows from {path.name}" + (f" (limit={limit})" if limit is not None else ""))
+    scheme_codes = [record[0] for record in fund_preview]
 
     if dry_run:
         print(
@@ -99,6 +101,7 @@ def seed(data_dir: Path | str | None = None, dry_run: bool = False, limit: int |
             "amcs": len(amcs),
             "categories": len(categories),
             "indexes": len(indexes),
+            "scheme_codes": scheme_codes,
         }
 
     try:
@@ -209,6 +212,7 @@ def seed(data_dir: Path | str | None = None, dry_run: bool = False, limit: int |
         "amcs": len(amcs),
         "categories": len(categories),
         "indexes": len(indexes),
+        "scheme_codes": [row[1] for row in fund_rows],
     }
 
 

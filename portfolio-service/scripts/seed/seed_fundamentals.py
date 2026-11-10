@@ -9,18 +9,29 @@ from _db import connect, ensure_project_paths
 ensure_project_paths()
 
 
-def seed(dry_run: bool = False, limit: int | None = None, delay_secs: float = 3.0) -> dict:
-    with connect() as connection:
-        with connection.cursor() as cur:
-            cur.execute(
-                """SELECT trading_symbol
-                   FROM market_data.stock_reference
-                   WHERE is_active = TRUE
-                   ORDER BY trading_symbol"""
-            )
-            symbols = [row[0] for row in cur.fetchall()]
-    if limit is not None:
-        symbols = symbols[:limit]
+def seed(
+    dry_run: bool = False,
+    limit: int | None = None,
+    delay_secs: float = 3.0,
+    symbols: list[str] | None = None,
+) -> dict:
+    from _db import normalize_limit, sanitize_seed_error
+
+    limit = normalize_limit(limit)
+    if symbols is None:
+        with connect() as connection:
+            with connection.cursor() as cur:
+                cur.execute(
+                    """SELECT trading_symbol
+                       FROM market_data.stock_reference
+                       WHERE is_active = TRUE
+                       ORDER BY trading_symbol"""
+                )
+                symbols = [row[0] for row in cur.fetchall()]
+        if limit is not None:
+            symbols = symbols[:limit]
+    else:
+        symbols = [str(symbol).strip() for symbol in symbols if str(symbol).strip()]
     if not symbols:
         print("  No active stocks found. Run seed_stocks.py first.")
         return {"stocks": 0, "ok": 0, "failed": 0}
@@ -47,10 +58,10 @@ def seed(dry_run: bool = False, limit: int | None = None, delay_secs: float = 3.
                 )
             else:
                 failed.append(symbol)
-                print(f"  FAILED: {result.get('reason')}")
+                print(f"  FAILED: {result.get('reason') or 'sync failed'}")
         except Exception as exc:
             failed.append(symbol)
-            print(f"  FAILED: {exc}")
+            print(f"  FAILED: {sanitize_seed_error(exc)}")
         time.sleep(delay_secs)
 
     print(f"  Fundamentals sync complete: {ok} ok, {len(failed)} failed")

@@ -36,16 +36,23 @@ def main():
     print("\n=== Seed mutual funds ===")
     print(f"data-dir: {data_dir}")
 
+    master_scheme_codes: list[str] | None = None
     if not args.skip_masters:
         print("\n[1] Mutual-fund masters")
         # --limit caps masters too (not only NAV), so guided setup stays small.
-        seed_funds.seed(data_dir=data_dir, dry_run=args.dry_run, limit=args.limit)
+        masters = seed_funds.seed(data_dir=data_dir, dry_run=args.dry_run, limit=args.limit)
+        master_scheme_codes = list(masters.get("scheme_codes") or [])
     else:
         print("\n[skipped] Mutual-fund masters")
 
     if not args.skip_nav:
         print("\n[2] Fund NAV history (mftool → MFAPI)")
-        seed_fund_nav.seed(dry_run=args.dry_run, limit=args.limit)
+        # When masters ran with --limit, reuse that CSV-order scheme set for NAV.
+        seed_fund_nav.seed(
+            dry_run=args.dry_run,
+            limit=None if master_scheme_codes is not None else args.limit,
+            scheme_codes=master_scheme_codes,
+        )
     else:
         print("\n[skipped] Fund NAV")
 

@@ -9,18 +9,40 @@ from _db import connect, ensure_project_paths
 ensure_project_paths()
 
 
-def seed(dry_run: bool = False, limit: int | None = None, delay_secs: float = 0.5) -> dict:
+def seed(
+    dry_run: bool = False,
+    limit: int | None = None,
+    delay_secs: float = 0.5,
+    scheme_codes: list[str] | None = None,
+) -> dict:
+    from _db import normalize_limit, sanitize_seed_error
+
+    limit = normalize_limit(limit)
     with connect() as connection:
         with connection.cursor() as cur:
-            cur.execute(
-                """SELECT scheme_code, scheme_name
-                   FROM market_data.mutual_fund_reference
-                   WHERE scheme_code IS NOT NULL AND scheme_code <> ''
-                   ORDER BY scheme_code"""
-            )
-            schemes = cur.fetchall()
-    if limit is not None:
-        schemes = schemes[:limit]
+            if scheme_codes is not None:
+                wanted = [str(code).strip() for code in scheme_codes if str(code).strip()]
+                if not wanted:
+                    print("  No scheme codes provided for NAV seed.")
+                    return {"schemes": 0, "ok": 0, "failed": 0}
+                cur.execute(
+                    """SELECT scheme_code, scheme_name
+                       FROM market_data.mutual_fund_reference
+                       WHERE scheme_code = ANY(%s)""",
+                    (wanted,),
+                )
+                by_code = {code: name for code, name in cur.fetchall()}
+                schemes = [(code, by_code[code]) for code in wanted if code in by_code]
+            else:
+                cur.execute(
+                    """SELECT scheme_code, scheme_name
+                       FROM market_data.mutual_fund_reference
+                       WHERE scheme_code IS NOT NULL AND scheme_code <> ''
+                       ORDER BY scheme_code"""
+                )
+                schemes = cur.fetchall()
+                if limit is not None:
+                    schemes = schemes[:limit]
     if not schemes:
         print("  No mutual-fund schemes found. Run seed_funds.py first.")
         return {"schemes": 0, "ok": 0, "failed": 0}
@@ -43,7 +65,7 @@ def seed(dry_run: bool = False, limit: int | None = None, delay_secs: float = 0.
             print(f"  rows={result.get('records_processed', 0)}")
         except Exception as exc:
             failed.append(scheme_code)
-            print(f"  FAILED: {exc}")
+            print(f"  FAILED: {sanitize_seed_error(exc)}")
         time.sleep(delay_secs)
 
     print(f"  NAV sync complete: {ok} ok, {len(failed)} failed")

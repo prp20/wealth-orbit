@@ -68,6 +68,50 @@ def print_session_pooler_steps() -> None:
     print("  5. Paste it below (input is hidden).\n")
 
 
+def guided_index_seed_argv() -> list[str]:
+    """Argv for recommended Home index seed (~5y, not max)."""
+    return [
+        "uv",
+        "run",
+        "python",
+        "portfolio-service/scripts/seed/run_seed_indexes.py",
+        "--data-dir",
+        "data/seed",
+        "--index-period",
+        "5y",
+    ]
+
+
+def guided_stock_masters_seed_argv(limit: str = "50") -> list[str]:
+    """Argv for optional stock names-only seed (no OHLC)."""
+    return [
+        "uv",
+        "run",
+        "python",
+        "portfolio-service/scripts/seed/run_seed_stocks.py",
+        "--data-dir",
+        "data/seed",
+        "--skip-prices",
+        "--limit",
+        str(limit),
+    ]
+
+
+def guided_fund_masters_seed_argv(limit: str = "50") -> list[str]:
+    """Argv for optional fund names-only seed (no NAV)."""
+    return [
+        "uv",
+        "run",
+        "python",
+        "portfolio-service/scripts/seed/run_seed_funds.py",
+        "--data-dir",
+        "data/seed",
+        "--skip-nav",
+        "--limit",
+        str(limit),
+    ]
+
+
 def require_postgres_url(ask_fn, probe) -> str:
     """Return a URL only after classify + SELECT 1. Failures ask again and write nothing."""
     print_session_pooler_steps()
@@ -252,49 +296,14 @@ def main() -> None:
         raise SystemExit(1)
 
     if ask_yes("Seed index history for Home? This is the recommended market data.", True):
-        run(
-            [
-                "uv",
-                "run",
-                "python",
-                "portfolio-service/scripts/seed/run_seed_indexes.py",
-                "--data-dir",
-                "data/seed",
-                "--index-period",
-                "5y",
-            ]
-        )
+        run(guided_index_seed_argv())
     if ask_yes(
         "Seed stock and fund names only? Default is 50 of each (no prices/NAV). History can sync later from the UI.",
         False,
     ):
         limit = ask("How many masters of each?", "50")
-        run(
-            [
-                "uv",
-                "run",
-                "python",
-                "portfolio-service/scripts/seed/run_seed_stocks.py",
-                "--data-dir",
-                "data/seed",
-                "--skip-prices",
-                "--limit",
-                limit,
-            ]
-        )
-        run(
-            [
-                "uv",
-                "run",
-                "python",
-                "portfolio-service/scripts/seed/run_seed_funds.py",
-                "--data-dir",
-                "data/seed",
-                "--skip-nav",
-                "--limit",
-                limit,
-            ]
-        )
+        run(guided_stock_masters_seed_argv(limit))
+        run(guided_fund_masters_seed_argv(limit))
     workbook = ask("Path to a mutual-fund order workbook, or leave blank to skip", "")
     if workbook:
         run(

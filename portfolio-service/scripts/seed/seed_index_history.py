@@ -65,6 +65,9 @@ def _download_history(ticker: str, period: str) -> list[tuple]:
 
 
 def seed(period: str = "max", dry_run: bool = False, limit: int | None = None) -> dict:
+    from _db import normalize_limit
+
+    limit = normalize_limit(limit)
     with connect() as connection:
         with connection.cursor() as cur:
             cur.execute(

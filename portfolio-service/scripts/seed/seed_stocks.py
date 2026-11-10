@@ -8,7 +8,7 @@ from pathlib import Path
 
 from psycopg2.extras import execute_values
 
-from _db import connect, resolve_data_dir  # noqa: E402
+from _db import connect, normalize_limit, resolve_data_dir  # noqa: E402
 
 
 def _load_rows(path: Path) -> list[dict]:
@@ -30,11 +30,12 @@ def seed(data_dir: Path | str | None = None, dry_run: bool = False, limit: int |
     path = data_dir / "stocks.csv"
     if not path.exists():
         print(f"  WARNING: {path.name} not found — skipping stocks")
-        return {"stocks": 0, "sectors": 0, "industries": 0}
+        return {"stocks": 0, "sectors": 0, "industries": 0, "symbols": []}
 
     rows = [row for row in _load_rows(path) if not _is_index(row) and (row.get("symbol") or "").strip()]
+    limit = normalize_limit(limit)
     if limit is not None:
-        rows = rows[: max(0, int(limit))]
+        rows = rows[:limit]
     print(f"  Loaded {len(rows)} equity rows from {path.name}" + (f" (limit={limit})" if limit is not None else ""))
 
     sectors: dict[str, uuid.UUID] = {}
@@ -60,6 +61,7 @@ def seed(data_dir: Path | str | None = None, dry_run: bool = False, limit: int |
             )
         )
 
+    symbols = [record[1] for record in stock_rows]
     if dry_run:
         print(
             f"  [DRY RUN] Would upsert {len(sectors)} sectors, {len(industries)} industries, "
@@ -67,7 +69,12 @@ def seed(data_dir: Path | str | None = None, dry_run: bool = False, limit: int |
         )
         for record in stock_rows[:5]:
             print(f"    {record[1]} | {record[3]}")
-        return {"stocks": len(stock_rows), "sectors": len(sectors), "industries": len(industries)}
+        return {
+            "stocks": len(stock_rows),
+            "sectors": len(sectors),
+            "industries": len(industries),
+            "symbols": symbols,
+        }
 
     try:
         with connect() as connection:
@@ -142,7 +149,12 @@ def seed(data_dir: Path | str | None = None, dry_run: bool = False, limit: int |
         raise SystemExit(f"ERROR: stock masters seed failed ({sanitize_seed_error(exc)})") from None
 
     print(f"  Upserted {len(resolved_stocks)} stocks ({len(sectors)} sectors, {len(industries)} industries)")
-    return {"stocks": len(resolved_stocks), "sectors": len(sectors), "industries": len(industries)}
+    return {
+        "stocks": len(resolved_stocks),
+        "sectors": len(sectors),
+        "industries": len(industries),
+        "symbols": [row[1] for row in resolved_stocks],
+    }
 
 
 def main():

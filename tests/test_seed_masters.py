@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 import seed_funds
 import seed_indexes
 import seed_stocks
-from _db import sanitize_seed_error
+from _db import normalize_limit, sanitize_seed_error
 
 
 MASTER_UPSERT_KEYS = {
@@ -40,6 +40,15 @@ def test_sanitize_seed_error_never_echoes_password_or_url():
     assert message == "authentication failed"
     assert "secret" not in message
     assert "://" not in sanitize_seed_error(RuntimeError("could not connect to postgresql://u:p@h/db"))
+    # Lone "@" (e.g. batch labels) must not become opaque connection failures.
+    assert "batch@3" in sanitize_seed_error(RuntimeError("download failed for batch@3"))
+
+
+def test_normalize_limit_clamps_negatives():
+    assert normalize_limit(None) is None
+    assert normalize_limit(5) == 5
+    assert normalize_limit(0) == 0
+    assert normalize_limit(-3) == 0
 
 
 def test_stock_masters_limit_is_stable_on_double_dry_run():
@@ -48,6 +57,8 @@ def test_stock_masters_limit_is_stable_on_double_dry_run():
     assert first["stocks"] == 7
     assert second["stocks"] == first["stocks"]
     assert second["sectors"] == first["sectors"]
+    assert len(first["symbols"]) == 7
+    assert first["symbols"] == second["symbols"]
 
 
 def test_fund_masters_limit_is_stable_on_double_dry_run():
@@ -56,6 +67,8 @@ def test_fund_masters_limit_is_stable_on_double_dry_run():
     assert first["funds"] == 5
     assert second["funds"] == first["funds"]
     assert second["amcs"] == first["amcs"]
+    assert len(first["scheme_codes"]) == 5
+    assert first["scheme_codes"] == second["scheme_codes"]
 
 
 def test_fund_masters_skip_blank_scheme_codes(tmp_path):
@@ -73,8 +86,15 @@ def test_fund_masters_skip_blank_scheme_codes(tmp_path):
 def test_stock_and_fund_runners_pass_limit_to_masters():
     stocks_runner = (SEED_DIR / "run_seed_stocks.py").read_text(encoding="utf-8")
     funds_runner = (SEED_DIR / "run_seed_funds.py").read_text(encoding="utf-8")
+    orchestrator = (SEED_DIR / "run_all_seeds.py").read_text(encoding="utf-8")
     assert "seed_stocks.seed(" in stocks_runner and "limit=args.limit" in stocks_runner
     assert "seed_funds.seed(" in funds_runner and "limit=args.limit" in funds_runner
+    assert "seed_stocks.seed(data_dir=data_dir, dry_run=args.dry_run, limit=args.limit)" in orchestrator
+    assert "seed_funds.seed(data_dir=data_dir, dry_run=args.dry_run, limit=args.limit)" in orchestrator
+    assert "symbols=master_symbols" in stocks_runner
+    assert "scheme_codes=master_scheme_codes" in funds_runner
+    assert "symbols=master_symbols" in orchestrator
+    assert "scheme_codes=master_scheme_codes" in orchestrator
 
 
 def test_idempotent_natural_key_store_does_not_grow_on_reseed():

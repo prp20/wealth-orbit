@@ -36,6 +36,13 @@ def database_url() -> str:
     return url.replace("postgresql+asyncpg://", "postgresql://").replace("+asyncpg", "")
 
 
+def normalize_limit(limit: int | None) -> int | None:
+    """Return a non-negative row cap, or None when unlimited."""
+    if limit is None:
+        return None
+    return max(0, int(limit))
+
+
 def sanitize_seed_error(exc: BaseException) -> str:
     """Short seed failure reason with no password / URL material."""
     text = str(exc).strip()
@@ -57,7 +64,10 @@ def sanitize_seed_error(exc: BaseException) -> str:
         return "host not found"
     if "connection refused" in lower:
         return "connection refused"
-    if "://" in text or "password" in lower or "@" in text:
+    # Redact credential/URL material; do not treat a lone "@" (e.g. "batch@3") as secret.
+    if "://" in text or "password" in lower:
+        return "database connection failed"
+    if "@" in text and any(token in lower for token in ("postgres", "mysql", "dsn", "uri", "user=", "jdbc")):
         return "database connection failed"
     cleaned = text.split("\n", 1)[0].strip()
     return cleaned[:160] if cleaned else "seed failed"
