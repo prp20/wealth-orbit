@@ -13,6 +13,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SQLITE = "sqlite+aiosqlite:///./portfolio-service/portfolio.db"
 
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.database_url import (  # noqa: E402
+    KIND_NOT_SUPABASE,
+    KIND_SESSION_POOLER,
+    classify_supabase_url,
+    ensure_sslmode_require,
+    sanitize_probe_error,
+    supabase_rejection_message,
+)
+
 
 def ask(prompt: str, default: str | None = None, secret: bool = False) -> str:
     label = f"{prompt} [{default}] " if default else f"{prompt} "
@@ -40,17 +52,38 @@ def sqlite_sync_url(url: str) -> str:
     return url.replace("sqlite+aiosqlite://", "sqlite://", 1)
 
 
+def print_session_pooler_steps() -> None:
+    print("Create a Supabase Postgres database (session pooler):")
+    print("  1. Create a project at https://supabase.com/dashboard")
+    print("  2. Open Project Settings → Database")
+    print("  3. Under Connection string, choose the URI and Session mode (port 5432)")
+    print("  4. Copy that URI. Do not use the direct host or Transaction mode (port 6543).")
+    print("  5. Paste it below (input is hidden).\n")
+
+
 def require_postgres_url(ask_fn, probe) -> str:
-    """Return a URL only after SELECT 1 succeeds. A failure asks again and writes nothing."""
+    """Return a URL only after classify + SELECT 1. Failures ask again and write nothing."""
+    print_session_pooler_steps()
     while True:
         url = ask_fn("Postgres URL (input is hidden)")
         if not looks_like_postgres(url):
             print("That URL must start with postgres:// or postgresql://.")
             continue
+        kind = classify_supabase_url(url)
+        rejection = supabase_rejection_message(kind)
+        if rejection:
+            print(rejection)
+            print("Nothing was saved. Try the session pooler URI again.")
+            continue
+        if kind not in {KIND_SESSION_POOLER, KIND_NOT_SUPABASE}:
+            print("Use the Supabase session pooler URI (port 5432), or a non-Supabase Postgres URL.")
+            print("Nothing was saved. Try the URL again.")
+            continue
+        url = ensure_sslmode_require(url)
         try:
             probe(url)
         except Exception as exc:
-            print(f"Could not connect: {exc}")
+            print(f"Could not connect: {sanitize_probe_error(exc)}")
             print("Nothing was saved. Try the URL again.")
             continue
         return url
@@ -111,7 +144,10 @@ def node_install_hint() -> str:
     if shutil.which("brew"):
         return "brew install node"
     if shutil.which("apt-get"):
-        return "sudo apt-get install -y nodejs npm"
+        return (
+            "Install Node.js 20 or newer from https://nodejs.org/ "
+            "(or use nvm / NodeSource). Do not use apt nodejs packages older than 20."
+        )
     return "Install Node.js 20 or newer from https://nodejs.org/"
 
 
