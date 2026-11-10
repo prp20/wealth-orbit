@@ -64,7 +64,18 @@ def _fetch_mfapi_nav(scheme_code: str):
     return payload["data"]
 
 
-def sync_nav(scheme_code: str, force: bool = False, from_date: date | None = None, to_date: date | None = None) -> dict:
+def sync_nav(
+    scheme_code: str,
+    force: bool = False,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    history_period: str | None = None,
+) -> dict:
+    if from_date is None and history_period is not None:
+        from backend.market_data.history_period import history_period_from_date, normalize_history_period
+
+        period = normalize_history_period(history_period, default=None)
+        from_date = history_period_from_date(period)
     try:
         from mftool import Mftool
         # mftool's second positional argument is ``as_json``.  The JSON

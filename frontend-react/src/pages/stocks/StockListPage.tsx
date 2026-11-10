@@ -49,7 +49,10 @@ export default function StockListPage() {
 
   return (
     <>
-      <PageHeader title="Stocks" subtitle="Browse, filter, and open a decision-ready stock view." />
+      <PageHeader
+        title="Stocks"
+        subtitle="Browse the seed list, or track symbols beyond it with Add stock."
+      />
       <section className="panel stock-list-panel">
         <div className="stock-toolbar">
           <label className="stock-field">
@@ -92,7 +95,7 @@ export default function StockListPage() {
                 setAddOpen(true);
               }}
             >
-              Add
+              Add stock
             </button>
           </div>
         </div>

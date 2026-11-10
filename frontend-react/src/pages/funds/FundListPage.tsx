@@ -58,7 +58,7 @@ export default function FundListPage() {
     <>
       <PageHeader
         title="Mutual funds"
-        subtitle="Browse, filter, and open a decision-ready fund view."
+        subtitle="Browse the seed list, or track schemes beyond it with Add fund."
         actions={
           <div className="page-header-actions-row">
             <Link className="text-link" to="/mutualfunds/screen">
@@ -123,7 +123,7 @@ export default function FundListPage() {
                 setAddOpen(true);
               }}
             >
-              Add
+              Add fund
             </button>
           </div>
         </div>

@@ -7,8 +7,12 @@ import {
   TrackInstrumentResult,
 } from '../api';
 import {
+  DEFAULT_HISTORY_PERIOD,
+  HISTORY_PERIOD_OPTIONS,
+  HistoryPeriod,
   InstrumentKind,
   addInstrumentCodeLabel,
+  addInstrumentDialogTitle,
   fundDetailPath,
   stockDetailPath,
   validateAddInstrumentCode,
@@ -58,6 +62,7 @@ export default function AddInstrumentDialog({
   );
   const [code, setCode] = React.useState(initialCode);
   const [yfSymbol, setYfSymbol] = React.useState('');
+  const [historyPeriod, setHistoryPeriod] = React.useState<HistoryPeriod>(DEFAULT_HISTORY_PERIOD);
   const [preview, setPreview] = React.useState<InstrumentPreview | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [info, setInfo] = React.useState<string | null>(null);
@@ -68,6 +73,7 @@ export default function AddInstrumentDialog({
     setKind(kinds.includes(initialKind) ? initialKind : kinds[0]);
     setCode(initialCode);
     setYfSymbol('');
+    setHistoryPeriod(DEFAULT_HISTORY_PERIOD);
     setPreview(null);
     setError(null);
     setInfo(null);
@@ -110,9 +116,9 @@ export default function AddInstrumentDialog({
     setInfo(null);
     try {
       let result: TrackInstrumentResult;
-      if (kind === 'stock') result = await api.trackStockInstrument(trimmed, true);
-      else if (kind === 'fund') result = await api.trackFundInstrument(trimmed, true);
-      else result = await api.trackIndexInstrument(trimmed, yfSymbol.trim(), true);
+      if (kind === 'stock') result = await api.trackStockInstrument(trimmed, true, historyPeriod);
+      else if (kind === 'fund') result = await api.trackFundInstrument(trimmed, true, historyPeriod);
+      else result = await api.trackIndexInstrument(trimmed, yfSymbol.trim(), true, historyPeriod);
 
       if (result.already_tracked) {
         setInfo('Already tracked — opening existing master and syncing history.');
@@ -152,7 +158,7 @@ export default function AddInstrumentDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="dialog-header">
-          <h2 id="add-instrument-title">Add instrument</h2>
+          <h2 id="add-instrument-title">{addInstrumentDialogTitle(kind)}</h2>
           <button type="button" className="dialog-close" onClick={onClose} aria-label="Close">
             ×
           </button>
@@ -213,6 +219,20 @@ export default function AddInstrumentDialog({
             />
           </label>
         )}
+
+        <label className="stock-field">
+          <span>History depth</span>
+          <select
+            value={historyPeriod}
+            onChange={(event) => setHistoryPeriod(event.target.value as HistoryPeriod)}
+          >
+            {HISTORY_PERIOD_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
 
         {preview && <div className="dialog-preview">Preview: {previewLabel(preview)}</div>}
         {info && <div className="dialog-info">{info}</div>}

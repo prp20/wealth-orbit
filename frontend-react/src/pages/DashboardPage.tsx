@@ -170,7 +170,9 @@ export default function DashboardPage() {
               kind="PRICES"
               label="Update indexes"
               hideSucceeded
+              extendHistory
               startJob={() => api.syncBenchmarks(syncCodes)}
+              startExtendJob={(period) => api.syncBenchmarks(syncCodes, period)}
               loadStatus={() => api.syncBenchmarkStatus()}
               invalidateKeys={[['benchmark-summary']]}
             />

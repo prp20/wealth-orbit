@@ -1,6 +1,7 @@
 import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, SyncJob, syncJobFailureMessage } from '../api';
+import { HISTORY_PERIOD_OPTIONS, HistoryPeriod } from '../lib/addInstrument';
 
 const TERMINAL = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED']);
 
@@ -29,6 +30,8 @@ export default function SyncJobButton({
   loadStatus,
   hideSucceeded = false,
   thenKind,
+  extendHistory = false,
+  startExtendJob,
 }: {
   entity?: 'stock' | 'fund';
   id?: string;
@@ -42,6 +45,10 @@ export default function SyncJobButton({
   hideSucceeded?: boolean;
   /** After this fund job succeeds, enqueue and poll a second kind. */
   thenKind?: string;
+  /** Show Extend history menu for 5y / 10y / max depth syncs. */
+  extendHistory?: boolean;
+  /** Custom extend starter (Home indexes). Defaults to stock prices / fund NAV. */
+  startExtendJob?: (period: HistoryPeriod) => Promise<SyncJob>;
 }) {
   const queryClient = useQueryClient();
   const entityId = id || symbol || '';
@@ -53,8 +60,10 @@ export default function SyncJobButton({
   const rootRef = React.useRef<HTMLDivElement>(null);
   const startJobRef = React.useRef(startJob);
   const loadStatusRef = React.useRef(loadStatus);
+  const startExtendJobRef = React.useRef(startExtendJob);
   startJobRef.current = startJob;
   loadStatusRef.current = loadStatus;
+  startExtendJobRef.current = startExtendJob;
 
   React.useEffect(() => {
     if (!custom && !entityId) return;
@@ -88,17 +97,19 @@ export default function SyncJobButton({
     return () => document.removeEventListener('mousedown', onDoc);
   }, [menuOpen]);
 
-  const run = async (force: boolean) => {
+  const run = async (force: boolean, historyPeriod: HistoryPeriod | '' = '') => {
     setBusy(true);
     setError('');
     setMenuOpen(false);
     setStatus('queued');
     try {
-      const job = custom
-        ? await startJobRef.current!()
-        : entity === 'fund'
-          ? await api.syncFundKind(entityId, kind, force)
-          : await api.syncStock(entityId, kind, force);
+      const job = historyPeriod && startExtendJobRef.current
+        ? await startExtendJobRef.current(historyPeriod)
+        : custom
+          ? await startJobRef.current!()
+          : entity === 'fund'
+            ? await api.syncFundKind(entityId, kind, force, historyPeriod)
+            : await api.syncStock(entityId, kind, force, historyPeriod);
       setStatus(quietStatus(String(job.status || 'QUEUED').toLowerCase(), hideSucceeded));
       let terminal = await pollJob(job.job_id, (current) => {
         const failure = syncJobFailureMessage(current);
@@ -146,12 +157,12 @@ export default function SyncJobButton({
       <button type="button" disabled={busy || (!custom && !entityId)} onClick={() => run(false)}>
         {busy ? 'Working…' : label}
       </button>
-      {!custom && (
+      {(!custom || extendHistory) && (
         <div className="sync-overflow">
           <button
             type="button"
             className="sync-overflow-trigger"
-            disabled={busy || !entityId}
+            disabled={busy || (!custom && !entityId)}
             aria-label="More sync options"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((open) => !open)}
@@ -160,9 +171,22 @@ export default function SyncJobButton({
           </button>
           {menuOpen && (
             <div className="sync-overflow-menu">
-              <button type="button" disabled={busy} onClick={() => run(true)}>
-                Force sync
-              </button>
+              {!custom && (
+                <button type="button" disabled={busy} onClick={() => run(true)}>
+                  Force sync
+                </button>
+              )}
+              {extendHistory &&
+                HISTORY_PERIOD_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => run(false, option.value)}
+                  >
+                    Extend history · {option.label}
+                  </button>
+                ))}
             </div>
           )}
         </div>

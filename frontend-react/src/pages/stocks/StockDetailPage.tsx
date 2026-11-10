@@ -193,6 +193,7 @@ export default function StockDetailPage() {
                   symbol={symbol}
                   kind="prices"
                   label="Update prices"
+                  extendHistory
                   invalidateKeys={[['history', 'stock', symbol], ['stock', symbol]]}
                 />
               </div>
