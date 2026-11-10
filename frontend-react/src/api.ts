@@ -3,6 +3,10 @@ const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 function errorDetail(payload: any, fallback: string) {
   const detail = payload?.detail;
   if (typeof detail === 'string') return detail;
+  if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+    const message = detail.message || detail.reason;
+    if (typeof message === 'string' && message.trim()) return message;
+  }
   if (Array.isArray(detail) && detail.length) return 'Use at least 8 characters.';
   return fallback;
 }
@@ -199,8 +203,11 @@ export const api = {
   stockValuation: (id: string) => get<any>(`/market-data/stocks/${encodeURIComponent(id)}/valuation`),
   stockCompare: (symbols: string[]) =>
     get<any[]>(`/market-data/stocks/compare?symbols=${encodeURIComponent(symbols.join(','))}`),
-  syncStock: (id: string, kind: string, force: boolean) =>
-    post<SyncJob>(`/market-data/stocks/${encodeURIComponent(id)}/sync?kind=${kind}&force=${force}`),
+  syncStock: (id: string, kind: string, force: boolean, historyPeriod = '') => {
+    const params = new URLSearchParams({ kind, force: String(force) });
+    if (historyPeriod) params.set('history_period', historyPeriod);
+    return post<SyncJob>(`/market-data/stocks/${encodeURIComponent(id)}/sync?${params}`);
+  },
   syncStockStatus: (id: string, kind: string) =>
     get<{ status: string; kind: string; job: SyncJob | null }>(
       `/market-data/stocks/${encodeURIComponent(id)}/sync/status?kind=${kind}`,
@@ -208,12 +215,18 @@ export const api = {
   syncJob: (jobId: string) => get<SyncJob>(`/market-data/sync/jobs/${encodeURIComponent(jobId)}`),
   syncQueue: (includeHistory = true, limit = 12) =>
     get<{ jobs: SyncJob[] }>(`/market-data/sync/queue?${syncQueueQuery(includeHistory, limit)}`),
-  syncFund: (id: string, force: boolean) =>
-    post<SyncJob>(`/market-data/mutual-funds/${encodeURIComponent(id)}/sync?kind=nav&force=${force}`),
-  syncFundKind: (id: string, kind: string, force: boolean) =>
-    post<SyncJob>(
-      `/market-data/mutual-funds/${encodeURIComponent(id)}/sync/${encodeURIComponent(kind)}?force=${force}`,
-    ),
+  syncFund: (id: string, force: boolean, historyPeriod = '') => {
+    const params = new URLSearchParams({ kind: 'nav', force: String(force) });
+    if (historyPeriod) params.set('history_period', historyPeriod);
+    return post<SyncJob>(`/market-data/mutual-funds/${encodeURIComponent(id)}/sync?${params}`);
+  },
+  syncFundKind: (id: string, kind: string, force: boolean, historyPeriod = '') => {
+    const params = new URLSearchParams({ force: String(force) });
+    if (historyPeriod) params.set('history_period', historyPeriod);
+    return post<SyncJob>(
+      `/market-data/mutual-funds/${encodeURIComponent(id)}/sync/${encodeURIComponent(kind)}?${params}`,
+    );
+  },
   syncFundStatus: (id: string, kind: string) =>
     get<{ status: string; kind: string; job: SyncJob | null }>(
       `/market-data/mutual-funds/${encodeURIComponent(id)}/sync/status?kind=${encodeURIComponent(kind)}`,
@@ -225,10 +238,80 @@ export const api = {
     ),
   benchmarkSummary: (codes: string[]) =>
     get<any[]>(`/market-data/benchmarks/summary?codes=${encodeURIComponent(codes.join(','))}`),
-  syncBenchmarks: (codes: string[]) =>
-    post<SyncJob>(`/market-data/benchmarks/sync?codes=${encodeURIComponent(codes.join(','))}`),
+  syncBenchmarks: (codes: string[], historyPeriod = '') => {
+    const params = new URLSearchParams({ codes: codes.join(',') });
+    if (historyPeriod) params.set('history_period', historyPeriod);
+    return post<SyncJob>(`/market-data/benchmarks/sync?${params}`);
+  },
   syncBenchmarkStatus: () =>
     get<{ status: string; job: SyncJob | null }>('/market-data/benchmarks/sync/status'),
+  previewStockInstrument: (tradingSymbol: string) =>
+    get<InstrumentPreview>(
+      `/market-data/instruments/stocks/preview?trading_symbol=${encodeURIComponent(tradingSymbol)}`,
+    ),
+  previewFundInstrument: (schemeCode: string) =>
+    get<InstrumentPreview>(
+      `/market-data/instruments/mutual-funds/preview?scheme_code=${encodeURIComponent(schemeCode)}`,
+    ),
+  previewIndexInstrument: (indexCode: string, yfSymbol = '') => {
+    const params = new URLSearchParams({ index_code: indexCode });
+    if (yfSymbol) params.set('yf_symbol', yfSymbol);
+    return get<InstrumentPreview>(`/market-data/instruments/indexes/preview?${params}`);
+  },
+  trackStockInstrument: (tradingSymbol: string, enqueueHistory = true, historyPeriod = '5y') => {
+    const params = new URLSearchParams({
+      enqueue_history: enqueueHistory ? 'true' : 'false',
+      history_period: historyPeriod,
+    });
+    return postJson<TrackInstrumentResult>(`/market-data/instruments/stocks?${params}`, {
+      trading_symbol: tradingSymbol,
+    });
+  },
+  trackFundInstrument: (schemeCode: string, enqueueHistory = true, historyPeriod = '5y') => {
+    const params = new URLSearchParams({
+      enqueue_history: enqueueHistory ? 'true' : 'false',
+      history_period: historyPeriod,
+    });
+    return postJson<TrackInstrumentResult>(`/market-data/instruments/mutual-funds?${params}`, {
+      scheme_code: schemeCode,
+    });
+  },
+  trackIndexInstrument: (
+    indexCode: string,
+    yfSymbol = '',
+    enqueueHistory = true,
+    historyPeriod = '5y',
+  ) => {
+    const params = new URLSearchParams({
+      enqueue_history: enqueueHistory ? 'true' : 'false',
+      history_period: historyPeriod,
+    });
+    return postJson<TrackInstrumentResult>(`/market-data/instruments/indexes?${params}`, {
+      index_code: indexCode,
+      yf_symbol: yfSymbol || null,
+    });
+  },
   sectors: () => get<string[]>('/market-data/sectors'),
   filters: (kind: string) => get<string[]>(`/market-data/filters/${kind}`),
+};
+
+export type InstrumentPreview = {
+  instrument_type: 'stock' | 'mutual_fund' | 'index';
+  trading_symbol?: string;
+  company_name?: string;
+  exchange?: string;
+  scheme_code?: string;
+  scheme_name?: string;
+  amc_name?: string;
+  index_code?: string;
+  index_name?: string;
+  yf_symbol?: string;
+};
+
+export type TrackInstrumentResult = {
+  status: 'created' | 'existing';
+  already_tracked: boolean;
+  master: Record<string, unknown>;
+  jobs: { job_id?: string; kind?: string; duplicate?: boolean }[];
+  preview?: InstrumentPreview;
 };

@@ -89,6 +89,32 @@ Guided setup defaults stay small: recommended index history is about **5y** for 
 
 Re-running masters seed upserts on those natural keys and must not create duplicate companies or schemes.
 
+## Track beyond seed (India-first)
+
+### How to add from the UI
+
+1. **Stock:** open **Stocks** → click **Add stock** → enter an NSE symbol → choose history depth (`5 years` default / `10 years` / `Maximum available`) → Preview → **Add & sync history**.
+2. **Fund:** open **Mutual funds** → **Add fund** → AMFI scheme code → depth → Preview → Add & sync.
+3. **Index:** on **Home** → **Add index** → index code (+ Yahoo if not allowlisted) → depth → Add & sync.
+
+Empty search that misses the catalog also offers **Add “CODE” as NSE symbol / scheme code?**  
+After add, detail/Home **⋯ → Extend history** can pull `5y` / `10y` / `max` without inventing duplicate keys.
+
+| Instrument | Identifier | Notes |
+|------------|------------|-------|
+| Stock | NSE `trading_symbol` | Runtime Yahoo ticker is `{symbol}.NS` |
+| Mutual fund | AMFI `scheme_code` | Digits from MFAPI / mftool |
+| Index | `index_code` + Yahoo `yf_symbol` | Allowlisted India codes can omit Yahoo; others require an explicit India Yahoo symbol |
+
+Non-goals: US tickers, bulk exchange import, watchlists. Seed CLI remains the bulk path; the UI is single-instrument add. Re-adding an already-tracked code is idempotent (`status: existing`). Rebuild/serve `frontend-react` from this branch so the labeled **Add stock** / **Add fund** buttons are visible.
+
+```bash
+# Optional API (same behavior as the Add dialog; default history_period=5y)
+curl -X POST "$API/market-data/instruments/stocks?enqueue_history=true&history_period=5y" \
+  -H 'Content-Type: application/json' \
+  -d '{"trading_symbol":"RELIANCE"}'
+```
+
 ## Seed flags
 
 Reference CSVs live under `data/seed/`. With `DATABASE_URL` set:

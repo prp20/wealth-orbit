@@ -46,13 +46,16 @@ def rows_from_yahoo_frame(frame: pd.DataFrame) -> list[tuple]:
     return rows
 
 
-def sync_home_indexes(codes: list[str]) -> dict:
-    """Upsert recent sessions through today for the requested index codes.
+def sync_home_indexes(codes: list[str], history_period: str | None = None) -> dict:
+    """Upsert index closes for the requested codes.
 
-    Uses the active yfinance symbol already stored on each index. A missing
-    mapping is reported; the job fails only when every requested index fails.
+    Default (no ``history_period``): incremental recent bars from the watermark.
+    With ``history_period`` ``5y`` / ``10y`` / ``max``: deep Yahoo download for
+    add / extend-history paths (still upserts; no duplicate keys).
     """
     import yfinance as yf
+
+    from .history_period import normalize_history_period, yfinance_period
 
     cleaned: list[str] = []
     seen: set[str] = set()
@@ -64,6 +67,10 @@ def sync_home_indexes(codes: list[str]) -> dict:
         cleaned.append(text)
     if not cleaned:
         raise ValueError("at least one index code is required")
+
+    deep_period = None
+    if history_period is not None and str(history_period).strip() != "":
+        deep_period = normalize_history_period(history_period, default=None)
 
     end = date.today() + timedelta(days=1)
     synced = []
@@ -114,14 +121,30 @@ def sync_home_indexes(codes: list[str]) -> dict:
                     failed.append({"index_code": code, "reason": "No Yahoo symbol is mapped"})
                     continue
                 index_id, ticker = found
-                cursor.execute(
-                    f"SELECT max({date_identifier}) FROM market_data.index_daily_history WHERE index_id=%s",
-                    (index_id,),
-                )
-                watermark = cursor.fetchone()[0]
-                start = (watermark - timedelta(days=7)) if watermark else date.today() - timedelta(days=14)
                 try:
-                    frame = yf.download(ticker, start=start, end=end, auto_adjust=True, progress=False, threads=False)
+                    if deep_period:
+                        frame = yf.download(
+                            ticker,
+                            period=yfinance_period(deep_period),
+                            auto_adjust=True,
+                            progress=False,
+                            threads=False,
+                        )
+                    else:
+                        cursor.execute(
+                            f"SELECT max({date_identifier}) FROM market_data.index_daily_history WHERE index_id=%s",
+                            (index_id,),
+                        )
+                        watermark = cursor.fetchone()[0]
+                        start = (watermark - timedelta(days=7)) if watermark else date.today() - timedelta(days=14)
+                        frame = yf.download(
+                            ticker,
+                            start=start,
+                            end=end,
+                            auto_adjust=True,
+                            progress=False,
+                            threads=False,
+                        )
                     bars = rows_from_yahoo_frame(frame)
                 except Exception as exc:
                     failed.append({"index_code": code, "reason": str(exc)})
@@ -148,6 +171,7 @@ def sync_home_indexes(codes: list[str]) -> dict:
         "status": "completed",
         "records_processed": records,
         "as_of": latest.isoformat() if latest else None,
+        "history_period": deep_period,
         "indexes": synced,
         "failed": failed,
     }

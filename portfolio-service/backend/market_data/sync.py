@@ -25,9 +25,27 @@ DEFAULT_INDICATORS = [
 ]
 
 
-def sync_prices(symbol: str, force: bool = False, from_date: date | None = None, to_date: date | None = None) -> dict:
-    """Fetch and persist OHLCV history. Unbounded dates request yfinance max history."""
+def sync_prices(
+    symbol: str,
+    force: bool = False,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    history_period: str | None = None,
+) -> dict:
+    """Fetch and persist OHLCV history.
+
+    Prefer explicit ``from_date``/``to_date``. Otherwise ``history_period``
+    (``5y`` / ``10y`` / ``max``) maps to a yfinance period. Unbounded defaults
+    still request max history.
+    """
     import yfinance as yf
+
+    from .history_period import normalize_history_period, yfinance_period
+
+    period = None
+    if from_date is None and to_date is None:
+        # Legacy callers with no period still get max; add/extend paths pass 5y/10y/max.
+        period = "max" if history_period is None else normalize_history_period(history_period, default=None)
     with psycopg2.connect(os.environ["DATABASE_URL"], connect_timeout=15) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT stock_id FROM market_data.stock_reference WHERE trading_symbol=%s AND is_active=TRUE", (symbol,))
@@ -39,7 +57,7 @@ def sync_prices(symbol: str, force: bool = False, from_date: date | None = None,
             if from_date or to_date:
                 kwargs.update(start=from_date, end=to_date)
             else:
-                kwargs["period"] = "max"
+                kwargs["period"] = yfinance_period(period)
             frame = yf.Ticker(f"{symbol}.NS").history(**kwargs)
             values = []
             for timestamp, row in frame.iterrows():
@@ -50,7 +68,16 @@ def sync_prices(symbol: str, force: bool = False, from_date: date | None = None,
                 execute_values(cur, """INSERT INTO market_data.stock_daily_prices(stock_id,trading_date,open,high,low,close,volume,source_id)
                     VALUES %s ON CONFLICT(stock_id,trading_date) DO UPDATE SET open=EXCLUDED.open,high=EXCLUDED.high,low=EXCLUDED.low,close=EXCLUDED.close,volume=EXCLUDED.volume,source_id=EXCLUDED.source_id,updated_at=NOW()""", values, page_size=1000)
         conn.commit()
-    return {"symbol": symbol, "kind": "prices", "status": "completed", "records_processed": len(values), "force": force, "from_date": from_date.isoformat() if from_date else None, "to_date": to_date.isoformat() if to_date else None}
+    return {
+        "symbol": symbol,
+        "kind": "prices",
+        "status": "completed",
+        "records_processed": len(values),
+        "force": force,
+        "history_period": period,
+        "from_date": from_date.isoformat() if from_date else None,
+        "to_date": to_date.isoformat() if to_date else None,
+    }
 
 
 def _source_id(cur, name: str) -> uuid.UUID:

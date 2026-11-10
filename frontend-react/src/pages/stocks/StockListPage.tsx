@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api';
+import AddInstrumentDialog from '../../components/AddInstrumentDialog';
 import PageHeader from '../../components/PageHeader';
 
 const PAGE_SIZE = 25;
@@ -12,6 +13,8 @@ export default function StockListPage() {
   const [sector, setSector] = React.useState('All');
   const [industry, setIndustry] = React.useState('All');
   const [page, setPage] = React.useState(1);
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [addCode, setAddCode] = React.useState('');
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
@@ -46,7 +49,10 @@ export default function StockListPage() {
 
   return (
     <>
-      <PageHeader title="Stocks" subtitle="Browse, filter, and open a decision-ready stock view." />
+      <PageHeader
+        title="Stocks"
+        subtitle="Browse the seed list, or track symbols beyond it with Add stock."
+      />
       <section className="panel stock-list-panel">
         <div className="stock-toolbar">
           <label className="stock-field">
@@ -80,11 +86,46 @@ export default function StockListPage() {
               ))}
             </select>
           </label>
+          <div className="toolbar-actions">
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => {
+                setAddCode(debouncedQuery);
+                setAddOpen(true);
+              }}
+            >
+              Add stock
+            </button>
+          </div>
         </div>
 
         {stocks.isLoading && <div className="loading">Loading stocks…</div>}
         {stocks.error && <div className="empty">{(stocks.error as Error).message}</div>}
-        {!stocks.isLoading && !rows.length && <div className="empty">No stocks match these filters.</div>}
+        {!stocks.isLoading && !rows.length && (
+          <div className="empty empty-cta">
+            <span>No stocks match these filters.</span>
+            {debouncedQuery && (
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => {
+                  setAddCode(debouncedQuery);
+                  setAddOpen(true);
+                }}
+              >
+                Add “{debouncedQuery}” as NSE symbol?
+              </button>
+            )}
+          </div>
+        )}
+        <AddInstrumentDialog
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          initialKind="stock"
+          initialCode={addCode}
+          allowedKinds={['stock']}
+        />
 
         {rows.length > 0 && (
           <>

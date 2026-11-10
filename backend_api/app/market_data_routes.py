@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException
 from datetime import date
+from pydantic import BaseModel, Field
 
+from .auth import current_user
 from .portfolio_backend import (filter_values, mutual_funds, mutual_fund_detail,
     mutual_fund_detail_by_name, mutual_fund_detail_enriched, mutual_fund_history,
     stock_categories, stock_detail,
@@ -32,6 +34,42 @@ MF_KIND_ALIASES = {
 router = APIRouter(prefix="/market-data", tags=["market-data"])
 
 
+class TrackStockBody(BaseModel):
+    trading_symbol: str = Field(min_length=1, max_length=32)
+
+
+class TrackFundBody(BaseModel):
+    scheme_code: str = Field(min_length=1, max_length=12)
+
+
+class TrackIndexBody(BaseModel):
+    index_code: str = Field(min_length=1, max_length=32)
+    yf_symbol: str | None = Field(default=None, max_length=32)
+
+
+def _instrument_http_error(exc: Exception) -> HTTPException:
+    from backend.market_data.instrument_registry import InstrumentResolveError
+
+    if isinstance(exc, InstrumentResolveError):
+        return HTTPException(
+            status_code=422,
+            detail={"reason": exc.reason, "message": exc.message},
+        )
+    return HTTPException(status_code=422, detail={"reason": "track_failed", "message": "Could not add instrument"})
+
+
+def _parse_history_period(raw: str | None, *, default: str | None = "5y") -> str | None:
+    from backend.market_data.history_period import normalize_history_period
+
+    try:
+        return normalize_history_period(raw, default=default)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"reason": "invalid_history_period", "message": str(exc)},
+        ) from None
+
+
 def _mf_sync_type(kind: str) -> str:
     key = kind.lower().strip()
     if key not in MF_KIND_ALIASES:
@@ -45,6 +83,7 @@ def _enqueue_mf_sync(
     force: bool,
     from_date: date | None = None,
     to_date: date | None = None,
+    history_period: str | None = None,
 ):
     if mutual_fund_detail(scheme_code) is None:
         raise HTTPException(status_code=404, detail="Mutual fund not found")
@@ -52,7 +91,13 @@ def _enqueue_mf_sync(
         raise HTTPException(status_code=422, detail="from_date must be on or before to_date")
     sync_type = _mf_sync_type(kind)
     if sync_type == "MF_NAV":
-        work = lambda: sync_nav(scheme_code, force, from_date, to_date)
+        work = lambda: sync_nav(
+            scheme_code,
+            force,
+            from_date,
+            to_date,
+            history_period=history_period,
+        )
     elif sync_type == "MF_METRICS":
         if not has_nav_history(scheme_code):
             raise HTTPException(
@@ -87,7 +132,14 @@ def sync_job(job_id: str):
     return job
 
 @router.post("/stocks/{symbol}/sync")
-def sync_stock(symbol: str, kind: str = Query("technical"), force: bool = Query(False), from_date: date | None = None, to_date: date | None = None):
+def sync_stock(
+    symbol: str,
+    kind: str = Query("technical"),
+    force: bool = Query(False),
+    from_date: date | None = None,
+    to_date: date | None = None,
+    history_period: str | None = Query(None),
+):
     """Return a sync request acknowledgement; ingestion workers can consume this request."""
     kind = kind.lower()
     if kind not in {"prices", "technical", "fundamentals", "daily_metrics", "shareholding"}:
@@ -96,13 +148,14 @@ def sync_stock(symbol: str, kind: str = Query("technical"), force: bool = Query(
         raise HTTPException(status_code=404, detail="Stock not found")
     if from_date and to_date and from_date > to_date:
         raise HTTPException(status_code=422, detail="from_date must be on or before to_date")
+    period = _parse_history_period(history_period, default=None) if history_period else None
     if kind == "fundamentals" or kind == "shareholding":
         work = lambda: sync_stock_fundamentals(symbol, force)
     else:
         from backend.market_data.sync import sync_daily_metrics, sync_technical_indicators, sync_prices
         work = (lambda: sync_daily_metrics(symbol, force)) if kind == "daily_metrics" else (lambda: sync_technical_indicators(symbol, force))
         if kind == "prices":
-            work = lambda: sync_prices(symbol, force, from_date, to_date)
+            work = lambda: sync_prices(symbol, force, from_date, to_date, history_period=period)
     job, created = enqueue("STOCK", symbol, kind.upper(), force, work)
     return {**job, "duplicate": not created}
 
@@ -125,8 +178,10 @@ def sync_mutual_fund(
     force: bool = Query(False),
     from_date: date | None = None,
     to_date: date | None = None,
+    history_period: str | None = Query(None),
 ):
-    return _enqueue_mf_sync(scheme_code, kind, force, from_date, to_date)
+    period = _parse_history_period(history_period, default=None) if history_period else None
+    return _enqueue_mf_sync(scheme_code, kind, force, from_date, to_date, history_period=period)
 
 @router.get("/mutual-funds/{scheme_code}/sync/status")
 def sync_mutual_fund_status(scheme_code: str, kind: str = Query("nav"), force: bool = Query(False)):
@@ -187,8 +242,15 @@ def mutual_fund_benchmark_history_route(
     return rows
 
 @router.post("/mutual-funds/{scheme_code}/sync/nav")
-def mutual_fund_nav_sync(scheme_code: str, force: bool = Query(False), from_date: date | None = None, to_date: date | None = None):
-    return _enqueue_mf_sync(scheme_code, "nav", force, from_date, to_date)
+def mutual_fund_nav_sync(
+    scheme_code: str,
+    force: bool = Query(False),
+    from_date: date | None = None,
+    to_date: date | None = None,
+    history_period: str | None = Query(None),
+):
+    period = _parse_history_period(history_period, default=None) if history_period else None
+    return _enqueue_mf_sync(scheme_code, "nav", force, from_date, to_date, history_period=period)
 
 @router.post("/mutual-funds/{scheme_code}/sync/metrics")
 def mutual_fund_metrics_sync(scheme_code: str, force: bool = Query(False)):
@@ -330,11 +392,18 @@ def benchmark_summary_route(codes: str = Query("")):
 HOME_INDEX_ENTITY = "HOME-INDEXES"
 
 @router.post("/benchmarks/sync")
-def benchmark_sync_route(codes: str = Query("")):
+def benchmark_sync_route(codes: str = Query(""), history_period: str | None = Query(None)):
     parts = _benchmark_codes(codes)
     if not parts:
         raise HTTPException(status_code=422, detail="at least one index code is required")
-    job, created = enqueue("STOCK", HOME_INDEX_ENTITY, "PRICES", False, lambda: sync_home_indexes(parts))
+    period = _parse_history_period(history_period, default=None) if history_period else None
+    job, created = enqueue(
+        "STOCK",
+        HOME_INDEX_ENTITY,
+        "PRICES",
+        False,
+        lambda: sync_home_indexes(parts, history_period=period),
+    )
     return {**job, "duplicate": not created}
 
 @router.get("/benchmarks/sync/status")
@@ -347,6 +416,155 @@ def benchmark_sync_status_route():
 @router.get("/benchmarks/{index_code}/history")
 def benchmark_history_route(index_code: str):
     return benchmark_history(index_code)
+
+
+@router.get("/instruments/stocks/preview")
+def preview_stock_instrument(
+    trading_symbol: str = Query(..., max_length=32),
+    _user=Depends(current_user),
+):
+    from backend.market_data.instrument_registry import InstrumentResolveError, resolve_stock
+
+    try:
+        return resolve_stock(trading_symbol)
+    except InstrumentResolveError as exc:
+        raise _instrument_http_error(exc) from None
+
+
+@router.get("/instruments/mutual-funds/preview")
+def preview_fund_instrument(
+    scheme_code: str = Query(..., max_length=12),
+    _user=Depends(current_user),
+):
+    from backend.market_data.instrument_registry import InstrumentResolveError, resolve_fund
+
+    try:
+        return resolve_fund(scheme_code)
+    except InstrumentResolveError as exc:
+        raise _instrument_http_error(exc) from None
+
+
+@router.get("/instruments/indexes/preview")
+def preview_index_instrument(
+    index_code: str = Query(..., max_length=32),
+    yf_symbol: str | None = Query(None, max_length=32),
+    _user=Depends(current_user),
+):
+    from backend.market_data.instrument_registry import InstrumentResolveError, resolve_index
+
+    try:
+        return resolve_index(index_code, yf_symbol)
+    except InstrumentResolveError as exc:
+        raise _instrument_http_error(exc) from None
+
+
+@router.post("/instruments/stocks")
+def track_stock_instrument(
+    body: TrackStockBody,
+    enqueue_history: bool = Query(True),
+    history_period: str = Query("5y"),
+    _user=Depends(current_user),
+):
+    from backend.market_data.instrument_registry import InstrumentResolveError, ensure_stock
+    from backend.market_data.sync import sync_prices
+
+    period = _parse_history_period(history_period, default="5y")
+    try:
+        result = ensure_stock(body.trading_symbol)
+    except InstrumentResolveError as exc:
+        raise _instrument_http_error(exc) from None
+    jobs = []
+    if enqueue_history:
+        symbol = result["master"]["trading_symbol"]
+        job, created = enqueue(
+            "STOCK",
+            symbol,
+            "PRICES",
+            False,
+            lambda: sync_prices(symbol, False, history_period=period),
+        )
+        jobs.append(
+            {
+                "job_id": job.get("job_id"),
+                "kind": "prices",
+                "history_period": period,
+                "duplicate": not created,
+            }
+        )
+    return {**result, "jobs": jobs, "history_period": period}
+
+
+@router.post("/instruments/mutual-funds")
+def track_fund_instrument(
+    body: TrackFundBody,
+    enqueue_history: bool = Query(True),
+    history_period: str = Query("5y"),
+    _user=Depends(current_user),
+):
+    from backend.market_data.instrument_registry import InstrumentResolveError, ensure_fund
+
+    period = _parse_history_period(history_period, default="5y")
+    try:
+        result = ensure_fund(body.scheme_code)
+    except InstrumentResolveError as exc:
+        raise _instrument_http_error(exc) from None
+    jobs = []
+    if enqueue_history:
+        code = result["master"]["scheme_code"]
+        job, created = enqueue(
+            "MUTUAL_FUND",
+            code,
+            "MF_NAV",
+            False,
+            lambda: sync_nav(code, False, history_period=period),
+        )
+        jobs.append(
+            {
+                "job_id": job.get("job_id"),
+                "kind": "nav",
+                "history_period": period,
+                "duplicate": not created,
+            }
+        )
+    return {**result, "jobs": jobs, "history_period": period}
+
+
+@router.post("/instruments/indexes")
+def track_index_instrument(
+    body: TrackIndexBody,
+    enqueue_history: bool = Query(True),
+    history_period: str = Query("5y"),
+    _user=Depends(current_user),
+):
+    from backend.market_data.instrument_registry import InstrumentResolveError, ensure_index
+
+    period = _parse_history_period(history_period, default="5y")
+    try:
+        result = ensure_index(body.index_code, body.yf_symbol)
+    except InstrumentResolveError as exc:
+        raise _instrument_http_error(exc) from None
+    jobs = []
+    if enqueue_history:
+        # Per-index job identity so Home Update (HOME-INDEXES) cannot swallow this work.
+        code = result["master"]["index_code"]
+        job, created = enqueue(
+            "STOCK",
+            code,
+            "PRICES",
+            False,
+            lambda: sync_home_indexes([code], history_period=period),
+        )
+        jobs.append(
+            {
+                "job_id": job.get("job_id"),
+                "kind": "index_history",
+                "entity_key": code,
+                "history_period": period,
+                "duplicate": not created,
+            }
+        )
+    return {**result, "jobs": jobs, "history_period": period}
+
 
 @router.get("/stocks")
 def stock_list(search: str = Query(""), exchange: str = Query("All"), sector: str = Query("All"), industry: str = Query("All")):

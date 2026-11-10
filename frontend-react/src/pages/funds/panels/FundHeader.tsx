@@ -29,6 +29,7 @@ export default function FundHeader({ schemeId, fund }: { schemeId: string; fund:
           thenKind="metrics"
           label="Update returns"
           hideSucceeded
+          extendHistory
           invalidateKeys={[
             ['fund', schemeId],
             ['fund-metrics', schemeId],
