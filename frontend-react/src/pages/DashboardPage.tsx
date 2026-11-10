@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api';
 import PageHeader from '../components/PageHeader';
+import RecentSyncJobs from '../components/RecentSyncJobs';
 import SyncJobButton from '../components/SyncJobButton';
 import { formatDisplayDate, formatInr, formatRatio } from '../lib/format';
 import { formatRecentWhen, readRecent } from '../lib/recent';
@@ -256,6 +257,8 @@ export default function DashboardPage() {
           )}
         </section>
       </div>
+
+      <RecentSyncJobs />
     </div>
   );
 }

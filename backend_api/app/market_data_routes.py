@@ -74,8 +74,8 @@ def _enqueue_mf_sync(
     return {**job, "duplicate": not created}
 
 @router.get("/sync/queue")
-def sync_queue(include_history: bool = Query(False)):
-    return {"jobs": list_jobs(include_history)}
+def sync_queue(include_history: bool = Query(False), limit: int = Query(25, ge=1, le=100)):
+    return {"jobs": list_jobs(include_history, limit)}
 
 @router.get("/sync/jobs/{job_id}")
 def sync_job(job_id: str):

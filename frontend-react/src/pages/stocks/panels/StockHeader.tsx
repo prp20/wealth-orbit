@@ -1,9 +1,11 @@
 import { formatCount, formatDisplayDate, formatInr, firstSentence } from '../../../lib/format';
+import { freshnessFailureLine } from '../../../lib/syncFailures';
 
 export default function StockHeader({ stock }: { stock: any }) {
   const price = stock?.latest_price;
   const freshness = stock?.freshness || {};
   const summary = firstSentence(stock?.business_summary);
+  const syncFailureLine = freshnessFailureLine(freshness);
   const freshnessBits = [
     freshness.latest_price_date ? `Price ${formatDisplayDate(freshness.latest_price_date)}` : null,
     freshness.latest_fundamental_period_end
@@ -38,6 +40,7 @@ export default function StockHeader({ stock }: { stock: any }) {
             <p className="panel-subtitle">Prices are not adjusted for splits or bonuses. Source: yfinance.</p>
           )}
           {freshnessBits.length > 0 && <p className="panel-subtitle">{freshnessBits.join(' · ')}</p>}
+          {syncFailureLine && <p className="panel-subtitle sync-failure-line">{syncFailureLine}</p>}
         </div>
         <div className="stock-price-block">
           <small>Last close</small>

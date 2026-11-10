@@ -39,6 +39,9 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 export type SyncJob = {
   job_id: string;
   status: string;
+  entity_type?: string;
+  entity_key?: string;
+  sync_type?: string;
   progress_percent?: number;
   last_error?: string | null;
   result?: string | Record<string, unknown> | null;
@@ -48,12 +51,22 @@ export type SyncJob = {
   duplicate?: boolean;
 };
 
-export function syncJobFailureMessage(job: SyncJob | null | undefined): string | null {
+export type SyncJobByKind = {
+  job_id?: string;
+  status?: string;
+  last_error?: string | null;
+  completed_at?: string | null;
+  started_at?: string | null;
+  queued_at?: string | null;
+  progress_percent?: number | null;
+};
+
+export function syncJobFailureMessage(job: SyncJob | SyncJobByKind | null | undefined): string | null {
   if (!job) return null;
   if (String(job.status || '').toUpperCase() === 'FAILED') {
     return job.last_error || 'Sync failed';
   }
-  let result = job.result;
+  let result = 'result' in job ? job.result : undefined;
   if (typeof result === 'string') {
     try {
       result = JSON.parse(result);
@@ -66,11 +79,23 @@ export function syncJobFailureMessage(job: SyncJob | null | undefined): string |
     if (status === 'failed' || status === 'error') {
       return String((result as any).reason || (result as any).error || 'Sync failed');
     }
-    if ((result as any).fundamental_rows === 0 && (result as any).shareholding_rows === 0) {
-      return 'Sync completed with no fundamental rows';
-    }
   }
   return null;
+}
+
+export function failedSyncSummaries(
+  lastSyncByKind: Record<string, SyncJobByKind | null | undefined> | null | undefined,
+  limit = 3,
+): { kind: string; reason: string }[] {
+  if (!lastSyncByKind) return [];
+  const rows: { kind: string; reason: string }[] = [];
+  for (const [kind, job] of Object.entries(lastSyncByKind)) {
+    const reason = syncJobFailureMessage(job);
+    if (!reason) continue;
+    rows.push({ kind, reason: reason.length > 80 ? `${reason.slice(0, 77)}…` : reason });
+    if (rows.length >= limit) break;
+  }
+  return rows;
 }
 
 export type InsightItem = {
@@ -167,6 +192,10 @@ export const api = {
       `/market-data/stocks/${encodeURIComponent(id)}/sync/status?kind=${kind}`,
     ),
   syncJob: (jobId: string) => get<SyncJob>(`/market-data/sync/jobs/${encodeURIComponent(jobId)}`),
+  syncQueue: (includeHistory = true, limit = 12) =>
+    get<{ jobs: SyncJob[] }>(
+      `/market-data/sync/queue?include_history=${includeHistory ? 'true' : 'false'}&limit=${limit}`,
+    ),
   syncFund: (id: string, force: boolean) =>
     post<SyncJob>(`/market-data/mutual-funds/${encodeURIComponent(id)}/sync?kind=nav&force=${force}`),
   syncFundKind: (id: string, kind: string, force: boolean) =>
