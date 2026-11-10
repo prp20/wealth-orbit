@@ -40,6 +40,13 @@
 .sync-overflow-menu button{width:100%;text-align:left;border:0!important;background:transparent!important;color:#39535a!important;padding:8px 10px!important;border-radius:7px!important}
 .sync-overflow-menu button:hover{background:#f3faf6!important}
 .sync-error{color:#a33b35!important;max-width:220px}
+.sync-failure-line{color:#a33b35!important}
+.sync-job-list{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:10px}
+.sync-job-row{display:grid;gap:4px;padding:10px 0;border-top:1px solid #edf1f0}
+.sync-job-row:first-child{border-top:0;padding-top:0}
+.sync-job-row>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sync-job-row strong{font-size:13px;font-weight:600;color:#3d5158}
+.sync-job-row small{color:#718089;font-size:12px;line-height:1.4}
 .stock-toolbar{display:grid;grid-template-columns:minmax(200px,1.4fr) repeat(2,minmax(140px,1fr));gap:14px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #edf1f0}
 .fund-toolbar{display:grid;grid-template-columns:minmax(200px,1.5fr) repeat(3,minmax(120px,1fr));gap:14px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #edf1f0}
 .fund-key-metrics{grid-template-columns:repeat(5,minmax(0,1fr))}

@@ -1,9 +1,10 @@
 import SyncJobButton from '../../../components/SyncJobButton';
-import { formatDisplayDate } from '../../../lib/format';
 import { planOptionLabel } from '../../../lib/fundMetrics';
+import { freshnessDateBits, freshnessFailureLine } from '../../../lib/syncFailures';
 
 export default function FundHeader({ schemeId, fund }: { schemeId: string; fund: any }) {
   const freshness = fund?.freshness || {};
+  const syncFailureLine = freshnessFailureLine(freshness);
   const subtitle = [
     fund?.amc_name,
     fund?.category_name,
@@ -11,11 +12,7 @@ export default function FundHeader({ schemeId, fund }: { schemeId: string; fund:
     planOptionLabel(fund?.plan_type),
     planOptionLabel(fund?.option_type),
   ].filter(Boolean).join(' · ');
-  const dates = [
-    freshness.latest_nav_date ? `NAV ${formatDisplayDate(freshness.latest_nav_date)}` : '',
-    freshness.latest_metrics_as_of ? `Returns ${formatDisplayDate(freshness.latest_metrics_as_of)}` : '',
-    freshness.latest_enrichment_as_of ? `Facts ${formatDisplayDate(freshness.latest_enrichment_as_of)}` : '',
-  ].filter(Boolean);
+  const dates = freshnessDateBits(freshness);
 
   return (
     <section className="stock-header panel">
@@ -43,6 +40,7 @@ export default function FundHeader({ schemeId, fund }: { schemeId: string; fund:
       <p className="panel-subtitle fund-freshness">
         {dates.length ? dates.join(' · ') : 'No NAV, returns, or facts loaded yet.'}
       </p>
+      {syncFailureLine && <p className="panel-subtitle sync-failure-line">{syncFailureLine}</p>}
     </section>
   );
 }

@@ -13,7 +13,7 @@ Tracked follow-ups from PR #2 code review (Standards + Spec) and the post-B1 roa
 ## From PR review (Spec)
 
 - [ ] Add technical indicator spark / last-points series in [`TechnicalsPanel.tsx`](../frontend-react/src/pages/stocks/panels/TechnicalsPanel.tsx)
-- [ ] Align FE sync failure UX with job status: remove or gate the zero-row SUCCEEDED→failed heuristic in `syncJobFailureMessage` ([`frontend-react/src/api.ts`](../frontend-react/src/api.ts))
+- [x] Align FE sync failure UX with job status: remove or gate the zero-row SUCCEEDED→failed heuristic in `syncJobFailureMessage` ([`frontend-react/src/api.ts`](../frontend-react/src/api.ts))
 - [ ] Optional: dedicated Sync kinds cluster on the stock detail page if product prefers the original B1 layout over per-panel sync
 
 ## Roadmap (post-B1)
