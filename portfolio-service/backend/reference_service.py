@@ -1341,9 +1341,9 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
                     continue
                 parsed_by_basis[basis] = ScreenerParser(basis).parse(html, stock_id)
             if not parsed_by_basis:
-                raise RuntimeError(f"Screener returned no HTML for {symbol}")
+                raise RuntimeError(f"Fundamentals sync failed for {symbol}: screener_html_unavailable")
             if not any(parsed.fundamental_values or parsed.shareholding for parsed in parsed_by_basis.values()):
-                raise RuntimeError(f"Screener parse returned no fundamentals or shareholding for {symbol}")
+                raise RuntimeError(f"Fundamentals sync failed for {symbol}: screener_parse_empty")
             # Remove Dec year-ends previously mis-tagged as Oct–Dec quarters.
             cur.execute(
                 """DELETE FROM market_data.stock_fundamental_values

@@ -11,7 +11,7 @@ from psycopg2.extras import execute_values
 
 from backend_api.app.technical_indicators import calculate_indicators
 
-from .daily_metrics import net_debt_from_parts
+from .daily_metrics import yahoo_daily_metric_fields
 from .sources import ensure_data_source
 
 
@@ -92,42 +92,28 @@ def sync_daily_metrics(symbol: str, force: bool = False) -> dict:
     """Persist provider ratios for the latest available market date.
 
     Ratios are point-in-time values; unavailable fields remain NULL rather than
-    being fabricated from prices.
+    being fabricated from prices. Yahoo forward PEG is never stored.
     """
     try:
         import yfinance as yf
         info = yf.Ticker(f"{symbol}.NS").info
     except Exception as exc:
-        raise RuntimeError(f"Unable to fetch daily metrics for {symbol}: {exc}") from exc
+        raise RuntimeError(f"Daily metrics sync failed for {symbol}: yahoo_info_unavailable") from exc
+    if not isinstance(info, dict) or not info:
+        raise RuntimeError(f"Daily metrics sync failed for {symbol}: yahoo_info_empty")
     with psycopg2.connect(os.environ["DATABASE_URL"], connect_timeout=15) as conn:
         with conn.cursor() as cur:
             stock_id, frame = _prices(cur, symbol)
             if frame.empty:
-                raise RuntimeError(f"No OHLC history for {symbol}; sync prices before daily metrics")
+                raise RuntimeError(f"Daily metrics sync failed for {symbol}: prices_missing")
             metric_date = frame.iloc[-1]["date"]
             source_id = _source_id(cur, "yfinance")
-            market_cap = info.get("marketCap")
-            enterprise_value = info.get("enterpriseValue")
-            ebitda_ttm = info.get("ebitda")
-            total_debt = info.get("totalDebt")
-            total_cash = info.get("totalCash")
-            net_debt = net_debt_from_parts(total_debt, total_cash)
-            ev_ebitda = info.get("enterpriseToEbitda")
-            if ev_ebitda is None and enterprise_value and ebitda_ttm and float(ebitda_ttm) != 0:
-                ev_ebitda = float(enterprise_value) / float(ebitda_ttm)
-            revenue = info.get("totalRevenue")
-            ev_sales = info.get("enterpriseToRevenue")
-            if ev_sales is None and enterprise_value and revenue and float(revenue) != 0:
-                ev_sales = float(enterprise_value) / float(revenue)
-            fcf = info.get("freeCashflow")
-            fcf_yield = None
-            if fcf is not None and market_cap and float(market_cap) > 0:
-                fcf_yield = float(fcf) / float(market_cap) * 100
+            fields = yahoo_daily_metric_fields(info)
             values = (
-                stock_id, metric_date, market_cap, info.get("trailingPE"), info.get("priceToBook"),
-                (float(info["dividendYield"]) * 100 if info.get("dividendYield") is not None else None),
-                info.get("bookValue"), info.get("returnOnCapitalEmployed"), info.get("returnOnEquity"),
-                enterprise_value, ebitda_ttm, ev_ebitda, ev_sales, net_debt, fcf_yield, source_id,
+                stock_id, metric_date, fields["market_cap"], fields["stock_pe"], fields["price_to_book"],
+                fields["dividend_yield"], fields["book_value"], fields["roce"], fields["roe"],
+                fields["enterprise_value"], fields["ebitda_ttm"], fields["ev_ebitda"], fields["ev_sales"],
+                fields["net_debt"], fields["fcf_yield"], source_id,
             )
             cur.execute("""INSERT INTO market_data.stock_daily_metrics
                 (stock_id,metric_date,market_cap,stock_pe,price_to_book,dividend_yield,book_value,roce,roe,
