@@ -3,12 +3,12 @@ run_all_seeds.py — Orchestrate Wealth Orbit market-data seed pipelines.
 
 Prefer the asset-specific entrypoints when you only need one domain:
   - run_seed_indexes.py
-  - run_seed_stocks.py   (OHLC by default; add --with-fundamentals for Screener)
+  - run_seed_stocks.py   (OHLC by default; add --with-fundamentals / --with-technicals)
   - run_seed_funds.py
 
 This script runs all three in dependency-friendly order:
   1. Indexes (masters + history)
-  2. Stocks (masters + OHLC; fundamentals optional)
+  2. Stocks (masters + OHLC; fundamentals/technicals optional)
   3. Mutual funds (masters + NAV)
 
 Prerequisites:
@@ -19,6 +19,7 @@ Prerequisites:
 Usage:
   uv run python portfolio-service/scripts/seed/run_all_seeds.py --data-dir data/seed --skip-prices --skip-nav --limit 50
   uv run python portfolio-service/scripts/seed/run_all_seeds.py --only stocks --with-fundamentals --limit 3
+  uv run python portfolio-service/scripts/seed/run_all_seeds.py --only stocks --with-technicals --limit 10
   uv run python portfolio-service/scripts/seed/run_all_seeds.py --only funds --limit 10
   uv run python portfolio-service/scripts/seed/run_all_seeds.py --only indexes --index-period 5y
 """
@@ -38,6 +39,7 @@ import seed_funds
 import seed_index_history
 import seed_indexes
 import seed_stock_prices
+import seed_stock_technicals
 import seed_stocks
 from _db import resolve_data_dir
 
@@ -74,10 +76,21 @@ def _seed_stocks(args, data_dir: Path) -> None:
         seed_fundamentals.seed(
             dry_run=args.dry_run,
             limit=None if master_symbols is not None else args.limit,
+            delay_secs=args.fundamentals_delay,
             symbols=master_symbols,
         )
     elif not args.skip_fundamentals:
         print("[stocks] fundamentals skipped (pass --with-fundamentals to enable)")
+    if args.with_technicals:
+        print("[stocks] technicals + daily metrics")
+        seed_stock_technicals.seed(
+            dry_run=args.dry_run,
+            limit=None if master_symbols is not None else args.limit,
+            delay_secs=args.technicals_delay,
+            symbols=master_symbols,
+        )
+    else:
+        print("[stocks] technicals skipped (pass --with-technicals to enable)")
 
 
 def _seed_funds(args, data_dir: Path) -> None:
@@ -128,6 +141,23 @@ def main():
         "--skip-fundamentals",
         action="store_true",
         help="Deprecated alias: fundamentals are already off unless --with-fundamentals",
+    )
+    parser.add_argument(
+        "--with-technicals",
+        action="store_true",
+        help="Include technical indicators + Yahoo daily metrics (off by default)",
+    )
+    parser.add_argument(
+        "--fundamentals-delay",
+        type=float,
+        default=3.0,
+        help="Seconds between Screener fundamentals calls",
+    )
+    parser.add_argument(
+        "--technicals-delay",
+        type=float,
+        default=0.5,
+        help="Seconds between technicals/metrics symbols",
     )
     args = parser.parse_args()
 

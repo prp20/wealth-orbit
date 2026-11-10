@@ -53,9 +53,12 @@ Install that, then run the setup script again.
 2. **Local portfolio file.** Enter keeps `sqlite+aiosqlite:///./portfolio-service/portfolio.db`.
 3. **Session secret.** Leave it blank and one is generated. It is written to `.env` and is not printed.
 4. **Index seed.** Recommended. Loads about five years of index history, which is what Home shows. It does not download the full history.
-5. **Stock and fund names.** Off unless you say yes. A yes loads names only, up to a limit you choose (default 50). Prices and NAV are large and can be synced later from the UI.
-6. **Order-history workbook.** Optional. A blank line skips it. A path imports that workbook in append mode.
-7. **Start now.** Recommended. Starts the API on http://127.0.0.1:8000/ui/ . The first visit should be **Create an account**. That account is empty until a workbook is imported.
+5. **Stock and fund names.** Off unless you say yes. A yes loads names only, up to a limit you choose (default 50). Prices and NAV are large and can be synced later.
+6. **Stock OHLC (Yahoo).** Off unless you say yes. Syncs price history for active stock masters (`5y` default; you can choose `10y` / `max` and an optional limit).
+7. **Stock fundamentals (Screener).** Off unless you say yes. Slow / rate-limited; default suggested limit is 10.
+8. **Stock technicals + daily metrics.** Off unless you say yes. Needs OHLC first; default suggested limit is 10.
+9. **Order-history workbook.** Optional. A blank line skips it. A path imports that workbook in append mode.
+10. **Start now.** Recommended. Starts the API on http://127.0.0.1:8000/ui/ . The first visit should be **Create an account**. That account is empty until a workbook is imported.
 
 On macOS and Linux the `.env` file is readable only by your user.
 
@@ -85,7 +88,7 @@ Masters are identity rows (names/codes), not full market history.
 | Fund AMCs / categories | derived from fund CSV | as listed in CSV | `(amc_name)`; category/subcategory pair |
 | Indexes | `indices.csv` | ~12 | `index_code` |
 
-Guided setup defaults stay small: recommended index history is about **5y** for Home; optional stock/fund seed is **names only** with a default limit of **50** (`--skip-prices` / `--skip-nav`). Full `max` OHLC/NAV/statements for every symbol is **not** part of install — open a symbol and use **Update** sync buttons (or API sync jobs) afterward.
+Guided setup defaults stay small: recommended index history is about **5y** for Home; optional stock/fund seed is **names only** with a default limit of **50** (`--skip-prices` / `--skip-nav`). Full `max` OHLC/NAV/statements for every symbol is **not** part of install — use the [Bulk stock market data](#bulk-stock-market-data-after-masters-exist) CLIs below, or open a symbol and use **Update** sync buttons afterward.
 
 Re-running masters seed upserts on those natural keys and must not create duplicate companies or schemes.
 
@@ -127,9 +130,10 @@ uv run python portfolio-service/scripts/seed/run_seed_indexes.py --data-dir data
 uv run python portfolio-service/scripts/seed/run_seed_stocks.py --data-dir data/seed --skip-prices --limit 50
 uv run python portfolio-service/scripts/seed/run_seed_funds.py --data-dir data/seed --skip-nav --limit 50
 
-# Optional capped masters + matching history/fundamentals (same CSV-order universe)
+# Optional capped masters + matching history/fundamentals/technicals (same CSV-order universe)
 uv run python portfolio-service/scripts/seed/run_seed_stocks.py --data-dir data/seed --limit 20
 uv run python portfolio-service/scripts/seed/run_seed_stocks.py --with-fundamentals --limit 5
+uv run python portfolio-service/scripts/seed/run_seed_stocks.py --with-technicals --limit 10
 uv run python portfolio-service/scripts/seed/run_seed_funds.py --data-dir data/seed --limit 10
 
 # Orchestrator: prefer skips/limits — bare run loads full masters + OHLC/NAV (indexes default max)
@@ -137,11 +141,54 @@ uv run python portfolio-service/scripts/seed/run_all_seeds.py --data-dir data/se
 uv run python portfolio-service/scripts/seed/run_all_seeds.py --only stocks --limit 20
 ```
 
-Useful flags: `--dry-run`, `--limit N` (caps masters **and** the matching history/NAV/fundamentals universe on `run_seed_*` and `run_all_seeds`), `--price-period 5y`, `--index-period 5y`, `--skip-masters`, `--skip-prices`, `--skip-nav`. For stocks, `--with-fundamentals` is off unless you pass it. Avoid a bare `run_all_seeds.py` without skips/limits unless you intentionally want a full dump.
+Useful flags: `--dry-run`, `--limit N` (caps masters **and** the matching history/NAV/fundamentals/technicals universe on `run_seed_*` and `run_all_seeds`), `--price-period 5y`, `--index-period 5y`, `--skip-masters`, `--skip-prices`, `--skip-nav`. For stocks, `--with-fundamentals` and `--with-technicals` are off unless you pass them. Avoid a bare `run_all_seeds.py` without skips/limits unless you intentionally want a full dump.
 
 ```bash
 uv run python portfolio-service/scripts/load_reference_data.py --data-dir data/seed
+```
+
+## Bulk stock market data (after masters exist)
+
+These read `market_data.stock_reference` where `is_active` (same universe as the seeders). Guided setup stays small on purpose — run these after install when you want a full research catalog.
+
+### 1. OHLC prices (Yahoo)
+
+```bash
+# all active symbols, 5y history
 uv run python portfolio-service/scripts/sync_yfinance.py --period 5y
+# or longer
+uv run python portfolio-service/scripts/sync_yfinance.py --period max
+# optional: --limit N, --dry-run
+```
+
+Same path as `seed_stock_prices` / `run_seed_stocks.py` (without `--skip-prices`).
+
+### 2. Fundamentals + shareholding (Screener)
+
+Slow / rate-limited — default ~3s delay between symbols.
+
+```bash
+uv run python portfolio-service/scripts/seed/run_seed_stocks.py \
+  --skip-masters --skip-prices --with-fundamentals
+# or directly:
+uv run python portfolio-service/scripts/seed/seed_fundamentals.py
+# start small first
+uv run python portfolio-service/scripts/seed/seed_fundamentals.py --limit 10 --delay 0.5
+```
+
+### 3. Technicals + daily metrics
+
+Requires OHLC already loaded. Technicals are derived from stored prices; daily metrics call Yahoo `.info` per symbol.
+
+```bash
+uv run python portfolio-service/scripts/seed/run_seed_stocks.py \
+  --skip-masters --skip-prices --with-technicals
+# or directly:
+uv run python portfolio-service/scripts/seed/seed_stock_technicals.py
+# start small / skip one side
+uv run python portfolio-service/scripts/seed/seed_stock_technicals.py --limit 10 --delay 0.5
+uv run python portfolio-service/scripts/seed/seed_stock_technicals.py --skip-daily-metrics
+uv run python portfolio-service/scripts/seed/seed_stock_technicals.py --skip-technicals
 ```
 
 ## Import a workbook later
