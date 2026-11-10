@@ -121,19 +121,38 @@ def seed(
     batch_size: int = 20,
     limit: int | None = None,
     data_dir: Path | str | None = None,
+    symbols: list[str] | None = None,
 ) -> dict:
+    from _db import normalize_limit
+
+    limit = normalize_limit(limit)
     yf_lookup = _yf_lookup(Path(data_dir) if data_dir else None)
     with connect() as connection:
         with connection.cursor() as cur:
-            cur.execute(
-                """SELECT stock_id, trading_symbol
-                   FROM market_data.stock_reference
-                   WHERE is_active = TRUE
-                   ORDER BY trading_symbol"""
-            )
-            stocks = cur.fetchall()
-            if limit is not None:
-                stocks = stocks[:limit]
+            if symbols is not None:
+                wanted = [str(symbol).strip() for symbol in symbols if str(symbol).strip()]
+                if not wanted:
+                    print("  No symbols provided for price seed.")
+                    return {"stocks": 0, "rows": 0}
+                cur.execute(
+                    """SELECT stock_id, trading_symbol
+                       FROM market_data.stock_reference
+                       WHERE is_active = TRUE AND trading_symbol = ANY(%s)""",
+                    (wanted,),
+                )
+                by_symbol = {symbol: stock_id for stock_id, symbol in cur.fetchall()}
+                # Preserve the masters/CSV order so --limit means the same universe.
+                stocks = [(by_symbol[symbol], symbol) for symbol in wanted if symbol in by_symbol]
+            else:
+                cur.execute(
+                    """SELECT stock_id, trading_symbol
+                       FROM market_data.stock_reference
+                       WHERE is_active = TRUE
+                       ORDER BY trading_symbol"""
+                )
+                stocks = cur.fetchall()
+                if limit is not None:
+                    stocks = stocks[:limit]
             if not stocks:
                 print("  No active stocks found. Run seed_stocks.py first.")
                 return {"stocks": 0, "rows": 0}

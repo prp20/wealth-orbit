@@ -36,8 +36,48 @@ def database_url() -> str:
     return url.replace("postgresql+asyncpg://", "postgresql://").replace("+asyncpg", "")
 
 
+def normalize_limit(limit: int | None) -> int | None:
+    """Return a non-negative row cap, or None when unlimited."""
+    if limit is None:
+        return None
+    return max(0, int(limit))
+
+
+def sanitize_seed_error(exc: BaseException) -> str:
+    """Short seed failure reason with no password / URL material."""
+    text = str(exc).strip()
+    lower = text.lower()
+    if "password authentication failed" in lower or "authentication failed" in lower:
+        return "authentication failed"
+    if "timed out" in lower or "timeout" in lower:
+        return "connection timed out"
+    if any(
+        token in lower
+        for token in (
+            "could not translate host",
+            "name or service not known",
+            "getaddrinfo failed",
+            "no such host is known",
+            "temporary failure in name resolution",
+        )
+    ):
+        return "host not found"
+    if "connection refused" in lower:
+        return "connection refused"
+    # Redact credential/URL material; do not treat a lone "@" (e.g. "batch@3") as secret.
+    if "://" in text or "password" in lower:
+        return "database connection failed"
+    if "@" in text and any(token in lower for token in ("postgres", "mysql", "dsn", "uri", "user=", "jdbc")):
+        return "database connection failed"
+    cleaned = text.split("\n", 1)[0].strip()
+    return cleaned[:160] if cleaned else "seed failed"
+
+
 def connect():
-    return psycopg2.connect(database_url(), connect_timeout=30)
+    try:
+        return psycopg2.connect(database_url(), connect_timeout=30)
+    except Exception as exc:
+        raise SystemExit(f"ERROR: could not connect for seed ({sanitize_seed_error(exc)})") from None
 
 
 def resolve_data_dir(data_dir: Path | str | None) -> Path:

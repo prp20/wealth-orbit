@@ -17,10 +17,10 @@ Prerequisites:
   - Seed CSVs under data/seed/ (or pass --data-dir)
 
 Usage:
-  uv run python portfolio-service/scripts/seed/run_all_seeds.py --data-dir data/seed --dry-run
+  uv run python portfolio-service/scripts/seed/run_all_seeds.py --data-dir data/seed --skip-prices --skip-nav --limit 50
   uv run python portfolio-service/scripts/seed/run_all_seeds.py --only stocks --with-fundamentals --limit 3
   uv run python portfolio-service/scripts/seed/run_all_seeds.py --only funds --limit 10
-  uv run python portfolio-service/scripts/seed/run_all_seeds.py --only indexes
+  uv run python portfolio-service/scripts/seed/run_all_seeds.py --only indexes --index-period 5y
 """
 from __future__ import annotations
 
@@ -54,33 +54,46 @@ def _seed_indexes(args, data_dir: Path) -> None:
 
 def _seed_stocks(args, data_dir: Path) -> None:
     print("\n--- Stocks ---")
+    master_symbols: list[str] | None = None
     if not args.skip_masters:
         print("[stocks] masters")
-        seed_stocks.seed(data_dir=data_dir, dry_run=args.dry_run)
+        masters = seed_stocks.seed(data_dir=data_dir, dry_run=args.dry_run, limit=args.limit)
+        master_symbols = list(masters.get("symbols") or [])
     if not args.skip_prices:
         print("[stocks] OHLC prices (Yahoo)")
         seed_stock_prices.seed(
             period=args.price_period,
             dry_run=args.dry_run,
             batch_size=args.batch_size,
-            limit=args.limit,
+            limit=None if master_symbols is not None else args.limit,
             data_dir=data_dir,
+            symbols=master_symbols,
         )
     if args.with_fundamentals and not args.skip_fundamentals:
         print("[stocks] fundamentals + shareholding (Screener)")
-        seed_fundamentals.seed(dry_run=args.dry_run, limit=args.limit)
+        seed_fundamentals.seed(
+            dry_run=args.dry_run,
+            limit=None if master_symbols is not None else args.limit,
+            symbols=master_symbols,
+        )
     elif not args.skip_fundamentals:
         print("[stocks] fundamentals skipped (pass --with-fundamentals to enable)")
 
 
 def _seed_funds(args, data_dir: Path) -> None:
     print("\n--- Mutual funds ---")
+    master_scheme_codes: list[str] | None = None
     if not args.skip_masters:
         print("[funds] masters")
-        seed_funds.seed(data_dir=data_dir, dry_run=args.dry_run)
+        masters = seed_funds.seed(data_dir=data_dir, dry_run=args.dry_run, limit=args.limit)
+        master_scheme_codes = list(masters.get("scheme_codes") or [])
     if not args.skip_nav:
         print("[funds] NAV history (mftool/MFAPI)")
-        seed_fund_nav.seed(dry_run=args.dry_run, limit=args.limit)
+        seed_fund_nav.seed(
+            dry_run=args.dry_run,
+            limit=None if master_scheme_codes is not None else args.limit,
+            scheme_codes=master_scheme_codes,
+        )
 
 
 def main():
@@ -96,7 +109,12 @@ def main():
     parser.add_argument("--price-period", default="5y", help="yfinance period for stock prices")
     parser.add_argument("--index-period", default="max", help="yfinance period for index history")
     parser.add_argument("--batch-size", type=int, default=20, help="Stock price download batch size")
-    parser.add_argument("--limit", type=int, default=None, help="Cap rows for history/NAV/fundamentals phases")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Cap masters and the matching OHLC/NAV/fundamentals universe",
+    )
     parser.add_argument("--skip-masters", action="store_true")
     parser.add_argument("--skip-index-history", action="store_true")
     parser.add_argument("--skip-prices", action="store_true", help="Skip stock OHLC")

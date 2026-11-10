@@ -22,6 +22,9 @@ from scripts.database_url import (
 from scripts.setup_guide import (
     configure_new_env,
     create_portfolio_tables,
+    guided_fund_masters_seed_argv,
+    guided_index_seed_argv,
+    guided_stock_masters_seed_argv,
     node_install_hint,
     node_is_ready,
     portfolio_has_users,
@@ -324,3 +327,20 @@ def test_local_portfolio_file_gets_a_users_table(tmp_path):
     url = f"sqlite:///{database}"
     create_portfolio_tables(url)
     assert portfolio_has_users(url)
+
+
+def test_guided_setup_seed_argv_defaults_stay_small():
+    index_argv = guided_index_seed_argv()
+    assert "--index-period" in index_argv
+    assert index_argv[index_argv.index("--index-period") + 1] == "5y"
+
+    stock_argv = guided_stock_masters_seed_argv()
+    assert "--skip-prices" in stock_argv
+    assert stock_argv[stock_argv.index("--limit") + 1] == "50"
+
+    fund_argv = guided_fund_masters_seed_argv()
+    assert "--skip-nav" in fund_argv
+    assert fund_argv[fund_argv.index("--limit") + 1] == "50"
+
+    custom = guided_stock_masters_seed_argv("25")
+    assert custom[custom.index("--limit") + 1] == "25"

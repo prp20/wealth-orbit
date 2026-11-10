@@ -68,27 +68,36 @@ def main():
         f"fundamentals={'on' if args.with_fundamentals else 'off'}"
     )
 
+    master_symbols: list[str] | None = None
     if not args.skip_masters:
         print("\n[1] Stock masters")
-        seed_stocks.seed(data_dir=data_dir, dry_run=args.dry_run)
+        # --limit caps masters too (not only OHLC), so guided setup stays small.
+        masters = seed_stocks.seed(data_dir=data_dir, dry_run=args.dry_run, limit=args.limit)
+        master_symbols = list(masters.get("symbols") or [])
     else:
         print("\n[skipped] Stock masters")
 
     if not args.skip_prices:
         print("\n[2] Stock OHLC prices (Yahoo Finance)")
+        # When masters ran with --limit, reuse that CSV-order symbol set for history.
         seed_stock_prices.seed(
             period=args.price_period,
             dry_run=args.dry_run,
             batch_size=args.batch_size,
-            limit=args.limit,
+            limit=None if master_symbols is not None else args.limit,
             data_dir=data_dir,
+            symbols=master_symbols,
         )
     else:
         print("\n[skipped] Stock OHLC prices")
 
     if args.with_fundamentals:
         print("\n[3] Stock fundamentals + shareholding (Screener)")
-        seed_fundamentals.seed(dry_run=args.dry_run, limit=args.limit)
+        seed_fundamentals.seed(
+            dry_run=args.dry_run,
+            limit=None if master_symbols is not None else args.limit,
+            symbols=master_symbols,
+        )
     else:
         print("\n[skipped] Fundamentals — pass --with-fundamentals if needed")
 
