@@ -154,6 +154,17 @@ uv run python portfolio-service/scripts/import_transactions.py /path/to/Mutual_F
 
 The importer classifies short-term, ultra-short-term, liquid, money-market, corporate-bond, and gilt funds as debt. Other imported mutual funds are classified as equity. Those labels can be corrected later.
 
+## Add a stock screen plugin
+
+Stock screens are Python files under `screens/stock/`. Built-ins live in `screens/stock/built_in/`. Operator screens go in `screens/stock/user/`.
+
+1. Copy a sample from `screens/stock/built_in/` into `screens/stock/user/`.
+2. Keep `SCREEN_ID`, `SCREEN_META`, and `screen(stocks, params)` — see `screens/README.md`.
+3. Open **Stocks → Screener → Refresh screens** (or `POST /api/v1/market-data/stocks/screens/refresh`).
+4. Run the screen. Results use stored metrics only (no live scrape).
+
+Invalid files are rejected with clear errors and stay out of the runnable list. Disable without deleting by adding the id to `disabled_ids` in `screens/registry.yaml`.
+
 ## Forgotten password
 
 There is no password-reset email. The account lives in the local SQLite file. Clear `password_hash` for that user:

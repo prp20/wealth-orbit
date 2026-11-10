@@ -181,6 +181,36 @@ export const api = {
       `/market-data/mutual-funds/overlap?scheme_codes=${encodeURIComponent(codes.join(','))}`,
     ),
   stocks: (params: string) => get<any[]>(`/market-data/stocks?${params}`),
+  stockScreen: (params: string) =>
+    get<{
+      rows: any[];
+      total: number;
+      limit: number;
+      offset: number;
+      snapshot_size: number;
+      metrics_available: number;
+      columns: string[];
+    }>(`/market-data/stocks/screen?${params}`),
+  stockScreens: (runnableOnly = false) =>
+    get<{ asset_class: string; timeout_seconds: number; screens: any[] }>(
+      `/market-data/stocks/screens?runnable_only=${runnableOnly ? 'true' : 'false'}`,
+    ),
+  refreshStockScreens: () =>
+    postJson<{ asset_class: string; timeout_seconds: number; screens: any[]; refreshed: boolean }>(
+      '/market-data/stocks/screens/refresh',
+      {},
+    ),
+  runStockScreen: (screenId: string, params: Record<string, unknown> = {}) =>
+    postJson<{
+      ok: boolean;
+      screen_id: string;
+      name?: string;
+      params: Record<string, unknown>;
+      rows: any[];
+      symbols: string[];
+      total: number;
+      error?: string | null;
+    }>(`/market-data/stocks/screens/${encodeURIComponent(screenId)}/run`, { params }),
   stock: (id: string) => get<any>(`/market-data/stocks/${encodeURIComponent(id)}`),
   stockHistory: (id: string, from = '', to = '') =>
     get<any[]>(withDates(`/market-data/stocks/${encodeURIComponent(id)}/history`, from, to)),

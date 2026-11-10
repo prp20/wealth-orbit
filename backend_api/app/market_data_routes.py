@@ -17,7 +17,8 @@ from .portfolio_backend import (filter_values, mutual_funds, mutual_fund_detail,
     mutual_fund_holdings_snapshot, mutual_fund_overlap, mutual_fund_managers,
     compute_metrics, has_nav_history, sync_nav, recompute_metrics, sync_benchmark, sync_enrichment,
     sync_holdings, sync_managers,
-    METRIC_PERIODS, SCREEN_SORT_COLUMNS)
+    METRIC_PERIODS, SCREEN_SORT_COLUMNS,
+    STOCK_SCREEN_SORT_COLUMNS, stock_screen, list_screens, refresh_screens, run_screen)
 from .sync_queue import enqueue, get_job, list_jobs, latest_job, latest_jobs_by_kind
 
 STOCK_SYNC_KINDS = ("PRICES", "TECHNICAL", "FUNDAMENTALS", "DAILY_METRICS", "SHAREHOLDING")
@@ -569,6 +570,78 @@ def track_index_instrument(
 @router.get("/stocks")
 def stock_list(search: str = Query(""), exchange: str = Query("All"), sector: str = Query("All"), industry: str = Query("All")):
     return stocks(search, exchange, sector, industry).to_dict(orient="records")
+
+
+@router.get("/stocks/screen")
+def stock_screen_route(
+    search: str = Query(""),
+    exchange: str = Query("All"),
+    sector: str = Query("All"),
+    industry: str = Query("All"),
+    require_metrics: bool = Query(False),
+    sort_by: str = Query("market_cap"),
+    sort_dir: str = Query("desc"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    if sort_by not in STOCK_SCREEN_SORT_COLUMNS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"sort_by must be one of {', '.join(STOCK_SCREEN_SORT_COLUMNS)}",
+        )
+    try:
+        return stock_screen(
+            search=search,
+            exchange=exchange,
+            sector=sector,
+            industry=industry,
+            require_metrics=require_metrics,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+            limit=limit,
+            offset=offset,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+
+
+@router.get("/stocks/screens")
+def stock_screens_list(runnable_only: bool = Query(False)):
+    from backend.screen_plugins.discovery import discover_screens
+
+    data = discover_screens(use_cache=True)
+    screens = list_screens(runnable_only=runnable_only)
+    return {
+        "asset_class": data.get("asset_class"),
+        "timeout_seconds": data.get("timeout_seconds"),
+        "screens": screens,
+    }
+
+
+@router.post("/stocks/screens/refresh")
+def stock_screens_refresh():
+    data = refresh_screens()
+    return {
+        "asset_class": data.get("asset_class"),
+        "timeout_seconds": data.get("timeout_seconds"),
+        "screens": data.get("screens") or [],
+        "refreshed": True,
+    }
+
+
+class RunStockScreenBody(BaseModel):
+    params: dict | None = None
+
+
+@router.post("/stocks/screens/{screen_id}/run")
+def stock_screen_run(screen_id: str, body: RunStockScreenBody | None = None):
+    result = run_screen(screen_id, (body.params if body else None) or {})
+    if not result.get("ok"):
+        error = result.get("error") or "screen failed"
+        status = 404 if "unknown screen" in error else 422
+        raise HTTPException(status_code=status, detail=error)
+    return result
+
 
 @router.get("/filters/{kind}")
 def filter_list(kind: str): return filter_values(kind)

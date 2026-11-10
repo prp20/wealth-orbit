@@ -52,6 +52,13 @@ export default function StockListPage() {
       <PageHeader
         title="Stocks"
         subtitle="Browse the seed list, or track symbols beyond it with Add stock."
+        actions={
+          <div className="page-header-actions-row">
+            <Link className="text-link" to="/stocks/screen">
+              Screener
+            </Link>
+          </div>
+        }
       />
       <section className="panel stock-list-panel">
         <div className="stock-toolbar">
