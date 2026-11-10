@@ -1,6 +1,7 @@
 """Provider mapping and guarded calculation fallbacks for daily valuation metrics."""
 from __future__ import annotations
 
+import math
 import re
 
 from .providers.screener import normalize_number
@@ -39,28 +40,43 @@ def _metric_number(value: str) -> float | None:
     return normalize_number(cleaned)
 
 
-def net_debt_from_parts(total_debt: float | None, total_cash: float | None) -> float | None:
-    """Net debt is debt minus cash. A missing side stays missing; zero is a real amount."""
-    if total_debt is None or total_cash is None:
-        return None
-    return float(total_debt) - float(total_cash)
-
-
-def normalize_yahoo_dividend_yield(raw) -> float | None:
-    """Store Yahoo dividendYield once as percent points.
-
-    Yahoo may return a fraction (0.015) or already-percent (1.5). Values already
-    in a sane percent range stay as-is. Nonsense outside 0–100 is rejected.
-    """
+def _as_float(raw) -> float | None:
+    """Return a finite float, or None when the value cannot be used in storage."""
     if raw is None or raw == "":
         return None
     try:
         number = float(raw)
     except (TypeError, ValueError):
         return None
-    if number < 0:
+    if not math.isfinite(number):
         return None
-    if number < 1.0:
+    return number
+
+
+def net_debt_from_parts(total_debt: float | None, total_cash: float | None) -> float | None:
+    """Net debt is debt minus cash. A missing side stays missing; zero is a real amount."""
+    debt = _as_float(total_debt)
+    cash = _as_float(total_cash)
+    if debt is None or cash is None:
+        return None
+    return debt - cash
+
+
+# Yahoo NSE (``.NS``) dividendYield is normally a decimal fraction (0.015 = 1.5%).
+# Values in [0, 0.2) are treated as that fraction. Values in [0.2, 100] are treated
+# as already-percent points so a true 0.8% yield is not scaled to 80%.
+_YAHOO_YIELD_FRACTION_MAX = 0.2
+
+
+def normalize_yahoo_dividend_yield(raw) -> float | None:
+    """Store Yahoo dividendYield once as percent points for NSE tickers.
+
+    Rejects negatives, NaN/inf, and nonsense above 100. See ``_YAHOO_YIELD_FRACTION_MAX``.
+    """
+    number = _as_float(raw)
+    if number is None or number < 0:
+        return None
+    if number < _YAHOO_YIELD_FRACTION_MAX:
         number = number * 100
     if number > 100:
         return None
@@ -68,32 +84,34 @@ def normalize_yahoo_dividend_yield(raw) -> float | None:
 
 
 def yahoo_daily_metric_fields(info: dict) -> dict:
-    """Map Yahoo info to stored daily-metric columns. Never reads forward PEG."""
-    market_cap = info.get("marketCap")
-    enterprise_value = info.get("enterpriseValue")
-    ebitda_ttm = info.get("ebitda")
-    total_debt = info.get("totalDebt")
-    total_cash = info.get("totalCash")
-    net_debt = net_debt_from_parts(total_debt, total_cash)
-    ev_ebitda = info.get("enterpriseToEbitda")
-    if ev_ebitda is None and enterprise_value and ebitda_ttm and float(ebitda_ttm) != 0:
-        ev_ebitda = float(enterprise_value) / float(ebitda_ttm)
-    revenue = info.get("totalRevenue")
-    ev_sales = info.get("enterpriseToRevenue")
-    if ev_sales is None and enterprise_value and revenue and float(revenue) != 0:
-        ev_sales = float(enterprise_value) / float(revenue)
-    fcf = info.get("freeCashflow")
+    """Map Yahoo info to stored daily-metric columns.
+
+    Never stores Yahoo PEG (forward or trailing). Conversion failures become NULL
+    fields instead of raising, so sync jobs keep opaque failure tokens.
+    """
+    market_cap = _as_float(info.get("marketCap"))
+    enterprise_value = _as_float(info.get("enterpriseValue"))
+    ebitda_ttm = _as_float(info.get("ebitda"))
+    net_debt = net_debt_from_parts(info.get("totalDebt"), info.get("totalCash"))
+    ev_ebitda = _as_float(info.get("enterpriseToEbitda"))
+    if ev_ebitda is None and enterprise_value is not None and ebitda_ttm not in (None, 0):
+        ev_ebitda = enterprise_value / ebitda_ttm
+    revenue = _as_float(info.get("totalRevenue"))
+    ev_sales = _as_float(info.get("enterpriseToRevenue"))
+    if ev_sales is None and enterprise_value is not None and revenue not in (None, 0):
+        ev_sales = enterprise_value / revenue
+    fcf = _as_float(info.get("freeCashflow"))
     fcf_yield = None
-    if fcf is not None and market_cap and float(market_cap) > 0:
-        fcf_yield = float(fcf) / float(market_cap) * 100
+    if fcf is not None and market_cap is not None and market_cap > 0:
+        fcf_yield = fcf / market_cap * 100
     return {
         "market_cap": market_cap,
-        "stock_pe": info.get("trailingPE"),
-        "price_to_book": info.get("priceToBook"),
+        "stock_pe": _as_float(info.get("trailingPE")),
+        "price_to_book": _as_float(info.get("priceToBook")),
         "dividend_yield": normalize_yahoo_dividend_yield(info.get("dividendYield")),
-        "book_value": info.get("bookValue"),
-        "roce": info.get("returnOnCapitalEmployed"),
-        "roe": info.get("returnOnEquity"),
+        "book_value": _as_float(info.get("bookValue")),
+        "roce": _as_float(info.get("returnOnCapitalEmployed")),
+        "roe": _as_float(info.get("returnOnEquity")),
         "enterprise_value": enterprise_value,
         "ebitda_ttm": ebitda_ttm,
         "ev_ebitda": ev_ebitda,

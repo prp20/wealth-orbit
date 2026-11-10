@@ -1,3 +1,4 @@
+import math
 import sys
 from pathlib import Path
 
@@ -49,16 +50,25 @@ def test_net_debt_requires_both_sides_and_keeps_zero():
     assert net_debt_from_parts(100, None) is None
     assert net_debt_from_parts(None, 40) is None
     assert net_debt_from_parts(0, 10) == -10
+    assert net_debt_from_parts(float("nan"), 10) is None
+    assert net_debt_from_parts(100, "bad") is None
 
 
 def test_normalize_yahoo_dividend_yield_stores_percent_points_once():
+    # Yahoo .NS typically returns a decimal fraction under 0.2.
     assert normalize_yahoo_dividend_yield(0.015) == 1.5
+    assert normalize_yahoo_dividend_yield(0.012) == 1.2
+    # Already-percent values, including sub-1%, stay as percent points.
     assert normalize_yahoo_dividend_yield(1.5) == 1.5
+    assert normalize_yahoo_dividend_yield(0.8) == 0.8
     assert normalize_yahoo_dividend_yield(1.0) == 1.0
     assert normalize_yahoo_dividend_yield(0) == 0.0
     assert normalize_yahoo_dividend_yield(150) is None
     assert normalize_yahoo_dividend_yield(None) is None
     assert normalize_yahoo_dividend_yield("bad") is None
+    assert normalize_yahoo_dividend_yield(float("nan")) is None
+    assert normalize_yahoo_dividend_yield(float("inf")) is None
+    assert normalize_yahoo_dividend_yield(-0.01) is None
 
 
 def test_yahoo_daily_metric_fields_never_store_forward_peg():
@@ -78,3 +88,24 @@ def test_yahoo_daily_metric_fields_never_store_forward_peg():
     assert fields["net_debt"] == 60
     assert "pegRatio" not in fields
     assert "forwardPegRatio" not in fields
+
+
+def test_yahoo_daily_metric_fields_null_bad_conversions_instead_of_raising():
+    fields = yahoo_daily_metric_fields(
+        {
+            "marketCap": "not-a-number",
+            "enterpriseValue": float("nan"),
+            "ebitda": float("inf"),
+            "totalDebt": object(),
+            "totalCash": 10,
+            "dividendYield": math.nan,
+            "trailingPE": "12.5",
+        }
+    )
+    assert fields["market_cap"] is None
+    assert fields["enterprise_value"] is None
+    assert fields["ebitda_ttm"] is None
+    assert fields["net_debt"] is None
+    assert fields["dividend_yield"] is None
+    assert fields["stock_pe"] == 12.5
+    assert fields["peg"] is None
