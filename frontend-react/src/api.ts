@@ -98,6 +98,20 @@ export function failedSyncSummaries(
   return rows;
 }
 
+export function syncQueueQuery(includeHistory = true, limit = 12): string {
+  return `include_history=${includeHistory ? 'true' : 'false'}&limit=${limit}`;
+}
+
+export function formatSyncJobLabel(job: {
+  entity_type?: string;
+  entity_key?: string;
+  sync_type?: string;
+}): string {
+  const entity = [job.entity_type, job.entity_key].filter(Boolean).join(' ');
+  const kind = job.sync_type || 'sync';
+  return entity ? `${entity} · ${kind}` : kind;
+}
+
 export type InsightItem = {
   id: string;
   kind: string;
@@ -193,9 +207,7 @@ export const api = {
     ),
   syncJob: (jobId: string) => get<SyncJob>(`/market-data/sync/jobs/${encodeURIComponent(jobId)}`),
   syncQueue: (includeHistory = true, limit = 12) =>
-    get<{ jobs: SyncJob[] }>(
-      `/market-data/sync/queue?include_history=${includeHistory ? 'true' : 'false'}&limit=${limit}`,
-    ),
+    get<{ jobs: SyncJob[] }>(`/market-data/sync/queue?${syncQueueQuery(includeHistory, limit)}`),
   syncFund: (id: string, force: boolean) =>
     post<SyncJob>(`/market-data/mutual-funds/${encodeURIComponent(id)}/sync?kind=nav&force=${force}`),
   syncFundKind: (id: string, kind: string, force: boolean) =>

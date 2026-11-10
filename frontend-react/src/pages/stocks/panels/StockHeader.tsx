@@ -1,23 +1,12 @@
 import { formatCount, formatDisplayDate, formatInr, firstSentence } from '../../../lib/format';
-import { freshnessFailureLine } from '../../../lib/syncFailures';
+import { freshnessDateBits, freshnessFailureLine } from '../../../lib/syncFailures';
 
 export default function StockHeader({ stock }: { stock: any }) {
   const price = stock?.latest_price;
   const freshness = stock?.freshness || {};
   const summary = firstSentence(stock?.business_summary);
   const syncFailureLine = freshnessFailureLine(freshness);
-  const freshnessBits = [
-    freshness.latest_price_date ? `Price ${formatDisplayDate(freshness.latest_price_date)}` : null,
-    freshness.latest_fundamental_period_end
-      ? `Statements ${formatDisplayDate(freshness.latest_fundamental_period_end)}`
-      : null,
-    freshness.latest_shareholding_period_end
-      ? `Shareholding ${formatDisplayDate(freshness.latest_shareholding_period_end)}`
-      : null,
-    freshness.latest_technical_calculated_at
-      ? `Indicators ${formatDisplayDate(freshness.latest_technical_calculated_at)}`
-      : null,
-  ].filter(Boolean);
+  const freshnessBits = freshnessDateBits(freshness);
   const identityBits = [
     stock?.exchange,
     stock?.sector_name,

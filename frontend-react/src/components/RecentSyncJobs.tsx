@@ -1,16 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { api, syncJobFailureMessage } from '../api';
+import { api, formatSyncJobLabel, syncJobFailureMessage } from '../api';
 import { formatDisplayDate } from '../lib/format';
-
-function jobLabel(job: {
-  entity_type?: string;
-  entity_key?: string;
-  sync_type?: string;
-}) {
-  const entity = [job.entity_type, job.entity_key].filter(Boolean).join(' ');
-  const kind = job.sync_type || 'sync';
-  return entity ? `${entity} · ${kind}` : kind;
-}
 
 export default function RecentSyncJobs() {
   const queue = useQuery({
@@ -42,7 +32,7 @@ export default function RecentSyncJobs() {
             return (
               <li key={job.job_id} className="sync-job-row">
                 <div>
-                  <strong>{jobLabel(job)}</strong>
+                  <strong>{formatSyncJobLabel(job)}</strong>
                   <span className={`sync-chip status-${status}`}>{status}</span>
                 </div>
                 <small>

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
@@ -33,32 +34,65 @@ _TRANSIENT_MARKERS = (
     "network is unreachable",
     "broken pipe",
 )
-_PERMANENT_PREFIXES = ("yahoo_", "screener_")
+_PERMANENT_TOKEN_RE = re.compile(r"(?:yahoo_|screener_)[a-z0-9_]+", re.IGNORECASE)
+
+
+class SoftSyncFailure(RuntimeError):
+    """Provider returned a failed status dict. Never retry."""
 
 
 def _db():
     return psycopg2.connect(os.environ["DATABASE_URL"], connect_timeout=15)
 
 
+def _exception_chain(exc: BaseException) -> list[BaseException]:
+    chain: list[BaseException] = []
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        chain.append(current)
+        nxt = current.__cause__ if current.__cause__ is not None else current.__context__
+        current = nxt if isinstance(nxt, BaseException) else None
+    return chain
+
+
+def _permanent_provider_token(text: str) -> str | None:
+    match = _PERMANENT_TOKEN_RE.search(text or "")
+    return match.group(0) if match else None
+
+
 def is_transient_sync_failure(exc: BaseException) -> bool:
     """Allowlist timeouts / connection blips; never retry validation or permanent provider tokens."""
+    if isinstance(exc, SoftSyncFailure):
+        return False
     if isinstance(exc, (ValueError, TypeError, KeyError)):
         return False
-    text = str(exc).lower().strip()
-    if any(text.startswith(prefix) for prefix in _PERMANENT_PREFIXES):
-        # Opaque provider tokens are permanent for 1.4 (yahoo_*/screener_*).
-        return False
-    if isinstance(exc, (TimeoutError, ConnectionError, ConnectionResetError, BrokenPipeError)):
-        return True
-    return any(marker in text for marker in _TRANSIENT_MARKERS)
+    for item in _exception_chain(exc):
+        if isinstance(item, SoftSyncFailure):
+            return False
+        if isinstance(item, (ValueError, TypeError, KeyError)):
+            return False
+        text = str(item)
+        if _permanent_provider_token(text):
+            return False
+    for item in _exception_chain(exc):
+        if isinstance(item, (TimeoutError, ConnectionError, ConnectionResetError, BrokenPipeError)):
+            return True
+        text = str(item).lower()
+        if any(marker in text for marker in _TRANSIENT_MARKERS):
+            return True
+    return False
 
 
 def opaque_sync_error(exc: BaseException) -> str:
     """Short last_error with no password / URL material."""
+    for item in _exception_chain(exc):
+        token = _permanent_provider_token(str(item))
+        if token and "://" not in str(item):
+            return token[:120]
     text = str(exc).strip()
     lower = text.lower()
-    if any(lower.startswith(prefix) for prefix in _PERMANENT_PREFIXES) and "://" not in text and len(text) < 120:
-        return text.split("\n", 1)[0][:120]
     if "password authentication failed" in lower or "authentication failed" in lower:
         return "authentication failed"
     if "timed out" in lower or "timeout" in lower:
@@ -84,12 +118,12 @@ def opaque_sync_error(exc: BaseException) -> str:
         return "ssl connection failed"
     if "://" in text or "password" in lower or "@" in text:
         return "connection failed"
-    # Keep short soft-fail reasons; clamp length.
     cleaned = text.split("\n", 1)[0].strip()
     return cleaned[:160] if cleaned else "sync failed"
 
 
 def enqueue(entity_type, entity_key, sync_type, force, work):
+    recover_stale_jobs()
     with _db() as c:
         with c.cursor(cursor_factory=RealDictCursor) as q:
             # Force mode changes fetch semantics, not the identity of a running job.
@@ -150,14 +184,25 @@ def _mark_failed(job_id: str, reason: str) -> None:
 
 
 def _run(job_id, work):
-    meta = _job_meta(job_id)
-    logger.info(
-        "sync started job_id=%s entity_type=%s entity_key=%s sync_type=%s",
-        job_id,
-        meta.get("entity_type"),
-        meta.get("entity_key"),
-        meta.get("sync_type"),
-    )
+    meta = {"job_id": job_id, "entity_type": None, "entity_key": None, "sync_type": None}
+    try:
+        meta = _job_meta(job_id)
+        logger.info(
+            "sync started job_id=%s entity_type=%s entity_key=%s sync_type=%s",
+            job_id,
+            meta.get("entity_type"),
+            meta.get("entity_key"),
+            meta.get("sync_type"),
+        )
+    except Exception as exc:
+        reason = opaque_sync_error(exc)
+        logger.warning("sync startup failed job_id=%s reason=%s", job_id, reason)
+        try:
+            _mark_failed(job_id, reason)
+        except Exception:
+            logger.exception("failed to persist terminal failure job_id=%s", job_id)
+        return
+
     last_reason = "sync failed"
     for attempt in range(1, MAX_TRANSIENT_ATTEMPTS + 1):
         try:
@@ -166,10 +211,19 @@ def _run(job_id, work):
             soft_failed = isinstance(result, dict) and str(result.get("status", "")).lower() in {"failed", "error"}
             if soft_failed:
                 reason = result.get("reason") or result.get("error") or "Sync reported failed status"
-                raise RuntimeError(reason)
-            logger.info("sync succeeded job_id=%s attempt=%s", job_id, attempt)
-            _mark_succeeded(job_id, result)
-            return
+                raise SoftSyncFailure(reason)
+        except SoftSyncFailure as exc:
+            last_reason = opaque_sync_error(exc)
+            logger.warning(
+                "sync soft-failed job_id=%s entity_type=%s entity_key=%s sync_type=%s attempt=%s reason=%s",
+                job_id,
+                meta.get("entity_type"),
+                meta.get("entity_key"),
+                meta.get("sync_type"),
+                attempt,
+                last_reason,
+            )
+            break
         except Exception as exc:
             last_reason = opaque_sync_error(exc)
             transient = is_transient_sync_failure(exc)
@@ -187,6 +241,28 @@ def _run(job_id, work):
                 time.sleep(min(0.5 * attempt, 1.5))
                 continue
             break
+
+        # work() completed successfully — persist is never part of the work retry loop.
+        try:
+            logger.info("sync succeeded job_id=%s attempt=%s", job_id, attempt)
+            _mark_succeeded(job_id, result)
+            return
+        except Exception as exc:
+            last_reason = opaque_sync_error(exc)
+            logger.warning(
+                "sync persist-succeeded failed job_id=%s entity_type=%s entity_key=%s sync_type=%s reason=%s",
+                job_id,
+                meta.get("entity_type"),
+                meta.get("entity_key"),
+                meta.get("sync_type"),
+                last_reason,
+            )
+            try:
+                _mark_failed(job_id, last_reason)
+            except Exception:
+                logger.exception("failed to persist terminal failure job_id=%s", job_id)
+            return
+
     try:
         _mark_failed(job_id, last_reason)
     except Exception:
@@ -232,22 +308,34 @@ def latest_jobs_by_kind(entity_type, entity_key, sync_types):
     return result
 
 
-def list_jobs(include_terminal: bool = False, limit: int = 25):
-    limit = max(1, min(int(limit or 25), 100))
+def recover_stale_jobs() -> int:
+    """Mark abandoned QUEUED/RUNNING jobs FAILED. Call from writers (enqueue), not Home reads."""
     with _db() as c:
         with c.cursor() as q:
             q.execute(
-                "UPDATE market_data.sync_jobs SET status='FAILED',completed_at=now(),last_error='Recovered stale queued/running job after worker restart',updated_at=now() WHERE (status='QUEUED' AND queued_at < now() - interval '10 minutes') OR (status='RUNNING' AND started_at < now() - interval '10 minutes')"
+                """UPDATE market_data.sync_jobs
+                   SET status='FAILED', completed_at=now(),
+                       last_error='Recovered stale queued/running job after worker restart',
+                       updated_at=now()
+                   WHERE (status='QUEUED' AND queued_at < now() - interval '10 minutes')
+                      OR (status='RUNNING' AND started_at < now() - interval '10 minutes')"""
             )
+            return q.rowcount or 0
+
+
+def list_jobs(include_terminal: bool = False, limit: int | None = 25):
+    """Read sync jobs. Does not mutate job status (stale recovery runs on enqueue)."""
+    with _db() as c:
         with c.cursor(cursor_factory=RealDictCursor) as q:
             if include_terminal:
+                capped = max(1, min(int(limit or 25), 100))
                 q.execute(
                     "SELECT * FROM market_data.sync_jobs ORDER BY queued_at DESC LIMIT %s",
-                    (limit,),
+                    (capped,),
                 )
             else:
+                # Active-only: do not LIMIT so live jobs are not truncated under load.
                 q.execute(
-                    "SELECT * FROM market_data.sync_jobs WHERE status IN ('QUEUED','RUNNING') ORDER BY queued_at DESC LIMIT %s",
-                    (limit,),
+                    "SELECT * FROM market_data.sync_jobs WHERE status IN ('QUEUED','RUNNING') ORDER BY queued_at DESC"
                 )
             return q.fetchall()

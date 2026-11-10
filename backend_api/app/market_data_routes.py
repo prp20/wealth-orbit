@@ -75,6 +75,8 @@ def _enqueue_mf_sync(
 
 @router.get("/sync/queue")
 def sync_queue(include_history: bool = Query(False), limit: int = Query(25, ge=1, le=100)):
+    # Read-only: does not run stale recovery (that happens on enqueue).
+    # Auth/rate-limit for sync enqueue remains a post-1.4 hardening item.
     return {"jobs": list_jobs(include_history, limit)}
 
 @router.get("/sync/jobs/{job_id}")
