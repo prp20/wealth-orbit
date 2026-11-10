@@ -10,6 +10,17 @@ The setup script takes a fresh clone to a running app. It installs the Python to
 
 Market research (funds, stocks, and index history) uses `DATABASE_URL`. The portfolio ledger never leaves the local SQLite file named by `PORTFOLIO_SQLITE_URL`.
 
+## Create a Supabase database
+
+1. Create a project at https://supabase.com/dashboard .
+2. Open **Project Settings → Database**.
+3. Under **Connection string**, choose the **URI** and **Session** mode (port **5432** on `*.pooler.supabase.com`).
+4. Copy that URI into the setup prompt (or into `.env` as `DATABASE_URL`).
+
+Do **not** use the direct host (`db.*.supabase.co`) or **Transaction** mode (port **6543**). Guided setup rejects those. If `sslmode` is missing, setup appends `sslmode=require` for Supabase URLs.
+
+A non-Supabase Postgres URL is still accepted when `SELECT 1` succeeds (local or other hosted Postgres).
+
 ## Run it
 
 From the repo root.
@@ -28,17 +39,17 @@ scripts\setup.bat
 
 Both files only install `uv` (after you say yes) and Python 3.13, then run the same guide. Press Enter to accept a default shown in brackets.
 
-If Node is missing:
+If Node is missing or older than 20:
 
 - Windows: `winget install OpenJS.NodeJS.LTS`
 - macOS: `brew install node`
-- Debian or Ubuntu: `sudo apt-get install -y nodejs npm`
+- Linux: install Node.js 20+ from https://nodejs.org/ (or use nvm / NodeSource). Do not rely on apt `nodejs` packages older than 20.
 
 Install that, then run the setup script again.
 
 ## What each prompt does
 
-1. **Postgres URL.** Required. The characters are hidden. The URL must start with `postgres://` or `postgresql://`. The script runs `SELECT 1` before it writes `.env`. A bad URL is not saved, and the prompt is shown again.
+1. **Postgres URL.** Required. The characters are hidden. The script prints Supabase session-pooler steps first. The URL must start with `postgres://` or `postgresql://`. Supabase direct and transaction-pooler URIs are rejected without connecting. The script runs `SELECT 1` before it writes `.env`. A bad URL is not saved, and the prompt is shown again. Connection failures print a short reason without echoing the URL.
 2. **Local portfolio file.** Enter keeps `sqlite+aiosqlite:///./portfolio-service/portfolio.db`.
 3. **Session secret.** Leave it blank and one is generated. It is written to `.env` and is not printed.
 4. **Index seed.** Recommended. Loads about five years of index history, which is what Home shows. It does not download the full history.

@@ -17,6 +17,9 @@ set "PATH=%USERPROFILE%\.local\bin;%PATH%"
 :have_uv
 where node >nul 2>&1
 if errorlevel 1 goto no_node
+for /f "usebackq delims=" %%V in (`node -p "process.versions.node.split('.')[0]"`) do set NODE_MAJOR=%%V
+if not defined NODE_MAJOR goto no_node
+if %NODE_MAJOR% LSS 20 goto old_node
 
 uv python install 3.13
 if errorlevel 1 goto failed
@@ -33,6 +36,13 @@ exit /b 1
 
 :no_node
 echo Node.js 20 or newer is required to build the UI.
+echo winget install OpenJS.NodeJS.LTS
+pause
+exit /b 1
+
+:old_node
+echo Node.js 20 or newer is required. This machine has:
+node -v
 echo winget install OpenJS.NodeJS.LTS
 pause
 exit /b 1

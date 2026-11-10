@@ -26,7 +26,8 @@ if ! command -v node >/dev/null 2>&1; then
   if command -v brew >/dev/null 2>&1; then
     echo "brew install node"
   elif command -v apt-get >/dev/null 2>&1; then
-    echo "sudo apt-get install -y nodejs npm"
+    echo "Install Node.js 20 or newer from https://nodejs.org/ (or use nvm / NodeSource)."
+    echo "Do not use apt nodejs packages older than 20."
   else
     echo "Install Node.js 20 or newer from https://nodejs.org/"
   fi
@@ -36,6 +37,7 @@ fi
 node_major="$(node -p "process.versions.node.split('.')[0]")"
 if [[ "$node_major" -lt 20 ]]; then
   echo "Node.js 20 or newer is required. This machine has $(node -v)."
+  echo "Install Node.js 20 or newer from https://nodejs.org/ (or use nvm / NodeSource)."
   exit 1
 fi
 
