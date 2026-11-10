@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api';
+import AddInstrumentDialog from '../components/AddInstrumentDialog';
 import PageHeader from '../components/PageHeader';
 import RecentSyncJobs from '../components/RecentSyncJobs';
 import SyncJobButton from '../components/SyncJobButton';
@@ -10,7 +11,25 @@ import { formatRecentWhen, readRecent } from '../lib/recent';
 
 const HOME_INDEXES = ['NIFTY50', 'SENSEX', 'NIFTYBANK', 'NIFTYIT'];
 const SECTOR_INDEXES = ['NIFTYPHARMA', 'NIFTYAUTO', 'NIFTYFMCG', 'NIFTYMETAL'];
-const SYNC_INDEXES = [...HOME_INDEXES, ...SECTOR_INDEXES];
+const EXTRA_INDEXES_KEY = 'wealth-orbit:extra-home-indexes';
+
+function readExtraIndexes(): string[] {
+  try {
+    const raw = window.localStorage.getItem(EXTRA_INDEXES_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed)
+      ? parsed.map((item) => String(item || '').toUpperCase()).filter(Boolean)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberExtraIndex(code: string) {
+  const next = Array.from(new Set([...readExtraIndexes(), code.toUpperCase()]));
+  window.localStorage.setItem(EXTRA_INDEXES_KEY, JSON.stringify(next));
+  return next;
+}
 
 const INDEX_LABELS: Record<string, string> = {
   NIFTY50: 'Nifty 50',
@@ -77,11 +96,21 @@ function IndexStrip({ rows }: { rows: any[] }) {
 
 export default function DashboardPage() {
   const [recent, setRecent] = React.useState(() => readRecent());
+  const [extraIndexes, setExtraIndexes] = React.useState(() => readExtraIndexes());
+  const [addIndexOpen, setAddIndexOpen] = React.useState(false);
+  const homeCodes = React.useMemo(
+    () => Array.from(new Set([...HOME_INDEXES, ...extraIndexes])),
+    [extraIndexes],
+  );
+  const syncCodes = React.useMemo(
+    () => Array.from(new Set([...homeCodes, ...SECTOR_INDEXES])),
+    [homeCodes],
+  );
   const account = useQuery({ queryKey: ['auth-me'], queryFn: api.authMe, retry: false });
   const signedIn = account.data?.signed_in === true;
   const market = useQuery({
-    queryKey: ['benchmark-summary', HOME_INDEXES.join(',')],
-    queryFn: () => api.benchmarkSummary(HOME_INDEXES),
+    queryKey: ['benchmark-summary', homeCodes.join(',')],
+    queryFn: () => api.benchmarkSummary(homeCodes),
   });
   const sectors = useQuery({
     queryKey: ['benchmark-summary', SECTOR_INDEXES.join(',')],
@@ -133,15 +162,30 @@ export default function DashboardPage() {
               {rows.length ? `Delayed · as of ${formatDisplayDate(newest)} · index history` : 'Delayed · index history'}
             </p>
           </div>
-          <SyncJobButton
-            kind="PRICES"
-            label="Update indexes"
-            hideSucceeded
-            startJob={() => api.syncBenchmarks(SYNC_INDEXES)}
-            loadStatus={() => api.syncBenchmarkStatus()}
-            invalidateKeys={[['benchmark-summary']]}
-          />
+          <div className="panel-sync">
+            <button type="button" className="secondary" onClick={() => setAddIndexOpen(true)}>
+              Add index
+            </button>
+            <SyncJobButton
+              kind="PRICES"
+              label="Update indexes"
+              hideSucceeded
+              startJob={() => api.syncBenchmarks(syncCodes)}
+              loadStatus={() => api.syncBenchmarkStatus()}
+              invalidateKeys={[['benchmark-summary']]}
+            />
+          </div>
         </div>
+        <AddInstrumentDialog
+          open={addIndexOpen}
+          onClose={() => setAddIndexOpen(false)}
+          initialKind="index"
+          allowedKinds={['index']}
+          onTracked={(result) => {
+            const code = String(result.master.index_code || '').toUpperCase();
+            if (code) setExtraIndexes(rememberExtraIndex(code));
+          }}
+        />
         {market.isLoading && <div className="home-note">Loading market…</div>}
         {market.error && <div className="home-note">Market data could not be loaded.</div>}
         {!market.isLoading && !market.error && !rows.length && <div className="home-note">No index history yet.</div>}

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Query, HTTPException
 from datetime import date
+from pydantic import BaseModel, Field
 
 from .portfolio_backend import (filter_values, mutual_funds, mutual_fund_detail,
     mutual_fund_detail_by_name, mutual_fund_detail_enriched, mutual_fund_history,
@@ -30,6 +31,30 @@ MF_KIND_ALIASES = {
 }
 
 router = APIRouter(prefix="/market-data", tags=["market-data"])
+
+
+class TrackStockBody(BaseModel):
+    trading_symbol: str = Field(min_length=1, max_length=32)
+
+
+class TrackFundBody(BaseModel):
+    scheme_code: str = Field(min_length=1, max_length=12)
+
+
+class TrackIndexBody(BaseModel):
+    index_code: str = Field(min_length=1, max_length=32)
+    yf_symbol: str | None = Field(default=None, max_length=32)
+
+
+def _instrument_http_error(exc: Exception) -> HTTPException:
+    from backend.market_data.instrument_registry import InstrumentResolveError
+
+    if isinstance(exc, InstrumentResolveError):
+        return HTTPException(
+            status_code=422,
+            detail={"reason": exc.reason, "message": exc.message},
+        )
+    return HTTPException(status_code=422, detail={"reason": "track_failed", "message": "Could not add instrument"})
 
 
 def _mf_sync_type(kind: str) -> str:
@@ -347,6 +372,98 @@ def benchmark_sync_status_route():
 @router.get("/benchmarks/{index_code}/history")
 def benchmark_history_route(index_code: str):
     return benchmark_history(index_code)
+
+
+@router.get("/instruments/stocks/preview")
+def preview_stock_instrument(trading_symbol: str = Query(...)):
+    from backend.market_data.instrument_registry import InstrumentResolveError, resolve_stock
+
+    try:
+        return resolve_stock(trading_symbol)
+    except InstrumentResolveError as exc:
+        raise _instrument_http_error(exc) from None
+
+
+@router.get("/instruments/mutual-funds/preview")
+def preview_fund_instrument(scheme_code: str = Query(...)):
+    from backend.market_data.instrument_registry import InstrumentResolveError, resolve_fund
+
+    try:
+        return resolve_fund(scheme_code)
+    except InstrumentResolveError as exc:
+        raise _instrument_http_error(exc) from None
+
+
+@router.get("/instruments/indexes/preview")
+def preview_index_instrument(index_code: str = Query(...), yf_symbol: str | None = Query(None)):
+    from backend.market_data.instrument_registry import InstrumentResolveError, resolve_index
+
+    try:
+        return resolve_index(index_code, yf_symbol)
+    except InstrumentResolveError as exc:
+        raise _instrument_http_error(exc) from None
+
+
+@router.post("/instruments/stocks")
+def track_stock_instrument(body: TrackStockBody, enqueue_history: bool = Query(True)):
+    from backend.market_data.instrument_registry import InstrumentResolveError, ensure_stock
+    from backend.market_data.sync import sync_prices
+
+    try:
+        result = ensure_stock(body.trading_symbol)
+    except InstrumentResolveError as exc:
+        raise _instrument_http_error(exc) from None
+    jobs = []
+    if enqueue_history:
+        symbol = result["master"]["trading_symbol"]
+        job, created = enqueue("STOCK", symbol, "PRICES", False, lambda: sync_prices(symbol, False))
+        jobs.append({"job_id": job.get("job_id"), "kind": "prices", "duplicate": not created})
+    return {**result, "jobs": jobs}
+
+
+@router.post("/instruments/mutual-funds")
+def track_fund_instrument(body: TrackFundBody, enqueue_history: bool = Query(True)):
+    from backend.market_data.instrument_registry import InstrumentResolveError, ensure_fund
+
+    try:
+        result = ensure_fund(body.scheme_code)
+    except InstrumentResolveError as exc:
+        raise _instrument_http_error(exc) from None
+    jobs = []
+    if enqueue_history:
+        code = result["master"]["scheme_code"]
+        job, created = enqueue(
+            "MUTUAL_FUND",
+            code,
+            "MF_NAV",
+            False,
+            lambda: sync_nav(code, False),
+        )
+        jobs.append({"job_id": job.get("job_id"), "kind": "nav", "duplicate": not created})
+    return {**result, "jobs": jobs}
+
+
+@router.post("/instruments/indexes")
+def track_index_instrument(body: TrackIndexBody, enqueue_history: bool = Query(True)):
+    from backend.market_data.instrument_registry import InstrumentResolveError, ensure_index
+
+    try:
+        result = ensure_index(body.index_code, body.yf_symbol)
+    except InstrumentResolveError as exc:
+        raise _instrument_http_error(exc) from None
+    jobs = []
+    if enqueue_history:
+        code = result["master"]["index_code"]
+        job, created = enqueue(
+            "STOCK",
+            HOME_INDEX_ENTITY,
+            "PRICES",
+            False,
+            lambda: sync_home_indexes([code]),
+        )
+        jobs.append({"job_id": job.get("job_id"), "kind": "index_history", "duplicate": not created})
+    return {**result, "jobs": jobs}
+
 
 @router.get("/stocks")
 def stock_list(search: str = Query(""), exchange: str = Query("All"), sector: str = Query("All"), industry: str = Query("All")):

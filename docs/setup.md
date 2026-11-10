@@ -89,6 +89,25 @@ Guided setup defaults stay small: recommended index history is about **5y** for 
 
 Re-running masters seed upserts on those natural keys and must not create duplicate companies or schemes.
 
+## Track beyond seed (India-first)
+
+Use the UI **Add** control on Stocks / Mutual funds (and **Add index** on Home) when a name is not in the seed catalog. The API resolves one instrument, upserts the master on the same natural keys as seed, then enqueues minimal history (`prices` / `nav` / index history).
+
+| Instrument | Identifier | Notes |
+|------------|------------|-------|
+| Stock | NSE `trading_symbol` | Runtime Yahoo ticker is `{symbol}.NS` |
+| Mutual fund | AMFI `scheme_code` | Digits from MFAPI / mftool |
+| Index | `index_code` + Yahoo `yf_symbol` | Allowlisted India codes can omit Yahoo; others require an explicit India Yahoo symbol |
+
+Non-goals: US tickers, bulk exchange import, watchlists. Seed CLI remains the bulk path; the UI is single-instrument add. Re-adding an already-tracked code is idempotent (`status: existing`).
+
+```bash
+# Optional API (same behavior as the Add dialog)
+curl -X POST "$API/market-data/instruments/stocks?enqueue_history=true" \
+  -H 'Content-Type: application/json' \
+  -d '{"trading_symbol":"RELIANCE"}'
+```
+
 ## Seed flags
 
 Reference CSVs live under `data/seed/`. With `DATABASE_URL` set:

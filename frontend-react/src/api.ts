@@ -3,6 +3,10 @@ const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 function errorDetail(payload: any, fallback: string) {
   const detail = payload?.detail;
   if (typeof detail === 'string') return detail;
+  if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+    const message = detail.message || detail.reason;
+    if (typeof message === 'string' && message.trim()) return message;
+  }
   if (Array.isArray(detail) && detail.length) return 'Use at least 8 characters.';
   return fallback;
 }
@@ -229,6 +233,55 @@ export const api = {
     post<SyncJob>(`/market-data/benchmarks/sync?codes=${encodeURIComponent(codes.join(','))}`),
   syncBenchmarkStatus: () =>
     get<{ status: string; job: SyncJob | null }>('/market-data/benchmarks/sync/status'),
+  previewStockInstrument: (tradingSymbol: string) =>
+    get<InstrumentPreview>(
+      `/market-data/instruments/stocks/preview?trading_symbol=${encodeURIComponent(tradingSymbol)}`,
+    ),
+  previewFundInstrument: (schemeCode: string) =>
+    get<InstrumentPreview>(
+      `/market-data/instruments/mutual-funds/preview?scheme_code=${encodeURIComponent(schemeCode)}`,
+    ),
+  previewIndexInstrument: (indexCode: string, yfSymbol = '') => {
+    const params = new URLSearchParams({ index_code: indexCode });
+    if (yfSymbol) params.set('yf_symbol', yfSymbol);
+    return get<InstrumentPreview>(`/market-data/instruments/indexes/preview?${params}`);
+  },
+  trackStockInstrument: (tradingSymbol: string, enqueueHistory = true) =>
+    postJson<TrackInstrumentResult>(
+      `/market-data/instruments/stocks?enqueue_history=${enqueueHistory ? 'true' : 'false'}`,
+      { trading_symbol: tradingSymbol },
+    ),
+  trackFundInstrument: (schemeCode: string, enqueueHistory = true) =>
+    postJson<TrackInstrumentResult>(
+      `/market-data/instruments/mutual-funds?enqueue_history=${enqueueHistory ? 'true' : 'false'}`,
+      { scheme_code: schemeCode },
+    ),
+  trackIndexInstrument: (indexCode: string, yfSymbol = '', enqueueHistory = true) =>
+    postJson<TrackInstrumentResult>(
+      `/market-data/instruments/indexes?enqueue_history=${enqueueHistory ? 'true' : 'false'}`,
+      { index_code: indexCode, yf_symbol: yfSymbol || null },
+    ),
   sectors: () => get<string[]>('/market-data/sectors'),
   filters: (kind: string) => get<string[]>(`/market-data/filters/${kind}`),
+};
+
+export type InstrumentPreview = {
+  instrument_type: 'stock' | 'mutual_fund' | 'index';
+  trading_symbol?: string;
+  company_name?: string;
+  exchange?: string;
+  scheme_code?: string;
+  scheme_name?: string;
+  amc_name?: string;
+  index_code?: string;
+  index_name?: string;
+  yf_symbol?: string;
+};
+
+export type TrackInstrumentResult = {
+  status: 'created' | 'existing';
+  already_tracked: boolean;
+  master: Record<string, unknown>;
+  jobs: { job_id?: string; kind?: string; duplicate?: boolean }[];
+  preview?: InstrumentPreview;
 };

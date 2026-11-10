@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api';
+import AddInstrumentDialog from '../../components/AddInstrumentDialog';
 import ChartToolbar, { ChartRange } from '../../components/ChartToolbar';
 import FundNavChart from '../../components/FundNavChart';
 import FundHeader from './panels/FundHeader';
@@ -35,6 +36,7 @@ export default function FundDetailPage() {
   const tab: TabId = isTabId(tabParam) ? tabParam : 'overview';
   const [range, setRange] = React.useState<ChartRange>('1Y');
   const [overlay, setOverlay] = React.useState(false);
+  const [addOpen, setAddOpen] = React.useState(false);
   const fund = useQuery({ queryKey: ['fund', schemeId], queryFn: () => api.fund(schemeId) });
 
   React.useEffect(() => {
@@ -66,12 +68,32 @@ export default function FundDetailPage() {
   }
 
   if (fund.error) {
+    const message = (fund.error as Error).message || 'Mutual fund not found';
+    const missing = /not found/i.test(message);
     return (
       <>
         <Link className="back" to="/mutualfunds">
           ← Back to mutual funds
         </Link>
-        <div className="empty">{(fund.error as Error).message}</div>
+        <div className="empty empty-cta">
+          <strong>{missing ? 'Not in catalog' : message}</strong>
+          {missing && (
+            <>
+              <span>{schemeId} is not tracked yet. Add it by AMFI scheme code to sync NAV.</span>
+              <button type="button" className="primary-button" onClick={() => setAddOpen(true)}>
+                Add “{schemeId}”
+              </button>
+            </>
+          )}
+          {!missing && <span>{message}</span>}
+        </div>
+        <AddInstrumentDialog
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          initialKind="fund"
+          initialCode={schemeId}
+          allowedKinds={['fund']}
+        />
       </>
     );
   }

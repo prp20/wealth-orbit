@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api';
+import AddInstrumentDialog from '../../components/AddInstrumentDialog';
 import MarketChart from '../../components/MarketChart';
 import SyncJobButton from '../../components/SyncJobButton';
 import ChartToolbar, { ChartRange } from '../../components/ChartToolbar';
@@ -34,6 +35,7 @@ export default function StockDetailPage() {
   const tab: TabId = tabParam === 'statements' ? 'fundamentals' : isTabId(tabParam) ? tabParam : 'overview';
   const [range, setRange] = React.useState<ChartRange>('1Y');
   const [mode, setMode] = React.useState('line');
+  const [addOpen, setAddOpen] = React.useState(false);
   const stock = useQuery({ queryKey: ['stock', symbol], queryFn: () => api.stock(symbol) });
   const metrics = stock.data?.latest_daily_metrics;
 
@@ -66,12 +68,32 @@ export default function StockDetailPage() {
   }
 
   if (stock.error) {
+    const message = (stock.error as Error).message || 'Stock not found';
+    const missing = /not found/i.test(message);
     return (
       <>
         <Link className="back" to="/stocks">
           ← Back to stocks
         </Link>
-        <div className="empty">{(stock.error as Error).message}</div>
+        <div className="empty empty-cta">
+          <strong>{missing ? 'Not in catalog' : message}</strong>
+          {missing && (
+            <>
+              <span>{symbol} is not tracked yet. Add it as an NSE symbol to sync history.</span>
+              <button type="button" className="primary-button" onClick={() => setAddOpen(true)}>
+                Add “{symbol}”
+              </button>
+            </>
+          )}
+          {!missing && <span>{message}</span>}
+        </div>
+        <AddInstrumentDialog
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          initialKind="stock"
+          initialCode={symbol}
+          allowedKinds={['stock']}
+        />
       </>
     );
   }

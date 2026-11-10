@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api';
+import AddInstrumentDialog from '../../components/AddInstrumentDialog';
 import PageHeader from '../../components/PageHeader';
 
 const PAGE_SIZE = 25;
@@ -14,6 +15,8 @@ export default function FundListPage() {
   const [category, setCategory] = React.useState('All');
   const [subcategory, setSubcategory] = React.useState('All');
   const [page, setPage] = React.useState(1);
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [addCode, setAddCode] = React.useState('');
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
@@ -111,11 +114,46 @@ export default function FundListPage() {
               ))}
             </select>
           </label>
+          <div className="toolbar-actions">
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => {
+                setAddCode(debouncedQuery);
+                setAddOpen(true);
+              }}
+            >
+              Add
+            </button>
+          </div>
         </div>
 
         {funds.isLoading && <div className="loading">Loading mutual funds…</div>}
         {funds.error && <div className="empty">{(funds.error as Error).message}</div>}
-        {!funds.isLoading && !rows.length && <div className="empty">No funds match these filters.</div>}
+        {!funds.isLoading && !rows.length && (
+          <div className="empty empty-cta">
+            <span>No funds match these filters.</span>
+            {debouncedQuery && (
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => {
+                  setAddCode(debouncedQuery);
+                  setAddOpen(true);
+                }}
+              >
+                Add “{debouncedQuery}” as scheme code?
+              </button>
+            )}
+          </div>
+        )}
+        <AddInstrumentDialog
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          initialKind="fund"
+          initialCode={addCode}
+          allowedKinds={['fund']}
+        />
 
         {rows.length > 0 && (
           <>

@@ -47,8 +47,8 @@
 .sync-job-row>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .sync-job-row strong{font-size:13px;font-weight:600;color:#3d5158}
 .sync-job-row small{color:#718089;font-size:12px;line-height:1.4}
-.stock-toolbar{display:grid;grid-template-columns:minmax(200px,1.4fr) repeat(2,minmax(140px,1fr));gap:14px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #edf1f0}
-.fund-toolbar{display:grid;grid-template-columns:minmax(200px,1.5fr) repeat(3,minmax(120px,1fr));gap:14px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #edf1f0}
+.stock-toolbar{display:grid;grid-template-columns:minmax(200px,1.4fr) repeat(2,minmax(140px,1fr)) auto;gap:14px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #edf1f0}
+.fund-toolbar{display:grid;grid-template-columns:minmax(200px,1.5fr) repeat(3,minmax(120px,1fr)) auto;gap:14px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #edf1f0}
 .fund-key-metrics{grid-template-columns:repeat(5,minmax(0,1fr))}
 .overlay-toggle{display:inline-flex;align-items:center;gap:8px;color:#39535a;font-size:13px;user-select:none}
 .overlay-toggle input{accent-color:#42a87c}
@@ -179,3 +179,23 @@
 .account-footer strong{overflow-wrap:anywhere}
 .statement-table .num{text-align:right;font-variant-numeric:tabular-nums}
 .statement-table th[scope=row]{text-align:left;font-weight:600}
+.toolbar-actions{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.toolbar-actions .primary-button,.dialog-actions button{border:0;border-radius:8px;padding:10px 14px;background:#42a87c;color:#fff;font-weight:600;cursor:pointer}
+.toolbar-actions .primary-button.secondary,.dialog-actions button.secondary{background:#203746}
+.toolbar-actions .primary-button:disabled,.dialog-actions button:disabled{opacity:.55;cursor:wait}
+.empty-cta{display:grid;gap:10px;justify-items:start}
+.empty-cta .primary-button{margin-top:4px}
+.dialog-backdrop{position:fixed;inset:0;background:rgba(16,25,35,.45);display:grid;place-items:center;z-index:40;padding:20px}
+.dialog-panel{width:min(480px,100%);background:#fff;border-radius:14px;border:1px solid #e3e9e7;padding:22px;box-shadow:0 18px 48px rgba(16,25,35,.18)}
+.dialog-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.dialog-header h2{margin:0;font-size:22px;letter-spacing:-.4px}
+.dialog-close{border:0;background:transparent;font-size:24px;line-height:1;color:#718089;cursor:pointer}
+.dialog-copy{color:#718089;font-size:13px;line-height:1.45;margin:8px 0 16px}
+.dialog-tabs{display:flex;gap:6px;margin:0 0 14px}
+.dialog-tabs button{border:1px solid #dbe5e1;background:#fff;border-radius:7px;padding:7px 12px;color:#39535a;cursor:pointer;font-weight:600}
+.dialog-tabs button.active{background:#42a87c;border-color:#42a87c;color:#fff}
+.dialog-panel .stock-field{display:grid;gap:6px;margin-bottom:12px}
+.dialog-preview,.dialog-info{background:#f3faf6;border:1px solid #d7eee3;border-radius:8px;padding:10px 12px;color:#2f6b52;font-size:13px;margin-bottom:10px}
+.dialog-error{background:#fcf8f7;border:1px solid #f0e4e1;border-radius:8px;padding:10px 12px;color:#8a4b3d;font-size:13px;margin-bottom:10px}
+.dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
+.panel-sync{flex-wrap:wrap}
