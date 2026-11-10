@@ -1,9 +1,10 @@
 """Read-only access to Supabase market_data reference tables."""
 import os
 import re
+import uuid
 import pandas as pd
 import psycopg2
-from psycopg2.extras import register_uuid
+from psycopg2.extras import execute_values, register_uuid
 from dotenv import load_dotenv
 from .market_data.index_history import quote_identifier, resolve_index_history_columns
 from .market_data.mutual_fund_analytics import METRIC_PERIODS, metric_period_rank_sql
@@ -1325,12 +1326,18 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
             row = cur.fetchone()
             if not row: raise ValueError(f"Active stock not found: {symbol}")
             stock_id = row[0]
-            for code, tagged in metric_statement_types().items():
+            tagged_types = metric_statement_types()
+            if tagged_types:
                 cur.execute(
-                    """UPDATE market_data.fundamental_metric_reference
-                       SET statement_type=%s, updated_at=NOW()
-                       WHERE metric_code=%s AND statement_type<>%s""",
-                    (tagged, code, tagged),
+                    """UPDATE market_data.fundamental_metric_reference AS metric
+                       SET statement_type = tagged.statement_type, updated_at = NOW()
+                       FROM (
+                         SELECT * FROM unnest(%s::text[], %s::text[])
+                           AS tagged(metric_code, statement_type)
+                       ) AS tagged
+                       WHERE metric.metric_code = tagged.metric_code
+                         AND metric.statement_type <> tagged.statement_type""",
+                    (list(tagged_types.keys()), list(tagged_types.values())),
                 )
             parsed_by_basis = {}
             basis_warnings = []
@@ -1363,40 +1370,123 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
             for basis, parsed in parsed_by_basis.items():
                 counts[basis] = len(parsed.fundamental_values)
                 parser_warnings += len(parsed.warnings)
+
+            # Prefetch metric map once — per-row SELECTs were multi-minute over pgbouncer.
+            cur.execute(
+                "SELECT metric_code, metric_id, statement_type FROM market_data.fundamental_metric_reference"
+            )
+            metric_map = {code: (metric_id, statement_type) for code, metric_id, statement_type in cur.fetchall()}
+            needed_types = {}
+            for parsed in parsed_by_basis.values():
                 for value in parsed.fundamental_values:
-                    cur.execute(
-                        "SELECT metric_id, statement_type FROM market_data.fundamental_metric_reference WHERE metric_code=%s",
-                        (value.metric_code,),
+                    needed_types[value.metric_code] = value.statement_type
+            new_metrics = []
+            for code, statement_type in needed_types.items():
+                existing = metric_map.get(code)
+                if existing is None:
+                    metric_id = uuid.uuid4()
+                    new_metrics.append(
+                        (metric_id, code, code.replace("_", " ").title(), statement_type)
                     )
-                    metric = cur.fetchone()
-                    if not metric:
-                        import uuid
-                        metric_id = uuid.uuid4()
-                        cur.execute(
-                            "INSERT INTO market_data.fundamental_metric_reference(metric_id,metric_code,metric_name,statement_type) VALUES(%s,%s,%s,%s)",
-                            (metric_id, value.metric_code, value.metric_code.replace("_", " ").title(), value.statement_type),
+                    metric_map[code] = (metric_id, statement_type)
+                elif existing[1] != statement_type:
+                    cur.execute(
+                        """UPDATE market_data.fundamental_metric_reference
+                           SET statement_type=%s, updated_at=NOW()
+                           WHERE metric_code=%s""",
+                        (statement_type, code),
+                    )
+                    metric_map[code] = (existing[0], statement_type)
+            if new_metrics:
+                execute_values(
+                    cur,
+                    """INSERT INTO market_data.fundamental_metric_reference
+                       (metric_id, metric_code, metric_name, statement_type)
+                       VALUES %s
+                       ON CONFLICT (metric_code) DO NOTHING""",
+                    new_metrics,
+                    page_size=200,
+                )
+                # Refresh ids in case ON CONFLICT skipped a concurrent insert.
+                cur.execute(
+                    "SELECT metric_code, metric_id, statement_type FROM market_data.fundamental_metric_reference"
+                )
+                metric_map = {
+                    code: (metric_id, statement_type)
+                    for code, metric_id, statement_type in cur.fetchall()
+                }
+
+            fundamental_rows = []
+            for parsed in parsed_by_basis.values():
+                for value in parsed.fundamental_values:
+                    metric = metric_map.get(value.metric_code)
+                    if metric is None:
+                        continue
+                    fundamental_rows.append(
+                        (
+                            stock_id,
+                            metric[0],
+                            value.reporting_period,
+                            value.period_start,
+                            value.period_end,
+                            value.reporting_basis,
+                            value.value,
+                            source_id,
                         )
-                    else:
-                        metric_id = metric[0]
-                        if metric[1] != value.statement_type:
-                            cur.execute(
-                                "UPDATE market_data.fundamental_metric_reference SET statement_type=%s, updated_at=NOW() WHERE metric_code=%s",
-                                (value.statement_type, value.metric_code),
-                            )
-                    cur.execute("""INSERT INTO market_data.stock_fundamental_values(stock_id,metric_id,reporting_period,period_start_date,period_end_date,reporting_basis,metric_value,source_id)
-                        VALUES(%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(stock_id,metric_id,reporting_period,reporting_basis,period_end_date)
-                        DO UPDATE SET metric_value=EXCLUDED.metric_value,source_id=EXCLUDED.source_id,updated_at=NOW()""",
-                        (stock_id, metric_id, value.reporting_period, value.period_start, value.period_end, value.reporting_basis, value.value, source_id))
+                    )
+            if fundamental_rows:
+                execute_values(
+                    cur,
+                    """INSERT INTO market_data.stock_fundamental_values
+                       (stock_id, metric_id, reporting_period, period_start_date, period_end_date,
+                        reporting_basis, metric_value, source_id)
+                       VALUES %s
+                       ON CONFLICT (stock_id, metric_id, reporting_period, reporting_basis, period_end_date)
+                       DO UPDATE SET metric_value=EXCLUDED.metric_value,
+                                     source_id=EXCLUDED.source_id,
+                                     updated_at=NOW()""",
+                    fundamental_rows,
+                    page_size=500,
+                )
+
             shareholding = []
             for basis in (CONSOLIDATED, STANDALONE):
                 parsed = parsed_by_basis.get(basis)
                 if parsed and parsed.shareholding:
                     shareholding = parsed.shareholding
                     break
-            for value in shareholding:
-                cur.execute("""INSERT INTO market_data.stock_shareholding_history(stock_id,period_end_date,promoter_pct,fii_pct,dii_pct,government_pct,public_pct,shareholder_count,source_id)
-                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(stock_id,period_end_date)
-                    DO UPDATE SET promoter_pct=EXCLUDED.promoter_pct,fii_pct=EXCLUDED.fii_pct,dii_pct=EXCLUDED.dii_pct,government_pct=EXCLUDED.government_pct,public_pct=EXCLUDED.public_pct,shareholder_count=EXCLUDED.shareholder_count,source_id=EXCLUDED.source_id,updated_at=NOW()""", (stock_id,value.period_end,value.promoter_pct,value.fii_pct,value.dii_pct,value.government_pct,value.public_pct,value.shareholder_count,source_id))
+            if shareholding:
+                execute_values(
+                    cur,
+                    """INSERT INTO market_data.stock_shareholding_history
+                       (stock_id, period_end_date, promoter_pct, fii_pct, dii_pct,
+                        government_pct, public_pct, shareholder_count, source_id)
+                       VALUES %s
+                       ON CONFLICT (stock_id, period_end_date)
+                       DO UPDATE SET promoter_pct=EXCLUDED.promoter_pct,
+                                     fii_pct=EXCLUDED.fii_pct,
+                                     dii_pct=EXCLUDED.dii_pct,
+                                     government_pct=EXCLUDED.government_pct,
+                                     public_pct=EXCLUDED.public_pct,
+                                     shareholder_count=EXCLUDED.shareholder_count,
+                                     source_id=EXCLUDED.source_id,
+                                     updated_at=NOW()""",
+                    [
+                        (
+                            stock_id,
+                            value.period_end,
+                            value.promoter_pct,
+                            value.fii_pct,
+                            value.dii_pct,
+                            value.government_pct,
+                            value.public_pct,
+                            value.shareholder_count,
+                            source_id,
+                        )
+                        for value in shareholding
+                    ],
+                    page_size=200,
+                )
         connection.commit()
     fundamental_rows = counts[CONSOLIDATED] + counts[STANDALONE]
     return {

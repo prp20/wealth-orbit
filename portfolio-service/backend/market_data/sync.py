@@ -63,7 +63,21 @@ def sync_prices(
             for timestamp, row in frame.iterrows():
                 if row[["Open", "High", "Low", "Close"]].isna().any():
                     continue
-                values.append((stock[0], timestamp.date(), float(row["Open"]), float(row["High"]), float(row["Low"]), float(row["Close"]), int(row.get("Volume", 0)), source_id))
+                open_ = float(row["Open"])
+                high = float(row["High"])
+                low = float(row["Low"])
+                close = float(row["Close"])
+                if min(open_, high, low, close) <= 0:
+                    continue
+                # Yahoo occasionally publishes open/close outside high/low.
+                high = max(open_, high, close)
+                low = min(open_, low, close)
+                if high < low:
+                    continue
+                volume = int(row.get("Volume", 0) or 0)
+                if volume < 0:
+                    volume = 0
+                values.append((stock[0], timestamp.date(), open_, high, low, close, volume, source_id))
             if values:
                 execute_values(cur, """INSERT INTO market_data.stock_daily_prices(stock_id,trading_date,open,high,low,close,volume,source_id)
                     VALUES %s ON CONFLICT(stock_id,trading_date) DO UPDATE SET open=EXCLUDED.open,high=EXCLUDED.high,low=EXCLUDED.low,close=EXCLUDED.close,volume=EXCLUDED.volume,source_id=EXCLUDED.source_id,updated_at=NOW()""", values, page_size=1000)

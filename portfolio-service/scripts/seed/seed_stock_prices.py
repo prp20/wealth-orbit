@@ -37,6 +37,25 @@ def _safe_int(value) -> int | None:
         return None
 
 
+def _sanitize_ohlc(
+    open_: float | None,
+    high: float | None,
+    low: float | None,
+    close: float | None,
+) -> tuple[float, float, float, float] | None:
+    """Make Yahoo bars satisfy chk_stock_price_values (high/low envelope open/close)."""
+    if None in (open_, high, low, close):
+        return None
+    if min(open_, high, low, close) <= 0:
+        return None
+    # Vendor bars sometimes have open/close outside the published high/low range.
+    high = max(open_, high, close)
+    low = min(open_, low, close)
+    if high < low:
+        return None
+    return open_, high, low, close
+
+
 def _yf_lookup(data_dir: Path | None) -> dict[str, str]:
     """Map trading_symbol -> yf_symbol from stocks.csv when available."""
     if data_dir is None:
@@ -94,12 +113,18 @@ def _download_batch(tickers: list[str], period: str) -> dict:
 def _build_rows(stock_id, frame, source_id) -> list[tuple]:
     rows = []
     for timestamp, values in frame.iterrows():
-        open_ = _safe_float(values.get("Open"))
-        high = _safe_float(values.get("High"))
-        low = _safe_float(values.get("Low"))
-        close = _safe_float(values.get("Close"))
-        if None in (open_, high, low, close):
+        sanitized = _sanitize_ohlc(
+            _safe_float(values.get("Open")),
+            _safe_float(values.get("High")),
+            _safe_float(values.get("Low")),
+            _safe_float(values.get("Close")),
+        )
+        if sanitized is None:
             continue
+        open_, high, low, close = sanitized
+        volume = _safe_int(values.get("Volume"))
+        if volume is None or volume < 0:
+            volume = 0
         rows.append(
             (
                 stock_id,
@@ -108,7 +133,7 @@ def _build_rows(stock_id, frame, source_id) -> list[tuple]:
                 high,
                 low,
                 close,
-                _safe_int(values.get("Volume")) or 0,
+                volume,
                 source_id,
             )
         )
