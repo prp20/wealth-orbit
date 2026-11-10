@@ -50,3 +50,21 @@ def test_track_and_sync_routes_accept_history_period():
         encoding="utf-8"
     )
     assert "history_period" in index_sync
+
+
+def test_ui_labels_history_depth_and_empty_cta_are_wired():
+    fe = ROOT / "frontend-react" / "src"
+    stocks = (fe / "pages" / "stocks" / "StockListPage.tsx").read_text(encoding="utf-8")
+    funds = (fe / "pages" / "funds" / "FundListPage.tsx").read_text(encoding="utf-8")
+    dialog = (fe / "components" / "AddInstrumentDialog.tsx").read_text(encoding="utf-8")
+    sync_btn = (fe / "components" / "SyncJobButton.tsx").read_text(encoding="utf-8")
+    stock_detail = (fe / "pages" / "stocks" / "StockDetailPage.tsx").read_text(encoding="utf-8")
+    fund_detail = (fe / "pages" / "funds" / "FundDetailPage.tsx").read_text(encoding="utf-8")
+    assert "Add stock" in stocks
+    assert "Add fund" in funds
+    assert "History depth" in dialog
+    assert "historyPeriod" in dialog
+    assert "Extend history" in sync_btn
+    assert "Not in catalog" in stock_detail
+    assert "Not in catalog" in fund_detail
+    assert "extendHistory" in stock_detail
