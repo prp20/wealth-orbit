@@ -151,6 +151,17 @@ def resolve_stock(symbol: str) -> dict:
     }
 
 
+def _fund_details_look_valid(details: dict, scheme_code: str) -> bool:
+    """Require a scheme name (or matching code) so empty provider dicts are not accepted."""
+    if not isinstance(details, dict) or not details:
+        return False
+    name = str(details.get("scheme_name") or details.get("schemeName") or "").strip()
+    if name:
+        return True
+    code_value = str(details.get("scheme_code") or details.get("schemeCode") or "").strip()
+    return code_value == scheme_code
+
+
 def resolve_fund(scheme_code: str) -> dict:
     code = normalize_scheme_code(scheme_code)
     details = None
@@ -158,7 +169,7 @@ def resolve_fund(scheme_code: str) -> dict:
         from mftool import Mftool
 
         raw = Mftool().get_scheme_details(code, as_json=True)
-        if isinstance(raw, dict):
+        if _fund_details_look_valid(raw if isinstance(raw, dict) else {}, code):
             details = raw
     except Exception:
         details = None
@@ -170,14 +181,16 @@ def resolve_fund(scheme_code: str) -> dict:
             response.raise_for_status()
             payload = response.json()
             meta = payload.get("meta") if isinstance(payload, dict) else None
-            if isinstance(meta, dict):
+            if _fund_details_look_valid(meta if isinstance(meta, dict) else {}, code):
                 details = meta
             elif isinstance(payload, dict) and payload.get("data"):
-                # Some MFAPI responses only return data; treat presence as resolvable.
+                # NAV data present is enough to prove the scheme exists.
                 details = {
-                    "scheme_name": payload.get("meta", {}).get("scheme_name")
-                    if isinstance(payload.get("meta"), dict)
-                    else f"Scheme {code}",
+                    "scheme_name": (
+                        meta.get("scheme_name")
+                        if isinstance(meta, dict) and meta.get("scheme_name")
+                        else f"Scheme {code}"
+                    ),
                     "fund_house": None,
                     "scheme_category": None,
                 }
@@ -211,6 +224,7 @@ def resolve_index(index_code: str, yf_symbol: str | None = None) -> dict:
     explicit = normalize_yf_symbol(yf_symbol)
     allowlist = _load_seed_index_map()
     mapped = allowlist.get(code)
+    approved_yahoo = {value.upper() for value in allowlist.values()}
     if explicit:
         yahoo = explicit
     elif mapped:
@@ -220,16 +234,14 @@ def resolve_index(index_code: str, yf_symbol: str | None = None) -> dict:
             "yf_symbol_required",
             "Provide a Yahoo Finance symbol for this India index code",
         )
-    # Refuse obvious US mega-cap tickers without an India policy allowlist hit.
-    if not mapped and not yahoo.startswith("^") and not yahoo.upper().endswith(".NS"):
-        # Explicit India-ish patterns only when not on allowlist.
-        if yahoo.upper() in {"SPY", "QQQ", "DIA", "IWM"} or (
-            yahoo.isalpha() and len(yahoo) <= 5 and not yahoo.startswith("^")
-        ):
-            raise InstrumentResolveError(
-                "index_not_india",
-                "Only India indexes are supported; pass an NSE/BSE Yahoo symbol",
-            )
+    yahoo_key = yahoo.upper()
+    # India-first: allowlist Yahoo symbols, NSE suffixes, or seed-mapped codes only.
+    # A lone "^…" caret no longer bypasses the India policy.
+    if yahoo_key not in approved_yahoo and not yahoo_key.endswith(".NS"):
+        raise InstrumentResolveError(
+            "index_not_india",
+            "Only India indexes are supported; pass an allowlisted or NSE Yahoo symbol",
+        )
     index_name = code
     try:
         import yfinance as yf
@@ -461,17 +473,54 @@ def upsert_index(resolved: dict) -> tuple[dict, bool]:
                 row = cur.fetchone()
                 index_id = row[0] if row else index_id
                 created = True
+            # Refuse stealing a Yahoo symbol already mapped to a different index.
             cur.execute(
-                """INSERT INTO market_data.index_provider_mappings
-                   (mapping_id, index_id, provider, exchange, segment, trading_symbol, is_tri, is_active, source_id)
-                   VALUES (%s, %s, 'yfinance', 'NSE', 'CASH', %s, FALSE, TRUE, %s)
-                   ON CONFLICT (provider, trading_symbol) DO UPDATE
-                   SET index_id=EXCLUDED.index_id,
-                       is_active=TRUE,
-                       source_id=EXCLUDED.source_id,
-                       updated_at=NOW()""",
-                (str(uuid.uuid4()), index_id, yf_symbol, source_id),
+                """SELECT index_id, is_active FROM market_data.index_provider_mappings
+                   WHERE provider='yfinance' AND trading_symbol=%s""",
+                (yf_symbol,),
             )
+            existing_map = cur.fetchone()
+            if existing_map and existing_map[0] != index_id:
+                raise InstrumentResolveError(
+                    "yf_symbol_in_use",
+                    "That Yahoo symbol is already mapped to another index",
+                )
+
+            # Keep a single active yfinance mapping per index on re-add.
+            cur.execute(
+                """SELECT mapping_id, trading_symbol FROM market_data.index_provider_mappings
+                   WHERE provider='yfinance' AND index_id=%s AND is_active=TRUE""",
+                (index_id,),
+            )
+            active_maps = cur.fetchall()
+            for mapping_id, trading_symbol in active_maps:
+                if trading_symbol != yf_symbol:
+                    cur.execute(
+                        """UPDATE market_data.index_provider_mappings
+                           SET is_active=FALSE, updated_at=NOW()
+                           WHERE mapping_id=%s""",
+                        (mapping_id,),
+                    )
+
+            if existing_map and existing_map[0] == index_id:
+                cur.execute(
+                    """UPDATE market_data.index_provider_mappings
+                       SET is_active=TRUE, source_id=%s, updated_at=NOW()
+                       WHERE provider='yfinance' AND trading_symbol=%s""",
+                    (source_id, yf_symbol),
+                )
+            else:
+                cur.execute(
+                    """INSERT INTO market_data.index_provider_mappings
+                       (mapping_id, index_id, provider, exchange, segment, trading_symbol, is_tri, is_active, source_id)
+                       VALUES (%s, %s, 'yfinance', 'NSE', 'CASH', %s, FALSE, TRUE, %s)
+                       ON CONFLICT (provider, trading_symbol) DO UPDATE
+                       SET is_active=TRUE,
+                           source_id=EXCLUDED.source_id,
+                           updated_at=NOW()
+                       WHERE market_data.index_provider_mappings.index_id = EXCLUDED.index_id""",
+                    (str(uuid.uuid4()), index_id, yf_symbol, source_id),
+                )
         conn.commit()
     master = {
         "index_id": str(index_id),

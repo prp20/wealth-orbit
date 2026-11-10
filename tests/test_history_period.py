@@ -60,11 +60,36 @@ def test_ui_labels_history_depth_and_empty_cta_are_wired():
     sync_btn = (fe / "components" / "SyncJobButton.tsx").read_text(encoding="utf-8")
     stock_detail = (fe / "pages" / "stocks" / "StockDetailPage.tsx").read_text(encoding="utf-8")
     fund_detail = (fe / "pages" / "funds" / "FundDetailPage.tsx").read_text(encoding="utf-8")
+    home = (fe / "pages" / "DashboardPage.tsx").read_text(encoding="utf-8")
     assert "Add stock" in stocks
     assert "Add fund" in funds
     assert "History depth" in dialog
     assert "historyPeriod" in dialog
+    assert "trackStockInstrument(trimmed, true, historyPeriod)" in dialog
+    assert "removeQueries({ queryKey: ['stock', symbol] })" in dialog
+    assert "removeQueries({ queryKey: ['fund', scheme] })" in dialog
     assert "Extend history" in sync_btn
     assert "Not in catalog" in stock_detail
     assert "Not in catalog" in fund_detail
     assert "extendHistory" in stock_detail
+    assert "MAX_HOME_EXTRA_INDEXES" in home
+
+
+def test_nav_deepen_bypasses_watermark_when_history_period_set():
+    nav = (
+        ROOT / "portfolio-service" / "backend" / "mutual_fund_service.py"
+    ).read_text(encoding="utf-8")
+    assert "deepen = history_period is not None" in nav
+    assert "if not force and not deepen:" in nav
+
+
+def test_index_add_job_identity_is_not_home_indexes():
+    routes = (ROOT / "backend_api" / "app" / "market_data_routes.py").read_text(encoding="utf-8")
+    track_index = routes.split("def track_index_instrument")[1].split("@router.get(\"/stocks\")")[0]
+    assert "HOME_INDEX_ENTITY" not in track_index
+    assert '"STOCK"' in track_index
+    assert "code," in track_index
+    assert '"PRICES"' in track_index
+    assert "entity_key" in track_index
+    preview_block = routes.split("def preview_stock_instrument")[1].split("def stock_list")[0]
+    assert "Depends(current_user)" in preview_block

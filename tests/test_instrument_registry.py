@@ -57,6 +57,22 @@ def test_resolve_index_allowlist_and_requires_yf_for_unknown(monkeypatch):
         registry.resolve_index("CUSTOMINDIA", "SPY")
     assert us.value.reason == "index_not_india"
 
+    # Lone caret symbols are not an India bypass.
+    with pytest.raises(InstrumentResolveError) as caret:
+        registry.resolve_index("CUSTOMINDIA", "^GSPC")
+    assert caret.value.reason == "index_not_india"
+
+    # Explicit NSE Yahoo symbols remain allowed.
+    ok = registry.resolve_index("CUSTOMINDIA", "NIFTYMIDCAP150.NS")
+    assert ok["yf_symbol"] == "NIFTYMIDCAP150.NS"
+
+
+def test_fund_details_reject_empty_provider_dict():
+    assert registry._fund_details_look_valid({}, "120503") is False
+    assert registry._fund_details_look_valid({"scheme_name": "Foo"}, "120503") is True
+    assert registry._fund_details_look_valid({"scheme_code": "120503"}, "120503") is True
+    assert registry._fund_details_look_valid({"scheme_code": "999"}, "120503") is False
+
 
 def test_resolve_stock_uses_yfinance_proof(monkeypatch):
     import types
@@ -113,6 +129,63 @@ def test_track_routes_enqueue_history_kinds():
     assert 'enqueue("STOCK"' in routes and '"PRICES"' in routes
     assert 'enqueue("MUTUAL_FUND"' in routes and '"MF_NAV"' in routes
     assert "HOME_INDEX_ENTITY" in routes
+    assert "Depends(current_user)" in routes
     assert "InstrumentResolveError" in inspect.getsource(
         __import__("backend.market_data.instrument_registry", fromlist=["InstrumentResolveError"])
     )
+
+
+def test_upsert_index_refuses_yahoo_mapping_steal(monkeypatch):
+    class FakeCursor:
+        def __init__(self):
+            self.calls = []
+
+        def execute(self, sql, params=None):
+            self.calls.append((sql, params))
+            self._sql = sql
+            self._params = params
+
+        def fetchone(self):
+            sql = self._sql
+            if "FROM market_data.index_reference" in sql:
+                return None
+            if "FROM market_data.index_provider_mappings" in sql and "trading_symbol" in sql:
+                # Existing mapping for ^NSEI belongs to a different index.
+                return ("other-index-id", True)
+            if "RETURNING index_id" in sql:
+                return ("new-index-id",)
+            return None
+
+        def fetchall(self):
+            return []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def commit(self):
+            return None
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(registry, "_connection", lambda: FakeConn())
+    monkeypatch.setattr(registry, "ensure_data_source", lambda cur, name: "source")
+    with pytest.raises(InstrumentResolveError) as exc:
+        registry.upsert_index(
+            {
+                "index_code": "CUSTOM",
+                "index_name": "Custom",
+                "yf_symbol": "^NSEI",
+            }
+        )
+    assert exc.value.reason == "yf_symbol_in_use"

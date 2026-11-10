@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException
 from datetime import date
 from pydantic import BaseModel, Field
 
+from .auth import current_user
 from .portfolio_backend import (filter_values, mutual_funds, mutual_fund_detail,
     mutual_fund_detail_by_name, mutual_fund_detail_enriched, mutual_fund_history,
     stock_categories, stock_detail,
@@ -418,7 +419,10 @@ def benchmark_history_route(index_code: str):
 
 
 @router.get("/instruments/stocks/preview")
-def preview_stock_instrument(trading_symbol: str = Query(...)):
+def preview_stock_instrument(
+    trading_symbol: str = Query(..., max_length=32),
+    _user=Depends(current_user),
+):
     from backend.market_data.instrument_registry import InstrumentResolveError, resolve_stock
 
     try:
@@ -428,7 +432,10 @@ def preview_stock_instrument(trading_symbol: str = Query(...)):
 
 
 @router.get("/instruments/mutual-funds/preview")
-def preview_fund_instrument(scheme_code: str = Query(...)):
+def preview_fund_instrument(
+    scheme_code: str = Query(..., max_length=12),
+    _user=Depends(current_user),
+):
     from backend.market_data.instrument_registry import InstrumentResolveError, resolve_fund
 
     try:
@@ -438,7 +445,11 @@ def preview_fund_instrument(scheme_code: str = Query(...)):
 
 
 @router.get("/instruments/indexes/preview")
-def preview_index_instrument(index_code: str = Query(...), yf_symbol: str | None = Query(None)):
+def preview_index_instrument(
+    index_code: str = Query(..., max_length=32),
+    yf_symbol: str | None = Query(None, max_length=32),
+    _user=Depends(current_user),
+):
     from backend.market_data.instrument_registry import InstrumentResolveError, resolve_index
 
     try:
@@ -452,6 +463,7 @@ def track_stock_instrument(
     body: TrackStockBody,
     enqueue_history: bool = Query(True),
     history_period: str = Query("5y"),
+    _user=Depends(current_user),
 ):
     from backend.market_data.instrument_registry import InstrumentResolveError, ensure_stock
     from backend.market_data.sync import sync_prices
@@ -487,6 +499,7 @@ def track_fund_instrument(
     body: TrackFundBody,
     enqueue_history: bool = Query(True),
     history_period: str = Query("5y"),
+    _user=Depends(current_user),
 ):
     from backend.market_data.instrument_registry import InstrumentResolveError, ensure_fund
 
@@ -521,6 +534,7 @@ def track_index_instrument(
     body: TrackIndexBody,
     enqueue_history: bool = Query(True),
     history_period: str = Query("5y"),
+    _user=Depends(current_user),
 ):
     from backend.market_data.instrument_registry import InstrumentResolveError, ensure_index
 
@@ -531,10 +545,11 @@ def track_index_instrument(
         raise _instrument_http_error(exc) from None
     jobs = []
     if enqueue_history:
+        # Per-index job identity so Home Update (HOME-INDEXES) cannot swallow this work.
         code = result["master"]["index_code"]
         job, created = enqueue(
             "STOCK",
-            HOME_INDEX_ENTITY,
+            code,
             "PRICES",
             False,
             lambda: sync_home_indexes([code], history_period=period),
@@ -543,6 +558,7 @@ def track_index_instrument(
             {
                 "job_id": job.get("job_id"),
                 "kind": "index_history",
+                "entity_key": code,
                 "history_period": period,
                 "duplicate": not created,
             }

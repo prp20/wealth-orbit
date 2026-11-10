@@ -101,6 +101,7 @@ def sync_nav(
     if not rows:
         raise RuntimeError(f"No parseable NAV history returned for {scheme_code}")
     fetched_rows = rows
+    deepen = history_period is not None and str(history_period).strip() != ""
     if from_date is not None:
         rows = [row for row in rows if row[1] >= from_date]
     if to_date is not None:
@@ -110,7 +111,9 @@ def sync_nav(
             cur.execute("SELECT scheme_id FROM market_data.mutual_fund_reference WHERE scheme_code=%s",(scheme_code,)); found=cur.fetchone()
             if not found: raise RuntimeError(f"Unknown mutual-fund scheme: {scheme_code}")
             source_id = ensure_data_source(cur, source_name)
-            if not force:
+            # Add / Extend history with history_period must upsert older bars.
+            # Keep incremental watermark only for routine force=False updates.
+            if not force and not deepen:
                 cur.execute("SELECT max(h.nav_date) FROM market_data.mutual_fund_nav_history h WHERE h.scheme_id=%s",(found[0],)); watermark=cur.fetchone()[0]
                 rows=[r for r in rows if watermark is None or r[1]>watermark]
             if rows:
@@ -129,6 +132,7 @@ def sync_nav(
             "latest_nav_date":max(row[1] for row in fetched_rows).isoformat(),
             "from_date": from_date.isoformat() if from_date else None,
             "to_date": to_date.isoformat() if to_date else None,
+            "history_period": str(history_period).strip() if deepen else None,
             "up_to_date":not rows}
 
 

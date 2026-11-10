@@ -130,12 +130,17 @@ export default function AddInstrumentDialog({
 
       if (kind === 'stock') {
         const symbol = String(result.master.trading_symbol || trimmed);
+        // Drop any cached "Not in catalog" error from the deep-link path.
+        await queryClient.removeQueries({ queryKey: ['stock', symbol] });
+        await queryClient.invalidateQueries({ queryKey: ['stock', symbol] });
         onClose();
         navigate(stockDetailPath(symbol));
         return;
       }
       if (kind === 'fund') {
         const scheme = String(result.master.scheme_code || trimmed);
+        await queryClient.removeQueries({ queryKey: ['fund', scheme] });
+        await queryClient.invalidateQueries({ queryKey: ['fund', scheme] });
         onClose();
         navigate(fundDetailPath(scheme));
         return;

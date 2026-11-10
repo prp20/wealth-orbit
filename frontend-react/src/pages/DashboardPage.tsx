@@ -12,21 +12,33 @@ import { formatRecentWhen, readRecent } from '../lib/recent';
 const HOME_INDEXES = ['NIFTY50', 'SENSEX', 'NIFTYBANK', 'NIFTYIT'];
 const SECTOR_INDEXES = ['NIFTYPHARMA', 'NIFTYAUTO', 'NIFTYFMCG', 'NIFTYMETAL'];
 const EXTRA_INDEXES_KEY = 'wealth-orbit:extra-home-indexes';
+/** Keep Home + extras under the benchmarks API 12-code cap (4 sector codes are separate). */
+const MAX_HOME_EXTRA_INDEXES = 8;
+const INDEX_CODE_RE = /^[A-Z][A-Z0-9_]{1,31}$/;
 
 function readExtraIndexes(): string[] {
   try {
     const raw = window.localStorage.getItem(EXTRA_INDEXES_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed)
-      ? parsed.map((item) => String(item || '').toUpperCase()).filter(Boolean)
-      : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => String(item || '').toUpperCase().replace(/[\s-]/g, ''))
+      .filter((code) => INDEX_CODE_RE.test(code))
+      .filter((code) => !HOME_INDEXES.includes(code))
+      .slice(0, MAX_HOME_EXTRA_INDEXES);
   } catch {
     return [];
   }
 }
 
 function rememberExtraIndex(code: string) {
-  const next = Array.from(new Set([...readExtraIndexes(), code.toUpperCase()]));
+  const normalized = String(code || '')
+    .toUpperCase()
+    .replace(/[\s-]/g, '');
+  if (!INDEX_CODE_RE.test(normalized) || HOME_INDEXES.includes(normalized)) {
+    return readExtraIndexes();
+  }
+  const next = Array.from(new Set([...readExtraIndexes(), normalized])).slice(0, MAX_HOME_EXTRA_INDEXES);
   window.localStorage.setItem(EXTRA_INDEXES_KEY, JSON.stringify(next));
   return next;
 }
