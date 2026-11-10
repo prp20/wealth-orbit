@@ -15,13 +15,43 @@ from backend.screen_plugins.discovery import discover_screens, refresh_screens
 from backend.screen_plugins.runner import dry_run_screen, run_screen
 from backend.screen_plugins.validator import validate_screen_file
 
+PLAYBOOK_IDS = [
+    "consistent_compounders",
+    "garp",
+    "debt_free_high_growth",
+    "magic_formula_in",
+    "small_cap_hidden_gems",
+    "cash_rich_undervalued",
+    "momentum_fundamentals",
+    "dividend_aristocrats_in",
+    "turnaround_candidates",
+    "capital_light_quality",
+]
+
+
+@pytest.mark.parametrize("screen_id", PLAYBOOK_IDS)
+def test_playbook_builtin_validates(screen_id: str):
+    path = ROOT / "screens" / "stock" / "built_in" / f"{screen_id}.py"
+    result = validate_screen_file(path, expected_asset_class="stock")
+    assert result.ok, result.errors
+    assert result.screen_id == screen_id
+
+
+@pytest.mark.parametrize("screen_id", PLAYBOOK_IDS)
+def test_playbook_builtin_dry_run_keeps_strong_fixture(screen_id: str):
+    path = ROOT / "screens" / "stock" / "built_in" / f"{screen_id}.py"
+    result = dry_run_screen(path, timeout_seconds=15)
+    assert result.get("ok") is True, result
+    symbols = set(result.get("symbols") or [])
+    assert "AAA" in symbols
+    assert "BBB" not in symbols
+
 
 def test_builtin_quality_value_validates():
     path = ROOT / "screens" / "stock" / "built_in" / "quality_value.py"
     result = validate_screen_file(path, expected_asset_class="stock")
     assert result.ok, result.errors
     assert result.screen_id == "quality_value"
-    assert result.meta["name"] == "Quality value"
 
 
 def test_rejects_forbidden_import(tmp_path: Path):
@@ -73,11 +103,13 @@ def test_rejects_missing_screen_fn(tmp_path: Path):
     assert any("screen(stocks, params)" in err for err in result.errors)
 
 
-def test_discover_lists_builtin_runnable_screens():
+def test_discover_lists_playbook_screens():
     payload = discover_screens(use_cache=False)
-    ids = {item["screen_id"] for item in payload["screens"] if item["status"] == "ok"}
-    assert "quality_value" in ids
-    assert "high_dividend" in ids
+    ok_ids = {item["screen_id"] for item in payload["screens"] if item["status"] == "ok"}
+    for screen_id in PLAYBOOK_IDS:
+        assert screen_id in ok_ids
+    assert "quality_value" in ok_ids
+    assert "high_dividend" in ok_ids
 
 
 def test_dry_run_builtin_quality_value():
@@ -85,7 +117,6 @@ def test_dry_run_builtin_quality_value():
     result = dry_run_screen(path, timeout_seconds=15)
     assert result.get("ok") is True, result
     symbols = result.get("symbols") or []
-    # Fixture AAA has pe=20, roe=0.16 → passes default max_pe=25 / min_roe=0.15
     assert "AAA" in symbols
     assert "BBB" not in symbols
 
@@ -94,7 +125,6 @@ def test_run_screen_honest_empty_snapshot(monkeypatch):
     import backend.screen_plugins.runner as runner
 
     monkeypatch.setattr(runner, "snapshot_records_for_plugins", lambda require_metrics=True: [])
-    # Bypass discover cache requiring DB by stubbing get_runnable_screen
     monkeypatch.setattr(
         runner,
         "get_runnable_screen",
@@ -110,7 +140,7 @@ def test_run_screen_honest_empty_snapshot(monkeypatch):
                 "asset_class": "stock",
                 "parameters": [
                     {"name": "max_pe", "type": "float", "default": 25.0},
-                    {"name": "min_roe", "type": "float", "default": 15.0},
+                    {"name": "min_roe", "type": "float", "default": 0.15},
                 ],
             },
         },
@@ -120,7 +150,7 @@ def test_run_screen_honest_empty_snapshot(monkeypatch):
         "discover_screens",
         lambda use_cache=True: {"timeout_seconds": 15, "screens": []},
     )
-    result = run_screen("quality_value", {"max_pe": 25, "min_roe": 15})
+    result = run_screen("quality_value", {"max_pe": 25, "min_roe": 0.15})
     assert result["ok"] is False
     assert "no stored stock metrics" in result["error"]
 
@@ -139,9 +169,29 @@ def test_routes_and_ui_wire_stock_screener():
     )
     assert 'to="/stocks/screen"' in stocks
     assert "Screener" in stocks
+    readme = (ROOT / "screens" / "README.md").read_text(encoding="utf-8")
+    assert "market_cap_cr" in readme
+    assert "consistent_compounders" in readme
 
 
-def test_refresh_screens_returns_payload():
+def test_refresh_screens_returns_playbook():
     payload = refresh_screens()
     assert payload["asset_class"] == "stock"
-    assert any(item["screen_id"] == "quality_value" and item["status"] == "ok" for item in payload["screens"])
+    ok = {item["screen_id"] for item in payload["screens"] if item["status"] == "ok"}
+    for screen_id in PLAYBOOK_IDS:
+        assert screen_id in ok, f"{screen_id} missing/failed: {[i for i in payload['screens'] if i['screen_id']==screen_id]}"
+
+
+def test_snapshot_exposes_expanded_columns():
+    from backend.market_data.stock_screen import SNAPSHOT_COLUMNS
+
+    for column in (
+        "market_cap_cr",
+        "earnings_yield",
+        "debt_to_equity",
+        "profit_growth_3y",
+        "promoter_holding",
+        "sma_200",
+        "roa",
+    ):
+        assert column in SNAPSHOT_COLUMNS

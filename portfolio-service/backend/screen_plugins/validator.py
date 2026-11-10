@@ -21,6 +21,7 @@ ALLOWED_IMPORT_ROOTS = frozenset(
         "json",
         "pandas",
         "numpy",
+        "nivesh_screens",
     }
 )
 

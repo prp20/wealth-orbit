@@ -69,6 +69,12 @@ def main() -> int:
     try:
         import pandas as pd
 
+        # Repo root must be importable for allowlisted helpers like nivesh_screens.
+        repo_root = Path(__file__).resolve().parents[3]
+        repo_root_str = str(repo_root)
+        if repo_root_str not in sys.path:
+            sys.path.insert(0, repo_root_str)
+
         source = plugin_path.read_text(encoding="utf-8")
         namespace: dict[str, Any] = {"__name__": "screen_plugin"}
         # Exec only inside the isolated worker after AST validation in the parent.
