@@ -70,7 +70,8 @@ def main():
 
     if not args.skip_masters:
         print("\n[1] Stock masters")
-        seed_stocks.seed(data_dir=data_dir, dry_run=args.dry_run)
+        # --limit caps masters too (not only OHLC), so guided setup stays small.
+        seed_stocks.seed(data_dir=data_dir, dry_run=args.dry_run, limit=args.limit)
     else:
         print("\n[skipped] Stock masters")
 

@@ -38,7 +38,8 @@ def main():
 
     if not args.skip_masters:
         print("\n[1] Mutual-fund masters")
-        seed_funds.seed(data_dir=data_dir, dry_run=args.dry_run)
+        # --limit caps masters too (not only NAV), so guided setup stays small.
+        seed_funds.seed(data_dir=data_dir, dry_run=args.dry_run, limit=args.limit)
     else:
         print("\n[skipped] Mutual-fund masters")
 

@@ -73,19 +73,40 @@ Open http://127.0.0.1:8000/ui/ .
 
 Run the same script. It keeps the existing `.env` unless you say you want to reconfigure it. Stored passwords and the session secret are not printed. Schema updates, the local tables, and the UI build run again.
 
+## India masters universe
+
+Masters are identity rows (names/codes), not full market history.
+
+| Domain | CSV under `data/seed/` | Size (approx) | Natural key |
+|--------|------------------------|---------------|-------------|
+| Stocks | `stocks.csv` equities | ~500 NSE names | `(exchange, trading_symbol)` |
+| Funds | `new_equity_only_updated.csv` | ~280 equity schemes | `scheme_code` |
+| Indexes | `indices.csv` | ~12 | `index_code` |
+
+Guided setup defaults stay small: recommended index history is about **5y** for Home; optional stock/fund seed is **names only** with a default limit of **50** (`--skip-prices` / `--skip-nav`). Full `max` OHLC/NAV/statements for every symbol is **not** part of install — open a symbol and use **Update** sync buttons (or API sync jobs) afterward.
+
+Re-running masters seed upserts on those natural keys and must not create duplicate companies or schemes.
+
 ## Seed flags
 
 Reference CSVs live under `data/seed/`. With `DATABASE_URL` set:
 
 ```bash
+# Indexes: masters + ~5y history for Home
 uv run python portfolio-service/scripts/seed/run_seed_indexes.py --data-dir data/seed --index-period 5y
+
+# Masters only (no OHLC / NAV) — matches guided setup
+uv run python portfolio-service/scripts/seed/run_seed_stocks.py --data-dir data/seed --skip-prices --limit 50
+uv run python portfolio-service/scripts/seed/run_seed_funds.py --data-dir data/seed --skip-nav --limit 50
+
+# Optional capped history or fundamentals later
 uv run python portfolio-service/scripts/seed/run_seed_stocks.py --data-dir data/seed --limit 20
 uv run python portfolio-service/scripts/seed/run_seed_stocks.py --with-fundamentals --limit 5
 uv run python portfolio-service/scripts/seed/run_seed_funds.py --data-dir data/seed --limit 10
 uv run python portfolio-service/scripts/seed/run_all_seeds.py --data-dir data/seed
 ```
 
-Useful flags: `--dry-run`, `--limit N`, `--price-period 5y`, `--index-period max`, `--skip-masters`, `--skip-history`, `--skip-prices`, `--skip-nav`. For stocks, `--with-fundamentals` is off unless you pass it.
+Useful flags: `--dry-run`, `--limit N` (caps masters and history phases), `--price-period 5y`, `--index-period 5y`, `--skip-masters`, `--skip-prices`, `--skip-nav`. For stocks, `--with-fundamentals` is off unless you pass it.
 
 ```bash
 uv run python portfolio-service/scripts/load_reference_data.py --data-dir data/seed

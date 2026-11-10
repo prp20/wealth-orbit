@@ -264,7 +264,10 @@ def main() -> None:
                 "5y",
             ]
         )
-    if ask_yes("Seed stock and fund names only? Prices and NAV are large and can be synced later from the UI.", False):
+    if ask_yes(
+        "Seed stock and fund names only? Default is 50 of each (no prices/NAV). History can sync later from the UI.",
+        False,
+    ):
         limit = ask("How many masters of each?", "50")
         run(
             [
