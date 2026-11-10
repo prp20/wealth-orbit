@@ -9,6 +9,8 @@ KIND_SESSION_POOLER = "session_pooler"
 KIND_TRANSACTION_POOLER = "transaction_pooler"
 KIND_DIRECT = "direct"
 KIND_NOT_SUPABASE = "not_supabase"
+KIND_INVALID_PORT = "invalid_port"
+KIND_UNKNOWN_POOLER_PORT = "unknown_pooler_port"
 
 _SESSION_PORT = 5432
 _TRANSACTION_PORT = 6543
@@ -33,12 +35,18 @@ def is_supabase_url(url: str) -> bool:
     return host.endswith(".supabase.com") or host.endswith(".supabase.co")
 
 
+def _parsed_port(parsed) -> int | None:
+    """Return port or raise ValueError for malformed / out-of-range ports."""
+    return parsed.port
+
+
 def classify_supabase_url(url: str) -> str:
     """Classify a Postgres URL for guided setup.
 
     Session pooler (accepted after SELECT 1): ``*.pooler.supabase.com`` on port 5432.
     Transaction pooler (rejected): same host family on port 6543.
     Direct (rejected): ``db.*.supabase.co`` or other non-pooler Supabase DB hosts.
+    Invalid / unknown pooler ports are rejected with a short message (no traceback).
     Non-Supabase: allowed when SELECT 1 succeeds.
     """
     if not is_supabase_url(url):
@@ -46,7 +54,10 @@ def classify_supabase_url(url: str) -> str:
 
     parsed = urlparse(url)
     host = (parsed.hostname or "").lower()
-    port = parsed.port
+    try:
+        port = _parsed_port(parsed)
+    except ValueError:
+        return KIND_INVALID_PORT
 
     if "pooler.supabase.com" in host:
         effective = port if port is not None else _SESSION_PORT
@@ -54,7 +65,7 @@ def classify_supabase_url(url: str) -> str:
             return KIND_TRANSACTION_POOLER
         if effective == _SESSION_PORT:
             return KIND_SESSION_POOLER
-        return KIND_TRANSACTION_POOLER
+        return KIND_UNKNOWN_POOLER_PORT
 
     return KIND_DIRECT
 
@@ -76,6 +87,10 @@ def supabase_rejection_message(kind: str) -> str | None:
         return "Use the Supabase session pooler URI (port 5432), not the direct database host."
     if kind == KIND_TRANSACTION_POOLER:
         return "Use Session mode (port 5432), not Transaction mode (port 6543)."
+    if kind == KIND_UNKNOWN_POOLER_PORT:
+        return "Use the Supabase session pooler URI on port 5432."
+    if kind == KIND_INVALID_PORT:
+        return "That URL has an invalid port. Use the session pooler URI on port 5432."
     return None
 
 
@@ -86,7 +101,15 @@ def sanitize_probe_error(exc: BaseException) -> str:
         return "authentication failed"
     if "timed out" in text or "timeout" in text:
         return "connection timed out"
-    if "could not translate host" in text or "name or service not known" in text or "nodename nor servname" in text:
+    if (
+        "could not translate host" in text
+        or "name or service not known" in text
+        or "nodename nor servname" in text
+        or "getaddrinfo failed" in text
+        or "no such host is known" in text
+        or "temporary failure in name resolution" in text
+        or "unknown host" in text
+    ):
         return "host not found"
     if "connection refused" in text:
         return "connection refused"

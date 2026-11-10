@@ -26,6 +26,13 @@ from scripts.database_url import (  # noqa: E402
 )
 
 
+def warn_if_existing_database_url_unsupported(url: str) -> None:
+    """Print a short warning when keep-existing .env still points at direct/txn/bad ports."""
+    rejection = supabase_rejection_message(classify_supabase_url(url))
+    if rejection:
+        print(f"Warning: DATABASE_URL in .env is not a session pooler URI. {rejection}")
+
+
 def ask(prompt: str, default: str | None = None, secret: bool = False) -> str:
     label = f"{prompt} [{default}] " if default else f"{prompt} "
     if secret:
@@ -98,6 +105,9 @@ def probe_postgres(url: str) -> None:
 
 
 def write_env(path: Path, values: dict[str, str]) -> None:
+    for key, value in values.items():
+        if "\n" in value or "\r" in value:
+            raise ValueError(f"{key} must be a single line")
     path.write_text("".join(f"{key}={value}\n" for key, value in values.items()), encoding="utf-8")
     if os.name != "nt":
         os.chmod(path, 0o600)
@@ -209,6 +219,7 @@ def main() -> None:
     if env_path.exists() and ask_yes("Keep the existing .env?", True):
         load_env_file(env_path)
         print("Keeping the existing .env.")
+        warn_if_existing_database_url_unsupported(os.environ.get("DATABASE_URL", ""))
     else:
         configure_new_env(
             env_path,
