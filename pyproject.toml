@@ -19,6 +19,7 @@ dependencies = [
     "psycopg-binary>=3.3.6",
     "mftool>=2.0.0",
     "pandas>=2.2.0",
+    "pyyaml>=6.0.0",
     "requests>=2.31.0",
     "pyotp>=2.9.0",
     "growwapi>=1.5.0",

@@ -23,7 +23,11 @@ def main():
     parser = argparse.ArgumentParser(
         description="Sync stock_daily_prices via yfinance (delegates to seed_stock_prices)"
     )
-    parser.add_argument("--period", default="1y", help="yfinance period, for example 1y or max")
+    parser.add_argument(
+        "--period",
+        default="10y",
+        help="yfinance period (default 10y; use max only as an explicit opt-in)",
+    )
     parser.add_argument("--source-name", default="yfinance", help="Ignored; source is always yfinance")
     parser.add_argument("--force", action="store_true", help="Ignored; upserts always refresh conflicting dates")
     parser.add_argument("--batch-size", type=int, default=20)

@@ -14,10 +14,13 @@ def seed(
     limit: int | None = None,
     delay_secs: float = 0.5,
     scheme_codes: list[str] | None = None,
+    history_period: str = "10y",
 ) -> dict:
     from _db import normalize_limit, sanitize_seed_error
+    from backend.market_data.history_period import retention_cutoff
 
     limit = normalize_limit(limit)
+    cutoff = retention_cutoff(history_period)
     with connect() as connection:
         with connection.cursor() as cur:
             if scheme_codes is not None:
@@ -47,7 +50,11 @@ def seed(
         print("  No mutual-fund schemes found. Run seed_funds.py first.")
         return {"schemes": 0, "ok": 0, "failed": 0}
 
-    print(f"  Syncing NAV for {len(schemes)} schemes{'  [DRY RUN]' if dry_run else ''}")
+    print(
+        f"  Syncing NAV for {len(schemes)} schemes"
+        f" (retain {history_period})"
+        f"{'  [DRY RUN]' if dry_run else ''}"
+    )
     if dry_run:
         for scheme_code, scheme_name in schemes[:5]:
             print(f"    {scheme_code} | {scheme_name[:60]}")
@@ -68,6 +75,17 @@ def seed(
             print(f"  FAILED: {sanitize_seed_error(exc)}")
         time.sleep(delay_secs)
 
+    if cutoff is not None:
+        with connect() as connection:
+            with connection.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM market_data.mutual_fund_nav_history WHERE nav_date < %s",
+                    (cutoff,),
+                )
+                pruned = cur.rowcount
+            connection.commit()
+        print(f"  Pruned NAV rows older than {cutoff}: {pruned}")
+
     print(f"  NAV sync complete: {ok} ok, {len(failed)} failed")
     return {"schemes": len(schemes), "ok": ok, "failed": len(failed), "failed_codes": failed}
 
@@ -77,9 +95,20 @@ def main():
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--delay", type=float, default=0.5)
+    parser.add_argument(
+        "--history-period",
+        default="10y",
+        choices=["1y", "2y", "3y", "5y", "10y", "max"],
+        help="Retention after sync (default 10y; providers may still return full history first)",
+    )
     args = parser.parse_args()
     print("=== Seeding fund NAV ===")
-    seed(dry_run=args.dry_run, limit=args.limit, delay_secs=args.delay)
+    seed(
+        dry_run=args.dry_run,
+        limit=args.limit,
+        delay_secs=args.delay,
+        history_period=args.history_period,
+    )
     print("Done.")
 
 

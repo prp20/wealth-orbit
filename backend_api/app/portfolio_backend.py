@@ -20,6 +20,15 @@ from backend.market_data.mutual_fund_analytics import METRIC_PERIODS  # noqa: E4
 from backend.market_data.mutual_fund_holdings import sync_holdings, sync_managers  # noqa: E402
 from backend.market_data.mutual_fund_sync import recompute_metrics, sync_benchmark, sync_enrichment  # noqa: E402
 from backend.market_data.index_sync import sync_home_indexes  # noqa: E402
+from backend.market_data.stock_screen import (  # noqa: E402
+    STOCK_SCREEN_SORT_COLUMNS,
+    stock_screen,
+)
+from backend.screen_plugins import (  # noqa: E402
+    list_screens,
+    refresh_screens,
+    run_screen,
+)
 from backend.reference_service import (  # noqa: E402
     SCREEN_SORT_COLUMNS,
     filter_values,
@@ -77,4 +86,6 @@ __all__ = [
     "mutual_fund_benchmark_history", "benchmark_list", "benchmark_history", "benchmark_snapshot",
     "sync_home_indexes",
     "METRIC_PERIODS", "SCREEN_SORT_COLUMNS",
+    "STOCK_SCREEN_SORT_COLUMNS", "stock_screen",
+    "list_screens", "refresh_screens", "run_screen",
 ]

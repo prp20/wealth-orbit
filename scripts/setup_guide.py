@@ -69,7 +69,7 @@ def print_session_pooler_steps() -> None:
 
 
 def guided_index_seed_argv() -> list[str]:
-    """Argv for recommended Home index seed (~5y, not max)."""
+    """Argv for recommended Home index seed (~10y, not max)."""
     return [
         "uv",
         "run",
@@ -78,7 +78,7 @@ def guided_index_seed_argv() -> list[str]:
         "--data-dir",
         "data/seed",
         "--index-period",
-        "5y",
+        "10y",
     ]
 
 
@@ -110,6 +110,58 @@ def guided_fund_masters_seed_argv(limit: str = "50") -> list[str]:
         "--limit",
         str(limit),
     ]
+
+
+def _optional_limit_argv(limit: str | None) -> list[str]:
+    """Append --limit when the user capped the universe; blank/all means every active symbol."""
+    if limit is None:
+        return []
+    text = str(limit).strip().lower()
+    if not text or text in {"all", "*"}:
+        return []
+    return ["--limit", text]
+
+
+def guided_stock_ohlc_seed_argv(period: str = "10y", limit: str | None = None) -> list[str]:
+    """Argv for Yahoo OHLC across active stock_reference rows (or a --limit cap)."""
+    argv = [
+        "uv",
+        "run",
+        "python",
+        "portfolio-service/scripts/sync_yfinance.py",
+        "--period",
+        period,
+    ]
+    argv.extend(_optional_limit_argv(limit))
+    return argv
+
+
+def guided_stock_fundamentals_seed_argv(limit: str | None = None, delay: str = "3.0") -> list[str]:
+    """Argv for Screener fundamentals + shareholding on active stocks."""
+    argv = [
+        "uv",
+        "run",
+        "python",
+        "portfolio-service/scripts/seed/seed_fundamentals.py",
+        "--delay",
+        str(delay),
+    ]
+    argv.extend(_optional_limit_argv(limit))
+    return argv
+
+
+def guided_stock_technicals_seed_argv(limit: str | None = None, delay: str = "0.5") -> list[str]:
+    """Argv for technical indicators + Yahoo daily metrics on active stocks."""
+    argv = [
+        "uv",
+        "run",
+        "python",
+        "portfolio-service/scripts/seed/seed_stock_technicals.py",
+        "--delay",
+        str(delay),
+    ]
+    argv.extend(_optional_limit_argv(limit))
+    return argv
 
 
 def require_postgres_url(ask_fn, probe) -> str:
@@ -304,6 +356,31 @@ def main() -> None:
         limit = ask("How many masters of each?", "50")
         run(guided_stock_masters_seed_argv(limit))
         run(guided_fund_masters_seed_argv(limit))
+
+    # Optional bulk stock market data — off by default; needs active stock masters in Postgres.
+    print("\nOptional bulk stock market data (uses active rows in market_data.stock_reference).")
+    print("Skip these for a fast install; you can re-run setup or the CLIs in docs/setup.md later.")
+    synced_ohlc = False
+    if ask_yes("Sync Yahoo OHLC prices for active stocks? (can take a while)", False):
+        period = ask("Price history period (5y / 10y / max)", "10y")
+        ohlc_limit = ask("How many stocks? blank = all active", "")
+        run(guided_stock_ohlc_seed_argv(period=period or "10y", limit=ohlc_limit or None))
+        synced_ohlc = True
+    if ask_yes(
+        "Sync Screener fundamentals + shareholding for active stocks? (slow / rate-limited)",
+        False,
+    ):
+        fund_limit = ask("How many stocks? blank = all active", "10")
+        run(guided_stock_fundamentals_seed_argv(limit=fund_limit or None))
+    if ask_yes(
+        "Sync technical indicators + Yahoo daily metrics for active stocks? (needs OHLC first)",
+        False,
+    ):
+        if not synced_ohlc:
+            print("Note: technicals need price history. Sync OHLC first if these fail.")
+        tech_limit = ask("How many stocks? blank = all active", "10")
+        run(guided_stock_technicals_seed_argv(limit=tech_limit or None))
+
     workbook = ask("Path to a mutual-fund order workbook, or leave blank to skip", "")
     if workbook:
         run(

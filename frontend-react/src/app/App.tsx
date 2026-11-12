@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import LoginPage from '../pages/LoginPage';
 import StockListPage from '../pages/stocks/StockListPage';
+import StockScreenerPage from '../pages/stocks/StockScreenerPage';
 import StockDetailPage from '../pages/stocks/StockDetailPage';
 import FundListPage from '../pages/funds/FundListPage';
 import FundDetailPage from '../pages/funds/FundDetailPage';
@@ -136,6 +137,7 @@ function Shell() {
           <Route path="/mutual-funds/compare" element={<Navigate replace to="/mutualfunds/compare" />} />
           <Route path="/mutual-funds/:schemeId" element={<FundDetailPage />} />
           <Route path="/stocks" element={<StockListPage />} />
+          <Route path="/stocks/screen" element={<StockScreenerPage />} />
           <Route path="/stocks/:symbol" element={<StockDetailPage />} />
           <Route path="*" element={<Navigate replace to="/portfolio" />} />
         </Routes>

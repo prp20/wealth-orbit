@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 import time
 
-from _db import connect, ensure_project_paths
+from _db import assert_database_writable, connect, ensure_project_paths
 
 ensure_project_paths()
 
@@ -42,6 +42,7 @@ def seed(
             print(f"    {symbol}")
         return {"stocks": len(symbols), "ok": 0, "failed": 0}
 
+    assert_database_writable()
     from backend.reference_service import sync_stock_fundamentals
 
     ok = 0
@@ -60,8 +61,14 @@ def seed(
                 failed.append(symbol)
                 print(f"  FAILED: {result.get('reason') or 'sync failed'}")
         except Exception as exc:
+            reason = sanitize_seed_error(exc)
+            print(f"  FAILED: {reason}")
+            if "read-only" in reason.lower():
+                raise SystemExit(
+                    "ERROR: database is read-only. Fix Supabase disk quota / project status, "
+                    "then re-run. Stopping so we do not retry every symbol."
+                ) from None
             failed.append(symbol)
-            print(f"  FAILED: {sanitize_seed_error(exc)}")
         time.sleep(delay_secs)
 
     print(f"  Fundamentals sync complete: {ok} ok, {len(failed)} failed")

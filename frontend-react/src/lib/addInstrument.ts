@@ -8,7 +8,7 @@ export const HISTORY_PERIOD_OPTIONS: { value: HistoryPeriod; label: string }[] =
   { value: 'max', label: 'Maximum available' },
 ];
 
-export const DEFAULT_HISTORY_PERIOD: HistoryPeriod = '5y';
+export const DEFAULT_HISTORY_PERIOD: HistoryPeriod = '10y';
 
 export function addInstrumentCodeLabel(kind: InstrumentKind): string {
   if (kind === 'stock') return 'NSE trading symbol';
