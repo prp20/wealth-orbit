@@ -288,7 +288,7 @@ export const api = {
     if (yfSymbol) params.set('yf_symbol', yfSymbol);
     return get<InstrumentPreview>(`/market-data/instruments/indexes/preview?${params}`);
   },
-  trackStockInstrument: (tradingSymbol: string, enqueueHistory = true, historyPeriod = '5y') => {
+  trackStockInstrument: (tradingSymbol: string, enqueueHistory = true, historyPeriod = '10y') => {
     const params = new URLSearchParams({
       enqueue_history: enqueueHistory ? 'true' : 'false',
       history_period: historyPeriod,
@@ -297,7 +297,7 @@ export const api = {
       trading_symbol: tradingSymbol,
     });
   },
-  trackFundInstrument: (schemeCode: string, enqueueHistory = true, historyPeriod = '5y') => {
+  trackFundInstrument: (schemeCode: string, enqueueHistory = true, historyPeriod = '10y') => {
     const params = new URLSearchParams({
       enqueue_history: enqueueHistory ? 'true' : 'false',
       history_period: historyPeriod,
@@ -310,7 +310,7 @@ export const api = {
     indexCode: string,
     yfSymbol = '',
     enqueueHistory = true,
-    historyPeriod = '5y',
+    historyPeriod = '10y',
   ) => {
     const params = new URLSearchParams({
       enqueue_history: enqueueHistory ? 'true' : 'false',

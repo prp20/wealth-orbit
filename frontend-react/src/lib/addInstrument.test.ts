@@ -33,6 +33,6 @@ describe('addInstrument helpers', () => {
   it('normalizes history depth presets', () => {
     expect(normalizeHistoryPeriod('10y')).toBe('10y');
     expect(normalizeHistoryPeriod('max')).toBe('max');
-    expect(normalizeHistoryPeriod('nope')).toBe('5y');
+    expect(normalizeHistoryPeriod('nope')).toBe('10y');
   });
 });

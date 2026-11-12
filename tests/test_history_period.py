@@ -15,11 +15,13 @@ from backend.market_data.history_period import (
     HISTORY_PERIODS,
     history_period_from_date,
     normalize_history_period,
+    retention_cutoff,
     yfinance_period,
 )
 
 
 def test_normalize_history_period_accepts_presets_and_default():
+    assert DEFAULT_HISTORY_PERIOD == "10y"
     assert normalize_history_period(None) == DEFAULT_HISTORY_PERIOD
     assert normalize_history_period("5Y") == "5y"
     assert normalize_history_period("10y") == "10y"
@@ -33,23 +35,36 @@ def test_history_period_from_date_and_yfinance_mapping():
     assert history_period_from_date("max") is None
     assert history_period_from_date(None) is None
     five = history_period_from_date("5y")
+    ten = history_period_from_date("10y")
     assert five == date.today() - timedelta(days=365 * 5 + 2)
+    assert ten == date.today() - timedelta(days=365 * 10 + 3)
     assert yfinance_period("5y") == "5y"
     assert yfinance_period("max") == "max"
+    assert yfinance_period(None) == DEFAULT_HISTORY_PERIOD
     assert set(HISTORY_PERIODS) == {"5y", "10y", "max"}
+    assert retention_cutoff("5y") == five
+    assert retention_cutoff("10y") == ten
+    assert retention_cutoff("max") is None
+    assert retention_cutoff(None) == ten
 
 
 def test_track_and_sync_routes_accept_history_period():
     routes = (ROOT / "backend_api" / "app" / "market_data_routes.py").read_text(encoding="utf-8")
-    assert 'history_period: str = Query("5y")' in routes
+    assert 'history_period: str = Query("10y")' in routes
     assert "history_period=period" in routes
     assert "sync_home_indexes(parts, history_period=period)" in routes or "history_period=period" in routes
     sync = (ROOT / "portfolio-service" / "backend" / "market_data" / "sync.py").read_text(encoding="utf-8")
     assert "history_period" in sync
+    assert '"persisted": True' in sync
     index_sync = (ROOT / "portfolio-service" / "backend" / "market_data" / "index_sync.py").read_text(
         encoding="utf-8"
     )
     assert "history_period" in index_sync
+    trim = (ROOT / "portfolio-service" / "scripts" / "seed" / "trim_market_history.py").read_text(
+        encoding="utf-8"
+    )
+    assert "DEFAULT_YEARS = 10" in trim
+    assert "prune_fundamental_periods" in trim
 
 
 def test_ui_labels_history_depth_and_empty_cta_are_wired():

@@ -335,7 +335,7 @@ def test_local_portfolio_file_gets_a_users_table(tmp_path):
 def test_guided_setup_seed_argv_defaults_stay_small():
     index_argv = guided_index_seed_argv()
     assert "--index-period" in index_argv
-    assert index_argv[index_argv.index("--index-period") + 1] == "5y"
+    assert index_argv[index_argv.index("--index-period") + 1] == "10y"
 
     stock_argv = guided_stock_masters_seed_argv()
     assert "--skip-prices" in stock_argv
@@ -352,7 +352,7 @@ def test_guided_setup_seed_argv_defaults_stay_small():
 def test_guided_bulk_stock_market_data_argv():
     ohlc = guided_stock_ohlc_seed_argv()
     assert any(part.endswith("sync_yfinance.py") for part in ohlc)
-    assert ohlc[ohlc.index("--period") + 1] == "5y"
+    assert ohlc[ohlc.index("--period") + 1] == "10y"
     assert "--limit" not in ohlc
 
     capped = guided_stock_ohlc_seed_argv(period="max", limit="25")

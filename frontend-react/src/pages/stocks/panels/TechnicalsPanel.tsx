@@ -37,21 +37,21 @@ export default function TechnicalsPanel({ symbol }: { symbol: string }) {
         <div>
           <h2>Technicals</h2>
           <p className="panel-subtitle">
-            Core indicators (SMA/EMA, RSI, MACD, Bollinger, ATR) derived from stored OHLCV. Source:
-            derived.
+            Core indicators (SMA/EMA, RSI, MACD, Bollinger, ATR) computed from OHLCV and stored for
+            the latest trading day only.
           </p>
         </div>
         <SyncJobButton
           symbol={symbol}
           kind="technical"
-          label="Update indicators"
+          label="Refresh indicators"
           invalidateKeys={[['stock-technical', symbol]]}
         />
       </div>
       {technical.isLoading && <div className="loading">Loading technicals…</div>}
       {technical.error && <div className="empty">{(technical.error as Error).message}</div>}
       {!technical.isLoading && !latest.length && (
-        <div className="empty">No technical indicators yet. Sync technicals after prices are available.</div>
+        <div className="empty">No technicals yet. Sync prices first, then refresh this panel.</div>
       )}
       {FAMILIES.map((family) => {
         const items = latest.filter((row) => family.match(String(row.indicator_code || '').toUpperCase()));

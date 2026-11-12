@@ -141,7 +141,7 @@ def _build_rows(stock_id, frame, source_id) -> list[tuple]:
 
 
 def seed(
-    period: str = "5y",
+    period: str = "10y",
     dry_run: bool = False,
     batch_size: int = 20,
     limit: int | None = None,
@@ -149,8 +149,10 @@ def seed(
     symbols: list[str] | None = None,
 ) -> dict:
     from _db import normalize_limit
+    from backend.market_data.history_period import retention_cutoff
 
     limit = normalize_limit(limit)
+    cutoff = retention_cutoff(period)
     yf_lookup = _yf_lookup(Path(data_dir) if data_dir else None)
     with connect() as connection:
         with connection.cursor() as cur:
@@ -192,11 +194,14 @@ def seed(
                 f"  Fetching {period} prices for {len(enriched)} stocks "
                 f"(batch_size={batch_size}){'  [DRY RUN]' if dry_run else ''}"
             )
+            if cutoff is not None:
+                print(f"  Retention: keep trading_date >= {cutoff} (drop older rows after upsert)")
             yf_to_stock = {yf_symbol: stock_id for stock_id, _, yf_symbol in enriched}
             tickers = [yf_symbol for _, _, yf_symbol in enriched]
             batches = [tickers[i : i + batch_size] for i in range(0, len(tickers), batch_size)]
             total_rows = 0
             failed = []
+            touched_stock_ids: set = set()
 
             for position, batch in enumerate(batches, 1):
                 print(f"  Batch {position}/{len(batches)} ({len(batch)} tickers)", flush=True)
@@ -207,7 +212,12 @@ def seed(
                     if frame is None or frame.empty:
                         failed.append(yf_symbol)
                         continue
-                    batch_rows.extend(_build_rows(yf_to_stock[yf_symbol], frame, source_id))
+                    rows = _build_rows(yf_to_stock[yf_symbol], frame, source_id)
+                    if cutoff is not None:
+                        rows = [row for row in rows if row[1] >= cutoff]
+                    if rows:
+                        touched_stock_ids.add(yf_to_stock[yf_symbol])
+                    batch_rows.extend(rows)
                 if dry_run:
                     total_rows += len(batch_rows)
                 elif batch_rows:
@@ -229,6 +239,12 @@ def seed(
                     )
                     total_rows += len(batch_rows)
                 time.sleep(BATCH_DELAY_SECS)
+            if not dry_run and cutoff is not None and touched_stock_ids:
+                cur.execute(
+                    """DELETE FROM market_data.stock_daily_prices
+                       WHERE stock_id = ANY(%s) AND trading_date < %s""",
+                    (list(touched_stock_ids), cutoff),
+                )
         connection.commit()
 
     print(
@@ -244,7 +260,7 @@ def seed(
 
 def main():
     parser = argparse.ArgumentParser(description="Seed stock_daily_prices from Yahoo Finance")
-    parser.add_argument("--period", default="5y", choices=["1y", "2y", "3y", "5y", "10y", "max"])
+    parser.add_argument("--period", default="10y", choices=["1y", "2y", "3y", "5y", "10y", "max"])
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--batch-size", type=int, default=20)
     parser.add_argument("--limit", type=int, default=None)

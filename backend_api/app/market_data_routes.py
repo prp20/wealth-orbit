@@ -59,7 +59,7 @@ def _instrument_http_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=422, detail={"reason": "track_failed", "message": "Could not add instrument"})
 
 
-def _parse_history_period(raw: str | None, *, default: str | None = "5y") -> str | None:
+def _parse_history_period(raw: str | None, *, default: str | None = "10y") -> str | None:
     from backend.market_data.history_period import normalize_history_period
 
     try:
@@ -463,13 +463,13 @@ def preview_index_instrument(
 def track_stock_instrument(
     body: TrackStockBody,
     enqueue_history: bool = Query(True),
-    history_period: str = Query("5y"),
+    history_period: str = Query("10y"),
     _user=Depends(current_user),
 ):
     from backend.market_data.instrument_registry import InstrumentResolveError, ensure_stock
     from backend.market_data.sync import sync_prices
 
-    period = _parse_history_period(history_period, default="5y")
+    period = _parse_history_period(history_period, default="10y")
     try:
         result = ensure_stock(body.trading_symbol)
     except InstrumentResolveError as exc:
@@ -499,12 +499,12 @@ def track_stock_instrument(
 def track_fund_instrument(
     body: TrackFundBody,
     enqueue_history: bool = Query(True),
-    history_period: str = Query("5y"),
+    history_period: str = Query("10y"),
     _user=Depends(current_user),
 ):
     from backend.market_data.instrument_registry import InstrumentResolveError, ensure_fund
 
-    period = _parse_history_period(history_period, default="5y")
+    period = _parse_history_period(history_period, default="10y")
     try:
         result = ensure_fund(body.scheme_code)
     except InstrumentResolveError as exc:
@@ -534,12 +534,12 @@ def track_fund_instrument(
 def track_index_instrument(
     body: TrackIndexBody,
     enqueue_history: bool = Query(True),
-    history_period: str = Query("5y"),
+    history_period: str = Query("10y"),
     _user=Depends(current_user),
 ):
     from backend.market_data.instrument_registry import InstrumentResolveError, ensure_index
 
-    period = _parse_history_period(history_period, default="5y")
+    period = _parse_history_period(history_period, default="10y")
     try:
         result = ensure_index(body.index_code, body.yf_symbol)
     except InstrumentResolveError as exc:

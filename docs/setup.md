@@ -52,11 +52,11 @@ Install that, then run the setup script again.
 1. **Postgres URL.** Required. The characters are hidden. The script prints Supabase session-pooler steps first. The URL must start with `postgres://` or `postgresql://`. Supabase direct and transaction-pooler URIs are rejected without connecting. The script runs `SELECT 1` before it writes `.env`. A bad URL is not saved, and the prompt is shown again. Connection failures print a short reason without echoing the URL.
 2. **Local portfolio file.** Enter keeps `sqlite+aiosqlite:///./portfolio-service/portfolio.db`.
 3. **Session secret.** Leave it blank and one is generated. It is written to `.env` and is not printed.
-4. **Index seed.** Recommended. Loads about five years of index history, which is what Home shows. It does not download the full history.
+4. **Index seed.** Recommended. Loads about ten years of index history, which is what Home shows. It does not download the full history.
 5. **Stock and fund names.** Off unless you say yes. A yes loads names only, up to a limit you choose (default 50). Prices and NAV are large and can be synced later.
-6. **Stock OHLC (Yahoo).** Off unless you say yes. Syncs price history for active stock masters (`5y` default; you can choose `10y` / `max` and an optional limit).
-7. **Stock fundamentals (Screener).** Off unless you say yes. Slow / rate-limited; default suggested limit is 10.
-8. **Stock technicals + daily metrics.** Off unless you say yes. Needs OHLC first; default suggested limit is 10.
+6. **Stock OHLC (Yahoo).** Off unless you say yes. Syncs price history for active stock masters (`10y` default; you can choose `5y` / `max` and an optional limit).
+7. **Stock fundamentals (Screener).** Off unless you say yes. Slow / rate-limited; default suggested limit is 10. Stored caps: 5 annual + 6 quarterly periods.
+8. **Stock technicals + daily metrics.** Off unless you say yes. Needs OHLC first; default suggested limit is 10. Technicals persist latest trading day only; Yahoo metrics stay latest-only.
 9. **Order-history workbook.** Optional. A blank line skips it. A path imports that workbook in append mode.
 10. **Start now.** Recommended. Starts the API on http://127.0.0.1:8000/ui/ . The first visit should be **Create an account**. That account is empty until a workbook is imported.
 
@@ -76,6 +76,29 @@ Open http://127.0.0.1:8000/ui/ .
 
 Run the same script. It keeps the existing `.env` unless you say you want to reconfigure it. Stored passwords and the session secret are not printed. Schema updates, the local tables, and the UI build run again.
 
+## Storage architecture
+
+Wealth Orbit uses **two databases on purpose**:
+
+| Store | Env | Holds |
+|-------|-----|--------|
+| Supabase Postgres | `DATABASE_URL` | Shared market research (`market_data`) |
+| Local SQLite | `PORTFOLIO_SQLITE_URL` | Private portfolio ledger (users, holdings, transactions) |
+
+**Persist (facts):** masters, OHLC / NAV / index history (default **10y**), fundamentals (5 annual + 6 quarterly periods), shareholding, latest Yahoo daily metrics, latest-day technical indicators, sync jobs.
+
+**Derived snapshots:** technical indicators (SMA/EMA/RSI/MACD/BB/ATR) are computed from OHLC and stored for the **latest trading day only**. Screener `sma_200` is computed in SQL from prices.
+
+**Do not put market history in SQLite.** Do not re-seed full technical history into Postgres. Bulk OHLC default is `10y`; use `max` only as an explicit opt-in for a few symbols.
+
+When disk quota makes Supabase read-only, free space first, then reclaim:
+
+```bash
+uv run python portfolio-service/scripts/seed/trim_market_history.py --dry-run
+uv run python portfolio-service/scripts/seed/trim_market_history.py --years 10
+uv run alembic -c migrations/alembic.ini upgrade head
+```
+
 ## India masters universe
 
 Masters are identity rows (names/codes), not full market history.
@@ -88,7 +111,7 @@ Masters are identity rows (names/codes), not full market history.
 | Fund AMCs / categories | derived from fund CSV | as listed in CSV | `(amc_name)`; category/subcategory pair |
 | Indexes | `indices.csv` | ~12 | `index_code` |
 
-Guided setup defaults stay small: recommended index history is about **5y** for Home; optional stock/fund seed is **names only** with a default limit of **50** (`--skip-prices` / `--skip-nav`). Full `max` OHLC/NAV/statements for every symbol is **not** part of install — use the [Bulk stock market data](#bulk-stock-market-data-after-masters-exist) CLIs below, or open a symbol and use **Update** sync buttons afterward.
+Guided setup defaults stay small: recommended index history is about **10y** for Home; optional stock/fund seed is **names only** with a default limit of **50** (`--skip-prices` / `--skip-nav`). Full `max` OHLC/NAV/statements for every symbol is **not** part of install — use the [Bulk stock market data](#bulk-stock-market-data-after-masters-exist) CLIs below, or open a symbol and use **Update** sync buttons afterward.
 
 Re-running masters seed upserts on those natural keys and must not create duplicate companies or schemes.
 
@@ -96,7 +119,7 @@ Re-running masters seed upserts on those natural keys and must not create duplic
 
 ### How to add from the UI
 
-1. **Stock:** open **Stocks** → click **Add stock** → enter an NSE symbol → choose history depth (`5 years` default / `10 years` / `Maximum available`) → Preview → **Add & sync history**.
+1. **Stock:** open **Stocks** → click **Add stock** → enter an NSE symbol → choose history depth (`10 years` default / `5 years` / `Maximum available`) → Preview → **Add & sync history**.
 2. **Fund:** open **Mutual funds** → **Add fund** → AMFI scheme code → depth → Preview → Add & sync.
 3. **Index:** on **Home** → **Add index** → index code (+ Yahoo if not allowlisted) → depth → Add & sync.
 
@@ -112,8 +135,8 @@ After add, detail/Home **⋯ → Extend history** can pull `5y` / `10y` / `max` 
 Non-goals: US tickers, bulk exchange import, watchlists. Seed CLI remains the bulk path; the UI is single-instrument add. Re-adding an already-tracked code is idempotent (`status: existing`). Rebuild/serve `frontend-react` from this branch so the labeled **Add stock** / **Add fund** buttons are visible.
 
 ```bash
-# Optional API (same behavior as the Add dialog; default history_period=5y)
-curl -X POST "$API/market-data/instruments/stocks?enqueue_history=true&history_period=5y" \
+# Optional API (same behavior as the Add dialog; default history_period=10y)
+curl -X POST "$API/market-data/instruments/stocks?enqueue_history=true&history_period=10y" \
   -H 'Content-Type: application/json' \
   -d '{"trading_symbol":"RELIANCE"}'
 ```
@@ -123,8 +146,8 @@ curl -X POST "$API/market-data/instruments/stocks?enqueue_history=true&history_p
 Reference CSVs live under `data/seed/`. With `DATABASE_URL` set:
 
 ```bash
-# Indexes: masters + ~5y history for Home
-uv run python portfolio-service/scripts/seed/run_seed_indexes.py --data-dir data/seed --index-period 5y
+# Indexes: masters + ~10y history for Home
+uv run python portfolio-service/scripts/seed/run_seed_indexes.py --data-dir data/seed --index-period 10y
 
 # Masters only (no OHLC / NAV) — matches guided setup
 uv run python portfolio-service/scripts/seed/run_seed_stocks.py --data-dir data/seed --skip-prices --limit 50
@@ -136,12 +159,12 @@ uv run python portfolio-service/scripts/seed/run_seed_stocks.py --with-fundament
 uv run python portfolio-service/scripts/seed/run_seed_stocks.py --with-technicals --limit 10
 uv run python portfolio-service/scripts/seed/run_seed_funds.py --data-dir data/seed --limit 10
 
-# Orchestrator: prefer skips/limits — bare run loads full masters + OHLC/NAV (indexes default max)
+# Orchestrator: prefer skips/limits — history defaults to 10y (prices, indexes, NAV retention)
 uv run python portfolio-service/scripts/seed/run_all_seeds.py --data-dir data/seed --skip-prices --skip-nav --limit 50
 uv run python portfolio-service/scripts/seed/run_all_seeds.py --only stocks --limit 20
 ```
 
-Useful flags: `--dry-run`, `--limit N` (caps masters **and** the matching history/NAV/fundamentals/technicals universe on `run_seed_*` and `run_all_seeds`), `--price-period 5y`, `--index-period 5y`, `--skip-masters`, `--skip-prices`, `--skip-nav`. For stocks, `--with-fundamentals` and `--with-technicals` are off unless you pass them. Avoid a bare `run_all_seeds.py` without skips/limits unless you intentionally want a full dump.
+Useful flags: `--dry-run`, `--limit N` (caps masters **and** the matching history/NAV/fundamentals/metrics universe on `run_seed_*` and `run_all_seeds`), `--price-period 10y`, `--index-period 10y`, `--nav-period 10y`, `--skip-masters`, `--skip-prices`, `--skip-nav`. For stocks, `--with-fundamentals` and `--with-technicals` are off unless you pass them. Seeders **prune rows older than the chosen period** after upsert (default 10y). Pass `--period max` / `--index-period max` / `--nav-period max` only as an explicit opt-in.
 
 ```bash
 uv run python portfolio-service/scripts/load_reference_data.py --data-dir data/seed
@@ -154,8 +177,8 @@ These read `market_data.stock_reference` where `is_active` (same universe as the
 ### 1. OHLC prices (Yahoo)
 
 ```bash
-# all active symbols, 5y history
-uv run python portfolio-service/scripts/sync_yfinance.py --period 5y
+# all active symbols, 10y history
+uv run python portfolio-service/scripts/sync_yfinance.py --period 10y
 # or longer
 uv run python portfolio-service/scripts/sync_yfinance.py --period max
 # optional: --limit N, --dry-run
@@ -176,20 +199,21 @@ uv run python portfolio-service/scripts/seed/seed_fundamentals.py
 uv run python portfolio-service/scripts/seed/seed_fundamentals.py --limit 10 --delay 0.5
 ```
 
-### 3. Technicals + daily metrics
+### 3. Latest-day technicals + daily metrics (Yahoo)
 
-Requires OHLC already loaded. Technicals are derived from stored prices; daily metrics call Yahoo `.info` per symbol.
+Requires OHLC already loaded. Persists **latest trading day** technical indicators and **latest** Yahoo ratios only (no historical technical series).
 
 ```bash
 uv run python portfolio-service/scripts/seed/run_seed_stocks.py \
   --skip-masters --skip-prices --with-technicals
 # or directly:
 uv run python portfolio-service/scripts/seed/seed_stock_technicals.py
-# start small / skip one side
 uv run python portfolio-service/scripts/seed/seed_stock_technicals.py --limit 10 --delay 0.5
-uv run python portfolio-service/scripts/seed/seed_stock_technicals.py --skip-daily-metrics
-uv run python portfolio-service/scripts/seed/seed_stock_technicals.py --skip-technicals
 ```
+
+If inserts fail with `read-only transaction`, the Supabase project is over disk quota or paused. Fix that in the dashboard (or run `trim_market_history.py` once writable), then re-run. The seeder **stops immediately** on persistent read-only instead of retrying every symbol.
+
+`seed_stock_technicals.py` can skip symbols that already have daily metrics when running metrics-only (`--skip-technicals`).
 
 ## Import a workbook later
 

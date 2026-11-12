@@ -3,7 +3,7 @@ run_all_seeds.py — Orchestrate Wealth Orbit market-data seed pipelines.
 
 Prefer the asset-specific entrypoints when you only need one domain:
   - run_seed_indexes.py
-  - run_seed_stocks.py   (OHLC by default; add --with-fundamentals / --with-technicals)
+  - run_seed_stocks.py   (OHLC by default; add --with-fundamentals / --with-technicals for latest technicals + metrics)
   - run_seed_funds.py
 
 This script runs all three in dependency-friendly order:
@@ -82,7 +82,7 @@ def _seed_stocks(args, data_dir: Path) -> None:
     elif not args.skip_fundamentals:
         print("[stocks] fundamentals skipped (pass --with-fundamentals to enable)")
     if args.with_technicals:
-        print("[stocks] technicals + daily metrics")
+        print("[stocks] latest-day technicals + daily metrics (Yahoo)")
         seed_stock_technicals.seed(
             dry_run=args.dry_run,
             limit=None if master_symbols is not None else args.limit,
@@ -90,7 +90,7 @@ def _seed_stocks(args, data_dir: Path) -> None:
             symbols=master_symbols,
         )
     else:
-        print("[stocks] technicals skipped (pass --with-technicals to enable)")
+        print("[stocks] technicals/metrics skipped (pass --with-technicals to enable)")
 
 
 def _seed_funds(args, data_dir: Path) -> None:
@@ -106,6 +106,7 @@ def _seed_funds(args, data_dir: Path) -> None:
             dry_run=args.dry_run,
             limit=None if master_scheme_codes is not None else args.limit,
             scheme_codes=master_scheme_codes,
+            history_period=args.nav_period,
         )
 
 
@@ -119,8 +120,14 @@ def main():
         default="all",
         help="Run a single asset pipeline or all (default)",
     )
-    parser.add_argument("--price-period", default="5y", help="yfinance period for stock prices")
-    parser.add_argument("--index-period", default="max", help="yfinance period for index history")
+    parser.add_argument("--price-period", default="10y", help="yfinance period for stock prices")
+    parser.add_argument("--index-period", default="10y", help="yfinance period for index history (default 10y)")
+    parser.add_argument(
+        "--nav-period",
+        default="10y",
+        choices=["1y", "2y", "3y", "5y", "10y", "max"],
+        help="NAV retention after sync (default 10y)",
+    )
     parser.add_argument("--batch-size", type=int, default=20, help="Stock price download batch size")
     parser.add_argument(
         "--limit",
@@ -145,7 +152,7 @@ def main():
     parser.add_argument(
         "--with-technicals",
         action="store_true",
-        help="Include technical indicators + Yahoo daily metrics (off by default)",
+        help="Include latest-day technicals + Yahoo daily metrics (off by default)",
     )
     parser.add_argument(
         "--fundamentals-delay",

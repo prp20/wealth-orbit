@@ -69,7 +69,7 @@ def print_session_pooler_steps() -> None:
 
 
 def guided_index_seed_argv() -> list[str]:
-    """Argv for recommended Home index seed (~5y, not max)."""
+    """Argv for recommended Home index seed (~10y, not max)."""
     return [
         "uv",
         "run",
@@ -78,7 +78,7 @@ def guided_index_seed_argv() -> list[str]:
         "--data-dir",
         "data/seed",
         "--index-period",
-        "5y",
+        "10y",
     ]
 
 
@@ -122,7 +122,7 @@ def _optional_limit_argv(limit: str | None) -> list[str]:
     return ["--limit", text]
 
 
-def guided_stock_ohlc_seed_argv(period: str = "5y", limit: str | None = None) -> list[str]:
+def guided_stock_ohlc_seed_argv(period: str = "10y", limit: str | None = None) -> list[str]:
     """Argv for Yahoo OHLC across active stock_reference rows (or a --limit cap)."""
     argv = [
         "uv",
@@ -362,9 +362,9 @@ def main() -> None:
     print("Skip these for a fast install; you can re-run setup or the CLIs in docs/setup.md later.")
     synced_ohlc = False
     if ask_yes("Sync Yahoo OHLC prices for active stocks? (can take a while)", False):
-        period = ask("Price history period (5y / 10y / max)", "5y")
+        period = ask("Price history period (5y / 10y / max)", "10y")
         ohlc_limit = ask("How many stocks? blank = all active", "")
-        run(guided_stock_ohlc_seed_argv(period=period or "5y", limit=ohlc_limit or None))
+        run(guided_stock_ohlc_seed_argv(period=period or "10y", limit=ohlc_limit or None))
         synced_ohlc = True
     if ask_yes(
         "Sync Screener fundamentals + shareholding for active stocks? (slow / rate-limited)",

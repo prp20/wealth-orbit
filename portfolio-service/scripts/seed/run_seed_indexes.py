@@ -24,7 +24,7 @@ def main():
     parser = argparse.ArgumentParser(description="Seed indexes (masters + optional Yahoo history)")
     parser.add_argument("--data-dir", type=Path, default=None)
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--index-period", default="max")
+    parser.add_argument("--index-period", default="10y", help="Index OHLC depth (default 10y; max is opt-in)")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--skip-masters", action="store_true")
     parser.add_argument("--skip-history", action="store_true")

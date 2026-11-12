@@ -13,7 +13,7 @@ Usage:
   # fundamentals only (assumes masters already loaded)
   uv run python portfolio-service/scripts/seed/run_seed_stocks.py --skip-masters --skip-prices --with-fundamentals
 
-  # technicals + daily metrics only (assumes OHLC already loaded)
+  # daily metrics only (assumes OHLC already loaded; technicals computed on read)
   uv run python portfolio-service/scripts/seed/run_seed_stocks.py --skip-masters --skip-prices --with-technicals
 """
 from __future__ import annotations
@@ -39,7 +39,7 @@ def main():
     )
     parser.add_argument("--data-dir", type=Path, default=None)
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--price-period", default="5y")
+    parser.add_argument("--price-period", default="10y")
     parser.add_argument("--batch-size", type=int, default=20)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--skip-masters", action="store_true")
@@ -57,12 +57,12 @@ def main():
     parser.add_argument(
         "--with-technicals",
         action="store_true",
-        help="Also sync technical indicators + Yahoo daily metrics (off by default)",
+        help="Also sync Yahoo daily metrics (technical indicators are computed on read)",
     )
     parser.add_argument(
         "--technicals-only",
         action="store_true",
-        help="Shortcut: skip masters/prices/fundamentals and only run technicals + daily metrics",
+        help="Shortcut: skip masters/prices/fundamentals and only sync daily metrics",
     )
     parser.add_argument(
         "--fundamentals-delay",
@@ -95,7 +95,7 @@ def main():
         f"masters={'on' if not args.skip_masters else 'off'}, "
         f"ohlc={'on' if not args.skip_prices else 'off'}, "
         f"fundamentals={'on' if args.with_fundamentals else 'off'}, "
-        f"technicals={'on' if args.with_technicals else 'off'}"
+        f"daily_metrics={'on' if args.with_technicals else 'off'}"
     )
 
     master_symbols: list[str] | None = None
@@ -133,7 +133,7 @@ def main():
         print("\n[skipped] Fundamentals — pass --with-fundamentals if needed")
 
     if args.with_technicals:
-        print("\n[4] Stock technicals + daily metrics")
+        print("\n[4] Stock technicals (latest day) + daily metrics (Yahoo)")
         seed_stock_technicals.seed(
             dry_run=args.dry_run,
             limit=None if master_symbols is not None else args.limit,
@@ -141,7 +141,7 @@ def main():
             symbols=master_symbols,
         )
     else:
-        print("\n[skipped] Technicals — pass --with-technicals if needed")
+        print("\n[skipped] Technicals/daily metrics — pass --with-technicals if needed")
 
     print("\nStocks seeding complete.\n")
 

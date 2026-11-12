@@ -2,6 +2,8 @@
 import os
 import re
 import uuid
+from datetime import date
+
 import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_values, register_uuid
@@ -161,8 +163,8 @@ def stock_detail_enriched(symbol: str, last_sync_by_kind: dict | None = None):
              JOIN base b ON b.stock_id=v.stock_id) AS latest_fundamental_period_end,
             (SELECT MAX(h.period_end_date) FROM market_data.stock_shareholding_history h
              JOIN base b ON b.stock_id=h.stock_id) AS latest_shareholding_period_end,
-            (SELECT MAX(t.calculated_at) FROM market_data.stock_technical_indicators t
-             JOIN base b ON b.stock_id=t.stock_id) AS latest_technical_calculated_at
+            (SELECT MAX(p.trading_date) FROM market_data.stock_daily_prices p
+             JOIN base b ON b.stock_id=p.stock_id) AS latest_technical_calculated_at
         )
         SELECT b.*,
                lp.date AS price_date, lp.close AS price_close, lp.raw_close, lp.adj_close AS price_adj_close,
@@ -1297,16 +1299,128 @@ def stock_shareholding(symbol: str, from_date=None, to_date=None) -> pd.DataFram
           AND (%s IS NULL OR h.period_end_date <= %s) ORDER BY h.period_end_date""",
         (symbol, from_date, from_date, to_date, to_date))
 
+_TECHNICAL_COLUMNS = [
+    "date",
+    "indicator_code",
+    "indicator_period",
+    "parameters",
+    "component",
+    "indicator_value",
+    "calculation_status",
+    "calculated_at",
+]
+
+
+def _empty_technicals() -> pd.DataFrame:
+    return pd.DataFrame(columns=_TECHNICAL_COLUMNS)
+
+
+def _load_stored_technicals(symbol: str, indicator: str = "") -> tuple[pd.DataFrame, date | None]:
+    """Return (rows, snapshot_trading_date) from the latest-day cache table."""
+    try:
+        with psycopg2.connect(os.environ["DATABASE_URL"], connect_timeout=15) as connection:
+            with connection.cursor() as cur:
+                cur.execute(
+                    """SELECT MAX(t.trading_date)
+                       FROM market_data.stock_technical_indicators t
+                       JOIN market_data.stock_reference s ON s.stock_id = t.stock_id
+                       WHERE s.trading_symbol=%s AND s.is_active=TRUE""",
+                    (symbol,),
+                )
+                snap = cur.fetchone()[0]
+                if snap is None:
+                    return _empty_technicals(), None
+                cur.execute(
+                    """SELECT t.trading_date AS date, t.indicator_code, t.indicator_period,
+                              t.parameters::text AS parameters, t.component, t.indicator_value,
+                              t.calculation_status, t.calculated_at
+                       FROM market_data.stock_technical_indicators t
+                       JOIN market_data.stock_reference s ON s.stock_id = t.stock_id
+                       WHERE s.trading_symbol=%s AND s.is_active=TRUE
+                         AND t.trading_date=%s
+                         AND (%s = '' OR t.indicator_code = %s)
+                       ORDER BY t.indicator_code, t.indicator_period, t.component""",
+                    (symbol, snap, indicator.upper() if indicator else "", indicator.upper() if indicator else ""),
+                )
+                rows = cur.fetchall()
+        if not rows:
+            return _empty_technicals(), snap
+        frame = pd.DataFrame(rows, columns=_TECHNICAL_COLUMNS)
+        return frame, snap
+    except Exception:
+        return _empty_technicals(), None
+
+
+def _last_ohlc_date(symbol: str) -> date | None:
+    try:
+        with psycopg2.connect(os.environ["DATABASE_URL"], connect_timeout=15) as connection:
+            with connection.cursor() as cur:
+                cur.execute(
+                    """SELECT MAX(p.trading_date)
+                       FROM market_data.stock_daily_prices p
+                       JOIN market_data.stock_reference s ON s.stock_id = p.stock_id
+                       WHERE s.trading_symbol=%s AND s.is_active=TRUE""",
+                    (symbol,),
+                )
+                value = cur.fetchone()[0]
+                return value
+    except Exception:
+        return None
+
+
+def _technicals_from_ohlc_frame(frame: pd.DataFrame, indicator: str = "") -> pd.DataFrame:
+    """Compute latest-day indicators from an OHLC frame (no DB write)."""
+    from datetime import datetime, timezone
+
+    from backend.market_data.sync import DEFAULT_INDICATORS, _latest_indicator_rows
+    from backend_api.app.technical_indicators import calculate_indicators
+
+    if frame.empty:
+        return _empty_technicals()
+    try:
+        _trading_date, latest_rows = _latest_indicator_rows(frame)
+    except RuntimeError:
+        calculated = calculate_indicators(frame, DEFAULT_INDICATORS).dropna(subset=["value"])
+        if calculated.empty:
+            return _empty_technicals()
+        latest_rows = calculated
+    if indicator:
+        latest_rows = latest_rows[latest_rows["indicator_code"] == indicator.upper()]
+    if latest_rows.empty:
+        return _empty_technicals()
+    out = latest_rows.rename(columns={"value": "indicator_value"}).copy()
+    out["calculation_status"] = "CURRENT"
+    out["calculated_at"] = datetime.now(timezone.utc)
+    return out[_TECHNICAL_COLUMNS].reset_index(drop=True)
+
+
 def stock_technical_indicators(symbol: str, indicator: str = "", from_date=None, to_date=None) -> pd.DataFrame:
-    return _query("""SELECT t.trading_date AS date, t.indicator_code, t.indicator_period,
-        t.parameters, t.component, t.indicator_value, t.calculation_status,
-        t.calculated_at
-        FROM market_data.stock_technical_indicators t
-        JOIN market_data.stock_reference s ON s.stock_id=t.stock_id
-        WHERE s.trading_symbol=%s AND (%s='' OR t.indicator_code=%s)
-          AND (%s IS NULL OR t.trading_date >= %s) AND (%s IS NULL OR t.trading_date <= %s)
-        ORDER BY t.trading_date, t.indicator_code, t.component""",
-        (symbol, indicator, indicator, from_date, from_date, to_date, to_date))
+    """Return latest-day technicals from Postgres; refresh from OHLC when stale/missing.
+
+    ``from_date`` / ``to_date`` are retained for API compatibility but ignored — only the
+    latest trading-day snapshot is stored and returned.
+    """
+    _ = from_date, to_date
+    stored, snap = _load_stored_technicals(symbol, indicator)
+    last_ohlc = _last_ohlc_date(symbol)
+    if not stored.empty and snap is not None and last_ohlc is not None and snap >= last_ohlc:
+        return stored.reset_index(drop=True)
+
+    # Refresh from OHLC only when the price table is reachable; otherwise fall back
+    # to an in-memory compute (tests / offline) without hanging on DB writes.
+    if last_ohlc is not None:
+        try:
+            from backend.market_data.sync import sync_technical_indicators
+
+            sync_technical_indicators(symbol)
+            stored, _snap = _load_stored_technicals(symbol, indicator)
+            if not stored.empty:
+                return stored.reset_index(drop=True)
+        except Exception:
+            pass
+
+    frame = stock_history(symbol, None, None)
+    return _technicals_from_ohlc_frame(frame, indicator)
 
 def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
     """Fetch Screener consolidated and standalone statements in one job.
@@ -1448,6 +1562,9 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
                     fundamental_rows,
                     page_size=500,
                 )
+                from backend.market_data.fundamentals_retention import prune_fundamental_periods
+
+                prune_fundamental_periods(cur, stock_id)
 
             shareholding = []
             for basis in (CONSOLIDATED, STANDALONE):
