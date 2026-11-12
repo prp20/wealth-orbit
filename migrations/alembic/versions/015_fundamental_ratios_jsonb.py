@@ -2,8 +2,8 @@
 
 from alembic import op
 
-revision = "013_fundamental_ratios"
-down_revision = "012_holding_negative_weights"
+revision = "015_fundamental_ratios"
+down_revision = "014_stock_tech_latest"
 branch_labels = None
 depends_on = None
 

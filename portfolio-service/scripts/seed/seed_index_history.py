@@ -64,10 +64,12 @@ def _download_history(ticker: str, period: str) -> list[tuple]:
     return rows
 
 
-def seed(period: str = "max", dry_run: bool = False, limit: int | None = None) -> dict:
+def seed(period: str = "10y", dry_run: bool = False, limit: int | None = None) -> dict:
     from _db import normalize_limit
+    from backend.market_data.history_period import retention_cutoff
 
     limit = normalize_limit(limit)
+    cutoff = retention_cutoff(period)
     with connect() as connection:
         with connection.cursor() as cur:
             cur.execute(
@@ -91,6 +93,8 @@ def seed(period: str = "max", dry_run: bool = False, limit: int | None = None) -
 
             print(f"  Found {len(benchmarks)} indexes — fetching '{period}' history "
                   f"(date column={date_col})")
+            if cutoff is not None:
+                print(f"  Retention: keep {date_col} >= {cutoff}")
             source_id = None if dry_run else get_or_create_source(cur, "yfinance")
             total_rows = 0
             failed = []
@@ -122,6 +126,8 @@ def seed(period: str = "max", dry_run: bool = False, limit: int | None = None) -
             for index_id, index_code, ticker in benchmarks:
                 print(f"  [{index_code}] ticker={ticker!r}", end="", flush=True)
                 rows = _download_history(ticker, period)
+                if cutoff is not None:
+                    rows = [row for row in rows if row[0] >= cutoff]
                 if not rows:
                     print("  ← no data")
                     failed.append(index_code)
@@ -144,6 +150,12 @@ def seed(period: str = "max", dry_run: bool = False, limit: int | None = None) -
                         for history_date, open_, high, low, close, _volume in rows
                     ]
                 execute_values(cur, insert_sql, values, page_size=1000)
+                if cutoff is not None:
+                    cur.execute(
+                        f"DELETE FROM market_data.index_daily_history "
+                        f"WHERE index_id=%s AND {date_identifier} < %s",
+                        (index_id, cutoff),
+                    )
                 total_rows += len(values)
                 print("  ok")
                 time.sleep(0.3)
@@ -156,7 +168,7 @@ def seed(period: str = "max", dry_run: bool = False, limit: int | None = None) -
 
 def main():
     parser = argparse.ArgumentParser(description="Seed index_daily_history from Yahoo Finance")
-    parser.add_argument("--period", default="max")
+    parser.add_argument("--period", default="10y", help="yfinance period (default 10y; max is opt-in)")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args()

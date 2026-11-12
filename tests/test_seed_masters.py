@@ -95,6 +95,27 @@ def test_stock_and_fund_runners_pass_limit_to_masters():
     assert "scheme_codes=master_scheme_codes" in funds_runner
     assert "symbols=master_symbols" in orchestrator
     assert "scheme_codes=master_scheme_codes" in orchestrator
+    assert "--with-technicals" in stocks_runner
+    assert "seed_stock_technicals.seed(" in stocks_runner
+    assert "--with-technicals" in orchestrator
+    assert "seed_stock_technicals.seed(" in orchestrator
+
+
+def test_seed_stock_technicals_module_exposes_seed():
+    technicals = (SEED_DIR / "seed_stock_technicals.py").read_text(encoding="utf-8")
+    assert "def seed(" in technicals
+    assert "sync_daily_metrics" in technicals
+    assert "sync_technical_indicators" in technicals
+    assert "ThreadPoolExecutor" in technicals
+    assert "workers" in technicals
+    assert "latest trading day" in technicals.lower() or "with_technicals" in technicals
+    stocks_runner = (SEED_DIR / "run_seed_stocks.py").read_text(encoding="utf-8")
+    assert "--technicals-workers" in stocks_runner
+    trim = (SEED_DIR / "trim_market_history.py").read_text(encoding="utf-8")
+    assert "def trim(" in trim
+    assert "stock_daily_prices" in trim
+    assert "DEFAULT_YEARS = 10" in trim
+    assert "prune_fundamental_periods" in trim
 
 
 def test_idempotent_natural_key_store_does_not_grow_on_reseed():

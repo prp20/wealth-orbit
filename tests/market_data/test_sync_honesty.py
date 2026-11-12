@@ -95,26 +95,25 @@ def test_sync_stock_fundamentals_persists_both_bases_without_clobber(monkeypatch
             self.last_sql = " ".join(sql.split())
             self.last_params = params
             self.rowcount = 0
-            if "INSERT INTO market_data.stock_fundamental_values" in self.last_sql:
-                inserts.append(params)
-                value_sql.append(self.last_sql)
             if "INSERT INTO market_data.fundamental_metric_reference" in self.last_sql:
-                metric_ids[params[1]] = params[0]
+                # Single-row path (legacy) or leftover execute_values expansion.
+                if params and len(params) >= 2 and not isinstance(params[0], (list, tuple)):
+                    metric_ids[params[1]] = params[0]
 
         def fetchone(self):
             sql = self.last_sql
             if "FROM market_data.stock_reference" in sql:
                 return (stock_id,)
-            if "FROM market_data.fundamental_metric_reference" in sql:
-                code = self.last_params[0]
-                if code in metric_ids:
-                    return (metric_ids[code], "CF")
-                return None
             if "FROM market_data.stock_daily_metrics" in sql and "ORDER BY metric_date DESC" in sql:
                 return None
             return None
 
         def fetchall(self):
+            if "FROM market_data.fundamental_metric_reference" in self.last_sql:
+                return [
+                    (code, metric_id, "CF")
+                    for code, metric_id in metric_ids.items()
+                ]
             # Annual consol statement pull for ratio snapshot — empty is fine for this test.
             return []
 
@@ -137,6 +136,18 @@ def test_sync_stock_fundamentals_persists_both_bases_without_clobber(monkeypatch
         def commit(self):
             return None
 
+    def fake_execute_values(cur, sql, argslist, template=None, page_size=100, fetch=False):
+        normalized = " ".join(sql.split())
+        if "INSERT INTO market_data.fundamental_metric_reference" in normalized:
+            for row in argslist:
+                metric_ids[row[1]] = row[0]
+            return None
+        if "INSERT INTO market_data.stock_fundamental_values" in normalized:
+            inserts.extend(argslist)
+            value_sql.append(normalized)
+            return None
+        return None
+
     html_by_basis = {
         "CONSOLIDATED": """
             <section id="cash-flow"><table class="data-table">
@@ -158,6 +169,7 @@ def test_sync_stock_fundamentals_persists_both_bases_without_clobber(monkeypatch
         return html_by_basis["STANDALONE"]
 
     monkeypatch.setattr(reference_service.psycopg2, "connect", lambda *a, **k: FakeConn())
+    monkeypatch.setattr(reference_service, "execute_values", fake_execute_values)
     monkeypatch.setattr("backend.market_data.providers.screener.fetch_html", fake_fetch)
     monkeypatch.setattr(
         "backend.market_data.sources.ensure_data_source",

@@ -47,6 +47,8 @@ def sanitize_seed_error(exc: BaseException) -> str:
     """Short seed failure reason with no password / URL material."""
     text = str(exc).strip()
     lower = text.lower()
+    if "read-only" in lower:
+        return "database is read-only (check Supabase disk quota / project status)"
     if "password authentication failed" in lower or "authentication failed" in lower:
         return "authentication failed"
     if "timed out" in lower or "timeout" in lower:
@@ -78,6 +80,26 @@ def connect():
         return psycopg2.connect(database_url(), connect_timeout=30)
     except Exception as exc:
         raise SystemExit(f"ERROR: could not connect for seed ({sanitize_seed_error(exc)})") from None
+
+
+def assert_database_writable() -> None:
+    """Fail fast when Postgres rejects writes (common Supabase quota/pause mode)."""
+    with connect() as connection:
+        with connection.cursor() as cur:
+            cur.execute("SHOW transaction_read_only")
+            if cur.fetchone()[0] == "on":
+                raise SystemExit(
+                    "ERROR: database is read-only. Check the Supabase dashboard "
+                    "(paused project, disk quota, or maintenance) and retry."
+                )
+            try:
+                cur.execute("CREATE TEMP TABLE _wealth_orbit_write_probe(x int)")
+                connection.commit()
+            except Exception as exc:
+                connection.rollback()
+                raise SystemExit(
+                    f"ERROR: database rejected a write probe ({sanitize_seed_error(exc)})"
+                ) from None
 
 
 def resolve_data_dir(data_dir: Path | str | None) -> Path:

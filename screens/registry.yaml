@@ -1,0 +1,12 @@
+version: 1
+asset_class: stock
+plugin_roots:
+  - screens/stock/built_in
+  - screens/stock/user
+disabled_ids: []
+timeout_seconds: 15
+# Optional explicit pins after validation:
+# entries:
+#   - id: quality_value
+#     module_path: screens/stock/built_in/quality_value.py
+#     enabled: true

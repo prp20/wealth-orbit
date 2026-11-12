@@ -24,7 +24,10 @@ from scripts.setup_guide import (
     create_portfolio_tables,
     guided_fund_masters_seed_argv,
     guided_index_seed_argv,
+    guided_stock_fundamentals_seed_argv,
     guided_stock_masters_seed_argv,
+    guided_stock_ohlc_seed_argv,
+    guided_stock_technicals_seed_argv,
     node_install_hint,
     node_is_ready,
     portfolio_has_users,
@@ -332,7 +335,7 @@ def test_local_portfolio_file_gets_a_users_table(tmp_path):
 def test_guided_setup_seed_argv_defaults_stay_small():
     index_argv = guided_index_seed_argv()
     assert "--index-period" in index_argv
-    assert index_argv[index_argv.index("--index-period") + 1] == "5y"
+    assert index_argv[index_argv.index("--index-period") + 1] == "10y"
 
     stock_argv = guided_stock_masters_seed_argv()
     assert "--skip-prices" in stock_argv
@@ -344,3 +347,25 @@ def test_guided_setup_seed_argv_defaults_stay_small():
 
     custom = guided_stock_masters_seed_argv("25")
     assert custom[custom.index("--limit") + 1] == "25"
+
+
+def test_guided_bulk_stock_market_data_argv():
+    ohlc = guided_stock_ohlc_seed_argv()
+    assert any(part.endswith("sync_yfinance.py") for part in ohlc)
+    assert ohlc[ohlc.index("--period") + 1] == "10y"
+    assert "--limit" not in ohlc
+
+    capped = guided_stock_ohlc_seed_argv(period="max", limit="25")
+    assert capped[capped.index("--period") + 1] == "max"
+    assert capped[capped.index("--limit") + 1] == "25"
+
+    fundamentals = guided_stock_fundamentals_seed_argv(limit="10")
+    assert any(part.endswith("seed_fundamentals.py") for part in fundamentals)
+    assert fundamentals[fundamentals.index("--limit") + 1] == "10"
+    assert fundamentals[fundamentals.index("--delay") + 1] == "3.0"
+    assert "--limit" not in guided_stock_fundamentals_seed_argv(limit="")
+
+    technicals = guided_stock_technicals_seed_argv(limit="10")
+    assert any(part.endswith("seed_stock_technicals.py") for part in technicals)
+    assert technicals[technicals.index("--limit") + 1] == "10"
+    assert technicals[technicals.index("--delay") + 1] == "0.5"

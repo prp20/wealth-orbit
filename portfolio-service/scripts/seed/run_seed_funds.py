@@ -30,6 +30,12 @@ def main():
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--skip-masters", action="store_true")
     parser.add_argument("--skip-nav", action="store_true")
+    parser.add_argument(
+        "--nav-period",
+        default="10y",
+        choices=["1y", "2y", "3y", "5y", "10y", "max"],
+        help="NAV retention after sync (default 10y)",
+    )
     args = parser.parse_args()
 
     data_dir = resolve_data_dir(args.data_dir)
@@ -52,6 +58,7 @@ def main():
             dry_run=args.dry_run,
             limit=None if master_scheme_codes is not None else args.limit,
             scheme_codes=master_scheme_codes,
+            history_period=args.nav_period,
         )
     else:
         print("\n[skipped] Fund NAV")

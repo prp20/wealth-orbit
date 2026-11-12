@@ -37,6 +37,25 @@ def _safe_int(value) -> int | None:
         return None
 
 
+def _sanitize_ohlc(
+    open_: float | None,
+    high: float | None,
+    low: float | None,
+    close: float | None,
+) -> tuple[float, float, float, float] | None:
+    """Make Yahoo bars satisfy chk_stock_price_values (high/low envelope open/close)."""
+    if None in (open_, high, low, close):
+        return None
+    if min(open_, high, low, close) <= 0:
+        return None
+    # Vendor bars sometimes have open/close outside the published high/low range.
+    high = max(open_, high, close)
+    low = min(open_, low, close)
+    if high < low:
+        return None
+    return open_, high, low, close
+
+
 def _yf_lookup(data_dir: Path | None) -> dict[str, str]:
     """Map trading_symbol -> yf_symbol from stocks.csv when available."""
     if data_dir is None:
@@ -94,12 +113,18 @@ def _download_batch(tickers: list[str], period: str) -> dict:
 def _build_rows(stock_id, frame, source_id) -> list[tuple]:
     rows = []
     for timestamp, values in frame.iterrows():
-        open_ = _safe_float(values.get("Open"))
-        high = _safe_float(values.get("High"))
-        low = _safe_float(values.get("Low"))
-        close = _safe_float(values.get("Close"))
-        if None in (open_, high, low, close):
+        sanitized = _sanitize_ohlc(
+            _safe_float(values.get("Open")),
+            _safe_float(values.get("High")),
+            _safe_float(values.get("Low")),
+            _safe_float(values.get("Close")),
+        )
+        if sanitized is None:
             continue
+        open_, high, low, close = sanitized
+        volume = _safe_int(values.get("Volume"))
+        if volume is None or volume < 0:
+            volume = 0
         rows.append(
             (
                 stock_id,
@@ -108,7 +133,7 @@ def _build_rows(stock_id, frame, source_id) -> list[tuple]:
                 high,
                 low,
                 close,
-                _safe_int(values.get("Volume")) or 0,
+                volume,
                 source_id,
             )
         )
@@ -116,7 +141,7 @@ def _build_rows(stock_id, frame, source_id) -> list[tuple]:
 
 
 def seed(
-    period: str = "5y",
+    period: str = "10y",
     dry_run: bool = False,
     batch_size: int = 20,
     limit: int | None = None,
@@ -124,8 +149,10 @@ def seed(
     symbols: list[str] | None = None,
 ) -> dict:
     from _db import normalize_limit
+    from backend.market_data.history_period import retention_cutoff
 
     limit = normalize_limit(limit)
+    cutoff = retention_cutoff(period)
     yf_lookup = _yf_lookup(Path(data_dir) if data_dir else None)
     with connect() as connection:
         with connection.cursor() as cur:
@@ -167,11 +194,14 @@ def seed(
                 f"  Fetching {period} prices for {len(enriched)} stocks "
                 f"(batch_size={batch_size}){'  [DRY RUN]' if dry_run else ''}"
             )
+            if cutoff is not None:
+                print(f"  Retention: keep trading_date >= {cutoff} (drop older rows after upsert)")
             yf_to_stock = {yf_symbol: stock_id for stock_id, _, yf_symbol in enriched}
             tickers = [yf_symbol for _, _, yf_symbol in enriched]
             batches = [tickers[i : i + batch_size] for i in range(0, len(tickers), batch_size)]
             total_rows = 0
             failed = []
+            touched_stock_ids: set = set()
 
             for position, batch in enumerate(batches, 1):
                 print(f"  Batch {position}/{len(batches)} ({len(batch)} tickers)", flush=True)
@@ -182,7 +212,12 @@ def seed(
                     if frame is None or frame.empty:
                         failed.append(yf_symbol)
                         continue
-                    batch_rows.extend(_build_rows(yf_to_stock[yf_symbol], frame, source_id))
+                    rows = _build_rows(yf_to_stock[yf_symbol], frame, source_id)
+                    if cutoff is not None:
+                        rows = [row for row in rows if row[1] >= cutoff]
+                    if rows:
+                        touched_stock_ids.add(yf_to_stock[yf_symbol])
+                    batch_rows.extend(rows)
                 if dry_run:
                     total_rows += len(batch_rows)
                 elif batch_rows:
@@ -204,6 +239,12 @@ def seed(
                     )
                     total_rows += len(batch_rows)
                 time.sleep(BATCH_DELAY_SECS)
+            if not dry_run and cutoff is not None and touched_stock_ids:
+                cur.execute(
+                    """DELETE FROM market_data.stock_daily_prices
+                       WHERE stock_id = ANY(%s) AND trading_date < %s""",
+                    (list(touched_stock_ids), cutoff),
+                )
         connection.commit()
 
     print(
@@ -219,7 +260,7 @@ def seed(
 
 def main():
     parser = argparse.ArgumentParser(description="Seed stock_daily_prices from Yahoo Finance")
-    parser.add_argument("--period", default="5y", choices=["1y", "2y", "3y", "5y", "10y", "max"])
+    parser.add_argument("--period", default="10y", choices=["1y", "2y", "3y", "5y", "10y", "max"])
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--batch-size", type=int, default=20)
     parser.add_argument("--limit", type=int, default=None)

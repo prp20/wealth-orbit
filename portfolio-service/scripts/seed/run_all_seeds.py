@@ -3,12 +3,12 @@ run_all_seeds.py — Orchestrate Wealth Orbit market-data seed pipelines.
 
 Prefer the asset-specific entrypoints when you only need one domain:
   - run_seed_indexes.py
-  - run_seed_stocks.py   (OHLC by default; add --with-fundamentals for Screener)
+  - run_seed_stocks.py   (OHLC by default; add --with-fundamentals / --with-technicals for latest technicals + metrics)
   - run_seed_funds.py
 
 This script runs all three in dependency-friendly order:
   1. Indexes (masters + history)
-  2. Stocks (masters + OHLC; fundamentals optional)
+  2. Stocks (masters + OHLC; fundamentals/technicals optional)
   3. Mutual funds (masters + NAV)
 
 Prerequisites:
@@ -19,6 +19,7 @@ Prerequisites:
 Usage:
   uv run python portfolio-service/scripts/seed/run_all_seeds.py --data-dir data/seed --skip-prices --skip-nav --limit 50
   uv run python portfolio-service/scripts/seed/run_all_seeds.py --only stocks --with-fundamentals --limit 3
+  uv run python portfolio-service/scripts/seed/run_all_seeds.py --only stocks --with-technicals --limit 10
   uv run python portfolio-service/scripts/seed/run_all_seeds.py --only funds --limit 10
   uv run python portfolio-service/scripts/seed/run_all_seeds.py --only indexes --index-period 5y
 """
@@ -38,6 +39,7 @@ import seed_funds
 import seed_index_history
 import seed_indexes
 import seed_stock_prices
+import seed_stock_technicals
 import seed_stocks
 from _db import resolve_data_dir
 
@@ -74,10 +76,22 @@ def _seed_stocks(args, data_dir: Path) -> None:
         seed_fundamentals.seed(
             dry_run=args.dry_run,
             limit=None if master_symbols is not None else args.limit,
+            delay_secs=args.fundamentals_delay,
             symbols=master_symbols,
         )
     elif not args.skip_fundamentals:
         print("[stocks] fundamentals skipped (pass --with-fundamentals to enable)")
+    if args.with_technicals:
+        print("[stocks] latest-day technicals + daily metrics (Yahoo)")
+        seed_stock_technicals.seed(
+            dry_run=args.dry_run,
+            limit=None if master_symbols is not None else args.limit,
+            delay_secs=args.technicals_delay,
+            symbols=master_symbols,
+            workers=args.technicals_workers,
+        )
+    else:
+        print("[stocks] technicals/metrics skipped (pass --with-technicals to enable)")
 
 
 def _seed_funds(args, data_dir: Path) -> None:
@@ -93,6 +107,7 @@ def _seed_funds(args, data_dir: Path) -> None:
             dry_run=args.dry_run,
             limit=None if master_scheme_codes is not None else args.limit,
             scheme_codes=master_scheme_codes,
+            history_period=args.nav_period,
         )
 
 
@@ -106,8 +121,14 @@ def main():
         default="all",
         help="Run a single asset pipeline or all (default)",
     )
-    parser.add_argument("--price-period", default="5y", help="yfinance period for stock prices")
-    parser.add_argument("--index-period", default="max", help="yfinance period for index history")
+    parser.add_argument("--price-period", default="10y", help="yfinance period for stock prices")
+    parser.add_argument("--index-period", default="10y", help="yfinance period for index history (default 10y)")
+    parser.add_argument(
+        "--nav-period",
+        default="10y",
+        choices=["1y", "2y", "3y", "5y", "10y", "max"],
+        help="NAV retention after sync (default 10y)",
+    )
     parser.add_argument("--batch-size", type=int, default=20, help="Stock price download batch size")
     parser.add_argument(
         "--limit",
@@ -128,6 +149,29 @@ def main():
         "--skip-fundamentals",
         action="store_true",
         help="Deprecated alias: fundamentals are already off unless --with-fundamentals",
+    )
+    parser.add_argument(
+        "--with-technicals",
+        action="store_true",
+        help="Include latest-day technicals + Yahoo daily metrics (off by default)",
+    )
+    parser.add_argument(
+        "--fundamentals-delay",
+        type=float,
+        default=3.0,
+        help="Seconds between Screener fundamentals calls",
+    )
+    parser.add_argument(
+        "--technicals-delay",
+        type=float,
+        default=0.0,
+        help="Per-worker pause after each technicals/metrics symbol (default 0)",
+    )
+    parser.add_argument(
+        "--technicals-workers",
+        type=int,
+        default=8,
+        help="Parallel workers for technicals/metrics sync (default 8)",
     )
     args = parser.parse_args()
 
