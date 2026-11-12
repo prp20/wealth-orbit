@@ -4,18 +4,20 @@ import { api } from '../../../api';
 import SyncJobButton from '../../../components/SyncJobButton';
 import { formatStatementValue } from '../../../lib/format';
 
-const STATEMENT_SECTIONS = [
+const ANNUAL_SECTIONS = [
   { id: 'PL', title: 'Profit & loss' },
   { id: 'BS', title: 'Balance sheet' },
   { id: 'CF', title: 'Cash flow' },
 ] as const;
 
-const RATIO_GROUPS = ['profitability', 'growth', 'leverage'] as const;
+const RATIO_GROUPS = ['profitability', 'growth', 'leverage', 'liquidity', 'efficiency'] as const;
 
 const GROUP_LABELS: Record<string, string> = {
   profitability: 'Profitability',
-  growth: 'Growth',
+  growth: 'Growth (YoY / QoQ from statements)',
   leverage: 'Leverage',
+  liquidity: 'Liquidity',
+  efficiency: 'Efficiency',
 };
 
 const LINE_ORDER = [
@@ -47,31 +49,31 @@ const LINE_ORDER = [
 ];
 
 const METRIC_LABELS: Record<string, string> = {
-  REVENUE: 'Revenue',
-  TOTAL_EXPENSES: 'Total expenses',
-  OPERATING_PROFIT: 'Operating profit',
-  OPERATING_MARGIN: 'Operating margin',
-  OTHER_INCOME: 'Other income',
+  REVENUE: 'Sales',
+  TOTAL_EXPENSES: 'Expenses',
+  OPERATING_PROFIT: 'Operating Profit',
+  OPERATING_MARGIN: 'OPM %',
+  OTHER_INCOME: 'Other Income',
   DEPRECIATION: 'Depreciation',
   INTEREST_EXPENSE: 'Interest',
   PROFIT_BEFORE_TAX: 'Profit before tax',
-  TAX_RATE: 'Tax',
-  NET_PROFIT: 'Net profit',
-  EPS: 'EPS',
-  EQUITY_CAPITAL: 'Equity capital',
+  TAX_RATE: 'Tax %',
+  NET_PROFIT: 'Net Profit',
+  EPS: 'EPS in Rs',
+  EQUITY_CAPITAL: 'Equity Capital',
   RESERVES: 'Reserves',
   BORROWINGS: 'Borrowings',
-  OTHER_LIABILITIES: 'Other liabilities',
-  TOTAL_LIABILITIES: 'Total liabilities',
-  FIXED_ASSETS: 'Fixed assets',
+  OTHER_LIABILITIES: 'Other Liabilities',
+  TOTAL_LIABILITIES: 'Total Liabilities',
+  FIXED_ASSETS: 'Fixed Assets',
   CWIP: 'CWIP',
   INVESTMENTS: 'Investments',
-  OTHER_ASSETS: 'Other assets',
-  TOTAL_ASSETS: 'Total assets',
-  CASH_FROM_OPERATING_ACTIVITIES: 'Cash from operations',
-  CASH_FROM_INVESTING_ACTIVITIES: 'Cash from investing',
-  CASH_FROM_FINANCING_ACTIVITIES: 'Cash from financing',
-  NET_CASH_FLOW: 'Net cash flow',
+  OTHER_ASSETS: 'Other Assets',
+  TOTAL_ASSETS: 'Total Assets',
+  CASH_FROM_OPERATING_ACTIVITIES: 'Cash from Operating Activity',
+  CASH_FROM_INVESTING_ACTIVITIES: 'Cash from Investing Activity',
+  CASH_FROM_FINANCING_ACTIVITIES: 'Cash from Financing Activity',
+  NET_CASH_FLOW: 'Net Cash Flow',
   ROE: 'Return on equity',
   ROCE: 'Return on capital',
   PAT_MARGIN: 'PAT margin',
@@ -79,6 +81,10 @@ const METRIC_LABELS: Record<string, string> = {
   EPS_GROWTH: 'EPS growth',
   DEBT_TO_EQUITY: 'Debt / equity',
   INTEREST_COVERAGE: 'Interest coverage',
+  CURRENT_RATIO: 'Current ratio',
+  QUICK_RATIO: 'Quick ratio',
+  ASSET_TURNOVER: 'Asset turnover',
+  ROA: 'Return on assets',
 };
 
 function orderedCodes(codes: string[]) {
@@ -87,9 +93,11 @@ function orderedCodes(codes: string[]) {
 }
 
 function StatementTable({ title, rows }: { title: string; rows: any[] }) {
-  const periods = Array.from(new Set(rows.map((row) => String(row.period_end_date)))).slice(0, 6);
+  const periods = Array.from(new Set(rows.map((row) => String(row.period_end_date).slice(0, 10)))).slice(0, 6);
   const codes = orderedCodes(Array.from(new Set(rows.map((row) => String(row.metric_code)))));
-  const values = new Map(rows.map((row) => [`${row.metric_code}|${row.period_end_date}`, row.metric_value]));
+  const values = new Map(
+    rows.map((row) => [`${row.metric_code}|${String(row.period_end_date).slice(0, 10)}`, row.metric_value]),
+  );
 
   return (
     <div className="fundamentals-group">
@@ -103,7 +111,7 @@ function StatementTable({ title, rows }: { title: string; rows: any[] }) {
                 <th>Line</th>
                 {periods.map((period) => (
                   <th key={period} className="num">
-                    {period.slice(0, 10)}
+                    {period}
                   </th>
                 ))}
               </tr>
@@ -127,6 +135,54 @@ function StatementTable({ title, rows }: { title: string; rows: any[] }) {
   );
 }
 
+function LatestRatiosStrip({
+  ratios,
+  snapshot,
+  definitions,
+}: {
+  ratios: Record<string, unknown>;
+  snapshot: Record<string, unknown> | undefined;
+  definitions: Record<string, string>;
+}) {
+  const entries = Object.entries(ratios || {}).filter(([, value]) => value != null && value !== '');
+  if (!entries.length) return null;
+  const asOf = snapshot?.as_of ? String(snapshot.as_of).slice(0, 10) : null;
+  const basis = snapshot?.reporting_basis ? String(snapshot.reporting_basis) : null;
+  const method = snapshot?.calculation_method ? String(snapshot.calculation_method) : 'calc_v1';
+  return (
+    <div className="fundamentals-group">
+      <h3>Latest ratios</h3>
+      <p className="panel-subtitle">
+        {basis ? `${basis === 'STANDALONE' ? 'Standalone' : 'Consolidated'}` : 'Basis'}
+        {asOf ? ` · as of ${asOf}` : ''}
+        {` · ${method}`}
+        {snapshot?.computed_on_read ? ' · computed on read' : ' · stored snapshot'}
+        . Standalone and consolidated are never mixed.
+      </p>
+      <div className="table-wrap statement-table-wrap">
+        <table className="stock-table statement-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th className="num">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map(([code, value]) => (
+              <tr key={code}>
+                <th scope="row" title={definitions[code] || ''}>
+                  {METRIC_LABELS[code] || code}
+                </th>
+                <td className="num">{formatStatementValue(code, value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function FundamentalsPanel({ symbol }: { symbol: string }) {
   const [period, setPeriod] = React.useState('ANNUAL');
   const [basis, setBasis] = React.useState('CONSOLIDATED');
@@ -144,9 +200,12 @@ export default function FundamentalsPanel({ symbol }: { symbol: string }) {
   });
 
   const rows = lines.data || [];
-  const periods = (summary.data?.periods || []).slice(0, 5);
+  const periods = (summary.data?.periods || []).slice(0, 6);
   const groups = summary.data?.groups || {};
   const definitions = summary.data?.definitions || {};
+  const latestRatios = summary.data?.latest_ratios || {};
+  const ratioSnapshot = summary.data?.ratio_snapshot;
+  const isQuarterly = period === 'QUARTERLY';
 
   return (
     <section className="panel">
@@ -154,8 +213,9 @@ export default function FundamentalsPanel({ symbol }: { symbol: string }) {
         <div>
           <h2>Fundamentals</h2>
           <p className="panel-subtitle">
-            Profit and loss, balance sheet, and cash flow stay in separate tables. Consolidated includes the
-            subsidiaries. Standalone is the parent company only.
+            Annual and quarterly statements are stored separately (up to 6 columns each). Quarterly matches
+            Screener Quarterly Results; annual matches yearly Profit &amp; loss, Balance sheet, and Cash
+            flow. Consolidated includes subsidiaries; standalone is the parent only — they are never mixed.
           </p>
         </div>
         <SyncJobButton
@@ -167,6 +227,7 @@ export default function FundamentalsPanel({ symbol }: { symbol: string }) {
             ['stock-fundamentals', symbol],
             ['stock-statements', symbol],
             ['stock-shareholding', symbol],
+            ['stock-detail', symbol],
           ]}
         />
       </div>
@@ -182,20 +243,35 @@ export default function FundamentalsPanel({ symbol }: { symbol: string }) {
       </div>
       {lines.isLoading && <div className="loading">Loading fundamentals…</div>}
       {lines.error && <div className="empty">{(lines.error as Error).message}</div>}
+      {!lines.isLoading && isQuarterly && (
+        <StatementTable title="Quarterly Results" rows={rows.filter((row: any) => row.statement_type === 'PL')} />
+      )}
       {!lines.isLoading &&
-        STATEMENT_SECTIONS.map((section) => (
+        !isQuarterly &&
+        ANNUAL_SECTIONS.map((section) => (
           <StatementTable
             key={section.id}
             title={section.title}
             rows={rows.filter((row: any) => row.statement_type === section.id)}
           />
         ))}
+      <LatestRatiosStrip ratios={latestRatios} snapshot={ratioSnapshot} definitions={definitions} />
       {periods.length > 0 &&
         RATIO_GROUPS.map((group) => {
           const metrics = groups[group] as Record<string, Record<string, unknown>> | undefined;
           if (!metrics) return null;
-          const hasAny = Object.values(metrics).some((values) => Object.keys(values || {}).length > 0);
+          const hasAny = Object.values(metrics).some((values) =>
+            Object.values(values || {}).some((value) => value != null && value !== ''),
+          );
           if (!hasAny) return null;
+          const columnPeriods =
+            group === 'growth'
+              ? periods
+              : Array.from(
+                  new Set(
+                    Object.values(metrics).flatMap((values) => Object.keys(values || {})),
+                  ),
+                ).sort((a, b) => b.localeCompare(a));
           return (
             <div key={group} className="fundamentals-group">
               <h3>{GROUP_LABELS[group]}</h3>
@@ -204,7 +280,7 @@ export default function FundamentalsPanel({ symbol }: { symbol: string }) {
                   <thead>
                     <tr>
                       <th>Line</th>
-                      {periods.map((item: string) => (
+                      {columnPeriods.map((item: string) => (
                         <th key={item} className="num">
                           {String(item).slice(0, 10)}
                         </th>
@@ -217,7 +293,7 @@ export default function FundamentalsPanel({ symbol }: { symbol: string }) {
                         <th scope="row" title={definitions[code] || ''}>
                           {METRIC_LABELS[code] || code}
                         </th>
-                        {periods.map((item: string) => (
+                        {columnPeriods.map((item: string) => (
                           <td key={item} className="num">
                             {formatStatementValue(code, values[item])}
                           </td>

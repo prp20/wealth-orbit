@@ -17,22 +17,27 @@ CONSOLIDATED = "CONSOLIDATED"
 STANDALONE = "STANDALONE"
 
 
+_PL_LABELS = {
+    "sales": "REVENUE",
+    "revenue": "REVENUE",
+    "expenses": "TOTAL_EXPENSES",
+    "operating profit": "OPERATING_PROFIT",
+    "opm %": "OPERATING_MARGIN",
+    "other income": "OTHER_INCOME",
+    "depreciation": "DEPRECIATION",
+    "interest": "INTEREST_EXPENSE",
+    "profit before tax": "PROFIT_BEFORE_TAX",
+    "tax %": "TAX_RATE",
+    "net profit": "NET_PROFIT",
+    "eps in rs": "EPS",
+    "eps": "EPS",
+}
+
 FUNDAMENTAL_METRICS = {
-    "profit-loss": {
-        "sales": "REVENUE",
-        "revenue": "REVENUE",
-        "expenses": "TOTAL_EXPENSES",
-        "operating profit": "OPERATING_PROFIT",
-        "opm %": "OPERATING_MARGIN",
-        "other income": "OTHER_INCOME",
-        "depreciation": "DEPRECIATION",
-        "interest": "INTEREST_EXPENSE",
-        "profit before tax": "PROFIT_BEFORE_TAX",
-        "tax %": "TAX_RATE",
-        "net profit": "NET_PROFIT",
-        "eps in rs": "EPS",
-        "eps": "EPS",
-    },
+    # Screener "Quarterly Results" — must be ingested as QUARTERLY (incl. Mar/Dec).
+    "quarters": _PL_LABELS,
+    # Annual Profit & Loss (Mar/Dec year-ends); skip TTM columns at parse time.
+    "profit-loss": _PL_LABELS,
     "balance-sheet": {
         "equity capital": "EQUITY_CAPITAL",
         "reserves": "RESERVES",
@@ -54,10 +59,17 @@ FUNDAMENTAL_METRICS = {
 }
 
 SECTION_STATEMENT_TYPE = {
+    "quarters": "PL",
     "profit-loss": "PL",
     "balance-sheet": "BS",
     "cash-flow": "CF",
 }
+
+# Sections whose every dated column is a quarter (Mar/Dec are quarters, not FY).
+FORCE_QUARTERLY_SECTIONS = frozenset({"quarters"})
+
+# Annual statement tables: only Mar/Dec year-ends are stored (skip mid-year columns).
+ANNUAL_ONLY_SECTIONS = frozenset({"profit-loss", "balance-sheet", "cash-flow"})
 
 
 def metric_statement_types() -> dict[str, str]:
@@ -144,27 +156,41 @@ def normalize_number(value: str | None) -> float | None:
     return -number if negative else number
 
 
-def parse_period(period: str) -> tuple[date, date, str] | None:
+def parse_period(period: str, *, force_quarterly: bool = False) -> tuple[date, date, str] | None:
     """Parse a Screener header into FY/quarter boundaries based on the header month.
 
-    Indian March year-ends and calendar December year-ends are treated as ANNUAL
-    (e.g. ABB). Other months stay QUARTERLY so mixed PL tables keep Jun/Sep quarters.
+    For annual statement tables (profit-loss / balance-sheet / cash-flow), Indian
+    March year-ends and calendar December year-ends are ANNUAL. Other months return
+    QUARTERLY so callers can skip them for annual-only sections.
+
+    For the ``quarters`` table, pass ``force_quarterly=True`` so Mar/Dec columns
+    stay quarterly results and never overwrite annual PL.
     """
-    match = re.fullmatch(r"([A-Za-z]{3})\s+(\d{4})", period.strip())
+    text = period.strip()
+    if not text or text.upper() == "TTM":
+        return None
+    match = re.fullmatch(r"([A-Za-z]{3})\s+(\d{4})", text)
     if not match:
         return None
     try:
         month = list(calendar.month_abbr).index(match.group(1).title())
     except ValueError:
         return None
+    if month <= 0:
+        return None
     year = int(match.group(2))
     end = date(year, month, calendar.monthrange(year, month)[1])
+    if force_quarterly or month not in (3, 12):
+        # Three-month window ending in ``month`` (Indian Q1=Apr–Jun … Q4=Jan–Mar).
+        start_month = month - 2
+        start_year = year
+        if start_month <= 0:
+            start_month += 12
+            start_year -= 1
+        return date(start_year, start_month, 1), end, "QUARTERLY"
     if month == 3:
         return date(year - 1, 4, 1), end, "ANNUAL"
-    if month == 12:
-        return date(year, 1, 1), end, "ANNUAL"
-    quarter_start_month = month - 2
-    return date(year, quarter_start_month, 1), end, "QUARTERLY"
+    return date(year, 1, 1), end, "ANNUAL"
 
 
 def checksum(payload: Any) -> str:
@@ -208,7 +234,11 @@ class ScreenerParser:
             if section is None:
                 continue
             periods, rows = self._table(section)
-            parsed_periods = [parse_period(period) for period in periods]
+            force_quarterly = section_id in FORCE_QUARTERLY_SECTIONS
+            annual_only = section_id in ANNUAL_ONLY_SECTIONS
+            parsed_periods = [
+                parse_period(period, force_quarterly=force_quarterly) for period in periods
+            ]
             for label, cells in rows:
                 metric_code = label_map.get(label.casefold())
                 if metric_code is None:
@@ -220,9 +250,13 @@ class ScreenerParser:
                     if period is None or number is None:
                         continue
                     start, end, reporting_period = period
+                    # Annual statement tables never write mid-year columns into quarterly storage.
+                    if annual_only and reporting_period != "ANNUAL":
+                        continue
+                    # Quarterly Results (#quarters) are PL only by section map.
                     values.append(FundamentalValue(
                         stock_id, metric_code, reporting_period, start, end, self.reporting_basis,
-                        number, checksum({"label": label, "period": periods[index], "value": cell, "basis": self.reporting_basis}),
+                        number, checksum({"label": label, "period": periods[index], "value": cell, "basis": self.reporting_basis, "section": section_id}),
                         SECTION_STATEMENT_TYPE[section_id],
                     ))
         shareholding = self._shareholding(soup, stock_id)

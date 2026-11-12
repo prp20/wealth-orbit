@@ -55,7 +55,7 @@ def test_opaque_sync_error_strips_url_and_password_material():
 UPSERT_KEYS = {
     "stock_ohlcv": "(stock_id, trading_date)",
     "stock_daily_metrics": "(stock_id, metric_date)",
-    "fundamentals": "(stock_id, metric_id, reporting_period, reporting_basis, period_end_date)",
+    "fundamentals": "(stock_id, metric_id, reporting_basis, period_end_date)",
     "shareholding": "(stock_id, period_end_date)",
     "mf_nav": "(scheme_id, nav_date)",
     "index_ohlc": "(index_id, history_date)",

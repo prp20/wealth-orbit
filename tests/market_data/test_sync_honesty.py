@@ -89,10 +89,12 @@ def test_sync_stock_fundamentals_persists_both_bases_without_clobber(monkeypatch
         def __init__(self):
             self.last_sql = ""
             self.last_params = None
+            self.rowcount = 0
 
         def execute(self, sql, params=None):
             self.last_sql = " ".join(sql.split())
             self.last_params = params
+            self.rowcount = 0
             if "INSERT INTO market_data.fundamental_metric_reference" in self.last_sql:
                 # Single-row path (legacy) or leftover execute_values expansion.
                 if params and len(params) >= 2 and not isinstance(params[0], (list, tuple)):
@@ -102,6 +104,8 @@ def test_sync_stock_fundamentals_persists_both_bases_without_clobber(monkeypatch
             sql = self.last_sql
             if "FROM market_data.stock_reference" in sql:
                 return (stock_id,)
+            if "FROM market_data.stock_daily_metrics" in sql and "ORDER BY metric_date DESC" in sql:
+                return None
             return None
 
         def fetchall(self):
@@ -110,6 +114,7 @@ def test_sync_stock_fundamentals_persists_both_bases_without_clobber(monkeypatch
                     (code, metric_id, "CF")
                     for code, metric_id in metric_ids.items()
                 ]
+            # Annual consol statement pull for ratio snapshot — empty is fine for this test.
             return []
 
         def __enter__(self):
@@ -137,7 +142,10 @@ def test_sync_stock_fundamentals_persists_both_bases_without_clobber(monkeypatch
             for row in argslist:
                 metric_ids[row[1]] = row[0]
             return None
-        if "INSERT INTO market_data.stock_fundamental_values" in normalized:
+        if (
+            "INSERT INTO market_data.stock_annual_fundamental_values" in normalized
+            or "INSERT INTO market_data.stock_quarterly_fundamental_values" in normalized
+        ):
             inserts.extend(argslist)
             value_sql.append(normalized)
             return None
@@ -176,9 +184,11 @@ def test_sync_stock_fundamentals_persists_both_bases_without_clobber(monkeypatch
     assert result["fundamental_rows_consolidated"] == 1
     assert result["fundamental_rows_standalone"] == 1
     assert result["basis_warnings"] == []
-    bases = {row[5] for row in inserts}
-    values = {row[5]: row[6] for row in inserts}
+    # row: stock_id, metric_id, period_start, period_end, reporting_basis, value, source_id
+    bases = {row[4] for row in inserts}
+    values = {row[4]: row[5] for row in inserts}
     assert bases == {"CONSOLIDATED", "STANDALONE"}
     assert values["CONSOLIDATED"] == 40.0
     assert values["STANDALONE"] == 35.0
+    assert all("stock_annual_fundamental_values" in sql for sql in value_sql)
     assert all("ON CONFLICT" in sql for sql in value_sql)

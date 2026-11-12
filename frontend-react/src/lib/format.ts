@@ -66,12 +66,19 @@ const PERCENT_POINT_CODES = new Set([
   'TAX_RATE',
   'ROE',
   'ROCE',
+  'ROA',
   'PAT_MARGIN',
   'REVENUE_GROWTH',
   'EPS_GROWTH',
 ]);
 
-const RATIO_CODES = new Set(['DEBT_TO_EQUITY', 'INTEREST_COVERAGE']);
+const RATIO_CODES = new Set([
+  'DEBT_TO_EQUITY',
+  'INTEREST_COVERAGE',
+  'CURRENT_RATIO',
+  'QUICK_RATIO',
+  'ASSET_TURNOVER',
+]);
 
 export function formatStatementValue(code: string, value: unknown): string {
   if (code === 'EPS') return formatInr(value);
