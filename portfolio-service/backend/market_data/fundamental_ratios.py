@@ -260,6 +260,7 @@ def upsert_latest_fundamental_ratios(cur, stock_id, snapshot: dict[str, Any], so
     # Ensure JSON-serializable floats/None
     json.dumps(payload, allow_nan=False)
 
+    # Column check allows only PROVIDER | CALCULATED; calc_v1 lives in the JSON bag.
     cur.execute(
         """
         INSERT INTO market_data.stock_daily_metrics
@@ -270,7 +271,7 @@ def upsert_latest_fundamental_ratios(cur, stock_id, snapshot: dict[str, Any], so
           updated_at = NOW()
         -- Do not overwrite Yahoo calculation_method / valuation columns.
         """,
-        (stock_id, metric_date, Json(payload), CALC_VERSION, source_id),
+        (stock_id, metric_date, Json(payload), "CALCULATED", source_id),
     )
     cur.execute(
         """
