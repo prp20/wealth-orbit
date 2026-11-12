@@ -89,10 +89,12 @@ def test_sync_stock_fundamentals_persists_both_bases_without_clobber(monkeypatch
         def __init__(self):
             self.last_sql = ""
             self.last_params = None
+            self.rowcount = 0
 
         def execute(self, sql, params=None):
             self.last_sql = " ".join(sql.split())
             self.last_params = params
+            self.rowcount = 0
             if "INSERT INTO market_data.stock_fundamental_values" in self.last_sql:
                 inserts.append(params)
                 value_sql.append(self.last_sql)
@@ -108,7 +110,13 @@ def test_sync_stock_fundamentals_persists_both_bases_without_clobber(monkeypatch
                 if code in metric_ids:
                     return (metric_ids[code], "CF")
                 return None
+            if "FROM market_data.stock_daily_metrics" in sql and "ORDER BY metric_date DESC" in sql:
+                return None
             return None
+
+        def fetchall(self):
+            # Annual consol statement pull for ratio snapshot — empty is fine for this test.
+            return []
 
         def __enter__(self):
             return self

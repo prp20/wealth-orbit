@@ -11,8 +11,15 @@ from psycopg2.extras import execute_values
 
 from backend_api.app.technical_indicators import calculate_indicators
 
+from psycopg2.extras import Json
+
 from .daily_metrics import yahoo_daily_metric_fields
 from .sources import ensure_data_source
+
+
+def json_bag(value):
+    """Wrap a dict for jsonb, or pass through NULL."""
+    return Json(value) if value is not None else None
 
 
 DEFAULT_INDICATORS = [
@@ -136,21 +143,43 @@ def sync_daily_metrics(symbol: str, force: bool = False) -> dict:
             metric_date = frame.iloc[-1]["date"]
             source_id = _source_id(cur, "yfinance")
             fields = yahoo_daily_metric_fields(info)
+            # Carry forward statement-derived ratio bag when the Yahoo as-of date moves.
+            cur.execute(
+                """
+                SELECT fundamental_ratios
+                FROM market_data.stock_daily_metrics
+                WHERE stock_id=%s AND fundamental_ratios IS NOT NULL
+                ORDER BY metric_date DESC
+                LIMIT 1
+                """,
+                (stock_id,),
+            )
+            bag_row = cur.fetchone()
+            carried_bag = bag_row[0] if bag_row else None
             values = (
                 stock_id, metric_date, fields["market_cap"], fields["stock_pe"], fields["price_to_book"],
                 fields["dividend_yield"], fields["book_value"], fields["roce"], fields["roe"],
                 fields["enterprise_value"], fields["ebitda_ttm"], fields["ev_ebitda"], fields["ev_sales"],
-                fields["net_debt"], fields["fcf_yield"], source_id,
+                fields["net_debt"], fields["fcf_yield"], source_id, json_bag(carried_bag),
             )
             cur.execute("""INSERT INTO market_data.stock_daily_metrics
                 (stock_id,metric_date,market_cap,stock_pe,price_to_book,dividend_yield,book_value,roce,roe,
-                 enterprise_value,ebitda_ttm,ev_ebitda,ev_sales,net_debt,fcf_yield,peg,calculation_method,source_id)
-                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL,'PROVIDER',%s)
+                 enterprise_value,ebitda_ttm,ev_ebitda,ev_sales,net_debt,fcf_yield,peg,calculation_method,source_id,
+                 fundamental_ratios)
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL,'PROVIDER',%s,%s)
                 ON CONFLICT(stock_id,metric_date) DO UPDATE SET market_cap=EXCLUDED.market_cap,stock_pe=EXCLUDED.stock_pe,
                 price_to_book=EXCLUDED.price_to_book,dividend_yield=EXCLUDED.dividend_yield,book_value=EXCLUDED.book_value,
                 roce=EXCLUDED.roce,roe=EXCLUDED.roe,enterprise_value=EXCLUDED.enterprise_value,
                 ebitda_ttm=EXCLUDED.ebitda_ttm,ev_ebitda=EXCLUDED.ev_ebitda,ev_sales=EXCLUDED.ev_sales,
                 net_debt=EXCLUDED.net_debt,fcf_yield=EXCLUDED.fcf_yield,peg=NULL,
-                source_id=EXCLUDED.source_id,updated_at=NOW()""", values)
+                source_id=EXCLUDED.source_id,
+                fundamental_ratios=COALESCE(EXCLUDED.fundamental_ratios, market_data.stock_daily_metrics.fundamental_ratios),
+                updated_at=NOW()""", values)
+            # Latest-only retention (bag carried onto this row; drop older dates).
+            cur.execute(
+                """DELETE FROM market_data.stock_daily_metrics
+                   WHERE stock_id=%s AND metric_date <> %s""",
+                (stock_id, metric_date),
+            )
         conn.commit()
     return {"symbol": symbol, "kind": "daily_metrics", "status": "completed", "records_processed": 1, "force": force, "metric_date": str(metric_date)}

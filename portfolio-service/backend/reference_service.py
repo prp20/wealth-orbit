@@ -92,9 +92,11 @@ CURATED_FUNDAMENTAL_GROUPS = {
     "profit_and_loss": ["REVENUE", "SALES", "OPERATING_PROFIT", "OPERATING_MARGIN", "EBITDA", "NET_PROFIT", "EPS"],
     "balance_sheet": ["EQUITY_CAPITAL", "RESERVES", "BORROWINGS", "TOTAL_DEBT", "NET_DEBT", "TOTAL_ASSETS"],
     "cash_flow": ["CASH_FROM_OPERATING_ACTIVITIES", "OPERATING_CASH_FLOW", "FREE_CASH_FLOW", "NET_CASH_FLOW"],
-    "profitability": ["ROE", "ROCE", "PAT_MARGIN"],
+    "profitability": ["ROE", "ROCE", "PAT_MARGIN", "OPERATING_MARGIN"],
     "growth": ["REVENUE_GROWTH", "EPS_GROWTH"],
     "leverage": ["DEBT_TO_EQUITY", "INTEREST_COVERAGE"],
+    "liquidity": ["CURRENT_RATIO", "QUICK_RATIO"],
+    "efficiency": ["ASSET_TURNOVER", "ROA"],
 }
 
 FUNDAMENTAL_DEFINITIONS = {
@@ -105,16 +107,23 @@ FUNDAMENTAL_DEFINITIONS = {
     "EBITDA": "Earnings before interest, tax, depreciation and amortisation",
     "NET_PROFIT": "Profit after tax",
     "EPS": "Earnings per share",
-    "ROE": "Net profit / average equity",
-    "ROCE": "EBIT / capital employed",
+    "ROE": "Net profit / shareholders' equity (calc_v1)",
+    "ROCE": "Operating profit / (equity + borrowings) (calc_v1)",
     "PAT_MARGIN": "Net profit as % of revenue",
-    "REVENUE_GROWTH": "Period-over-period revenue growth",
-    "EPS_GROWTH": "Period-over-period EPS growth",
-    "DEBT_TO_EQUITY": "Total debt / equity",
-    "INTEREST_COVERAGE": "EBIT / interest expense",
+    "REVENUE_GROWTH": "Period-over-period revenue growth from stored statements",
+    "EPS_GROWTH": "Period-over-period EPS growth from stored statements",
+    "DEBT_TO_EQUITY": "Borrowings / shareholders' equity",
+    "INTEREST_COVERAGE": "Operating profit / interest expense",
+    "CURRENT_RATIO": "Current assets / current liabilities (Screener fallback when missing)",
+    "QUICK_RATIO": "Quick assets / current liabilities (Screener fallback when missing)",
+    "ASSET_TURNOVER": "Revenue / total assets",
+    "ROA": "Net profit / total assets",
     "FREE_CASH_FLOW": "Cash from operations minus capex (when disclosed)",
     "NET_DEBT": "Interest-bearing debt minus cash",
 }
+
+RATIO_GROUP_NAMES = ("profitability", "growth", "leverage", "liquidity", "efficiency")
+
 
 
 def stock_detail_enriched(symbol: str, last_sync_by_kind: dict | None = None):
@@ -423,33 +432,144 @@ def stock_compare(symbols: list[str]) -> list[dict]:
 
 
 def stock_fundamentals_summary(symbol: str, reporting_period: str = "ANNUAL", reporting_basis: str = "CONSOLIDATED") -> dict | None:
+    """Statement groups plus latest ratios and on-read YoY/QoQ trends.
+
+    Ratio history is never stored; growth and SA ratios are computed from the
+    capped PL/BS/CF rows. The consol latest snapshot on ``stock_daily_metrics``
+    is preferred when ``reporting_basis`` is CONSOLIDATED.
+    """
+    from backend.market_data.fundamental_ratios import (
+        RATIO_DEFINITIONS,
+        build_latest_snapshot,
+        growth_series,
+    )
+
     if stock_detail(symbol) is None:
         return None
     reporting_period = reporting_period or "ANNUAL"
     reporting_basis = reporting_basis or "CONSOLIDATED"
-    curated_codes = [code for codes in CURATED_FUNDAMENTAL_GROUPS.values() for code in codes]
+    statement_codes = [
+        code
+        for name, codes in CURATED_FUNDAMENTAL_GROUPS.items()
+        if name in ("profit_and_loss", "balance_sheet", "cash_flow")
+        for code in codes
+    ]
+    ratio_codes = [
+        code for name in RATIO_GROUP_NAMES for code in CURATED_FUNDAMENTAL_GROUPS[name]
+    ]
     frame = stock_fundamentals(symbol, reporting_period, reporting_basis, "", "")
-    if not frame.empty:
-        frame = frame[frame["metric_code"].isin(curated_codes)]
-    periods = sorted({str(p) for p in frame["period_end_date"].tolist()}, reverse=True) if not frame.empty else []
-    groups: dict[str, dict] = {name: {code: {} for code in codes} for name, codes in CURATED_FUNDAMENTAL_GROUPS.items()}
-    if not frame.empty:
-        for _, row in frame.iterrows():
+    statement_frame = frame[frame["metric_code"].isin(statement_codes)] if not frame.empty else frame
+    periods = (
+        sorted({str(p)[:10] for p in statement_frame["period_end_date"].tolist()}, reverse=True)
+        if not statement_frame.empty
+        else []
+    )[:6]
+    groups: dict[str, dict] = {
+        name: {code: {} for code in codes} for name, codes in CURATED_FUNDAMENTAL_GROUPS.items()
+    }
+    if not statement_frame.empty:
+        for _, row in statement_frame.iterrows():
             code = row["metric_code"]
-            period = str(row["period_end_date"])
-            for group_name, codes in CURATED_FUNDAMENTAL_GROUPS.items():
-                if code in codes:
+            period = str(row["period_end_date"])[:10]
+            for group_name in ("profit_and_loss", "balance_sheet", "cash_flow"):
+                if code in CURATED_FUNDAMENTAL_GROUPS[group_name]:
                     groups[group_name][code][period] = row["metric_value"]
                     break
+
+    rows = statement_frame.to_dict(orient="records") if not statement_frame.empty else []
+    # Growth trends always from statements on read.
+    revenue_growth = growth_series(rows, "REVENUE")
+    eps_growth = growth_series(rows, "EPS")
+    for period in periods:
+        groups["growth"]["REVENUE_GROWTH"][period] = revenue_growth.get(period)
+        groups["growth"]["EPS_GROWTH"][period] = eps_growth.get(period)
+
+    latest_ratios: dict | None = None
+    snapshot_meta: dict = {}
+    if reporting_basis == "CONSOLIDATED":
+        bag = _latest_fundamental_ratios_bag(symbol)
+        if bag and bag.get("ratios"):
+            latest_ratios = bag["ratios"]
+            snapshot_meta = {
+                "as_of": bag.get("as_of"),
+                "reporting_basis": bag.get("reporting_basis") or "CONSOLIDATED",
+                "reporting_period": bag.get("reporting_period") or "ANNUAL",
+                "calculation_method": bag.get("calculation_method") or "calc_v1",
+                "methods": bag.get("methods") or {},
+            }
+    if latest_ratios is None:
+        # SA (or missing consol snapshot): compute on read from current view statements.
+        annual_rows = rows
+        if reporting_period != "ANNUAL":
+            annual = stock_fundamentals(symbol, "ANNUAL", reporting_basis, "", "")
+            annual_rows = annual.to_dict(orient="records") if not annual.empty else []
+        built = build_latest_snapshot(
+            annual_rows,
+            None,
+            reporting_basis=reporting_basis,
+            reporting_period="ANNUAL",
+        )
+        latest_ratios = built["ratios"]
+        snapshot_meta = {
+            "as_of": built.get("as_of"),
+            "reporting_basis": reporting_basis,
+            "reporting_period": "ANNUAL",
+            "calculation_method": built.get("calculation_method"),
+            "methods": built.get("methods") or {},
+            "computed_on_read": True,
+        }
+
+    for group_name in RATIO_GROUP_NAMES:
+        if group_name == "growth":
+            continue
+        for code in CURATED_FUNDAMENTAL_GROUPS[group_name]:
+            value = (latest_ratios or {}).get(code)
+            as_of = snapshot_meta.get("as_of")
+            if as_of and value is not None:
+                groups[group_name][code][str(as_of)[:10]] = value
+            elif value is not None and periods:
+                groups[group_name][code][periods[0]] = value
+
+    definitions = {
+        code: FUNDAMENTAL_DEFINITIONS[code]
+        for code in statement_codes + ratio_codes
+        if code in FUNDAMENTAL_DEFINITIONS
+    }
+    definitions.update({k: v for k, v in RATIO_DEFINITIONS.items() if k not in definitions})
+
     return {
         "reporting_period": reporting_period,
         "reporting_basis": reporting_basis,
         "periods": periods,
         "groups": groups,
-        "definitions": {code: FUNDAMENTAL_DEFINITIONS[code] for code in curated_codes if code in FUNDAMENTAL_DEFINITIONS},
+        "latest_ratios": latest_ratios or {},
+        "ratio_snapshot": snapshot_meta,
+        "definitions": definitions,
         "source": "screener",
-        "note": "Standalone and consolidated values are never mixed in one view.",
+        "note": (
+            "Standalone and consolidated values are never mixed in one view. "
+            "Ratio trends (YoY/QoQ) are computed on read from stored statements; "
+            "only one latest ratio snapshot is persisted per stock."
+        ),
     }
+
+
+def _latest_fundamental_ratios_bag(symbol: str) -> dict | None:
+    frame = _query(
+        """
+        SELECT m.fundamental_ratios
+        FROM market_data.stock_daily_metrics m
+        JOIN market_data.stock_reference s ON s.stock_id = m.stock_id
+        WHERE s.trading_symbol=%s AND m.fundamental_ratios IS NOT NULL
+        ORDER BY m.metric_date DESC
+        LIMIT 1
+        """,
+        (symbol,),
+    )
+    if frame.empty:
+        return None
+    bag = frame.iloc[0]["fundamental_ratios"]
+    return bag if isinstance(bag, dict) else None
 
 
 def mutual_fund_detail(scheme_code: str):
@@ -1397,6 +1517,41 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
                 cur.execute("""INSERT INTO market_data.stock_shareholding_history(stock_id,period_end_date,promoter_pct,fii_pct,dii_pct,government_pct,public_pct,shareholder_count,source_id)
                     VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(stock_id,period_end_date)
                     DO UPDATE SET promoter_pct=EXCLUDED.promoter_pct,fii_pct=EXCLUDED.fii_pct,dii_pct=EXCLUDED.dii_pct,government_pct=EXCLUDED.government_pct,public_pct=EXCLUDED.public_pct,shareholder_count=EXCLUDED.shareholder_count,source_id=EXCLUDED.source_id,updated_at=NOW()""", (stock_id,value.period_end,value.promoter_pct,value.fii_pct,value.dii_pct,value.government_pct,value.public_pct,value.shareholder_count,source_id))
+            from backend.market_data.fundamentals_retention import prune_fundamental_periods
+            from backend.market_data.fundamental_ratios import (
+                build_latest_snapshot,
+                upsert_latest_fundamental_ratios,
+            )
+
+            pruned = prune_fundamental_periods(cur, stock_id)
+            # Consol annual statements → latest ratio snapshot (SA computed on read).
+            cur.execute(
+                """
+                SELECT r.metric_code, v.period_end_date, v.metric_value
+                FROM market_data.stock_fundamental_values v
+                JOIN market_data.fundamental_metric_reference r ON r.metric_id = v.metric_id
+                WHERE v.stock_id=%s
+                  AND v.reporting_basis=%s
+                  AND v.reporting_period='ANNUAL'
+                  AND r.statement_type IN ('PL','BS','CF')
+                """,
+                (stock_id, CONSOLIDATED),
+            )
+            statement_rows = [
+                {"metric_code": code, "period_end_date": str(period_end)[:10], "metric_value": value}
+                for code, period_end, value in cur.fetchall()
+            ]
+            top_ratios = {}
+            consol_parsed = parsed_by_basis.get(CONSOLIDATED)
+            if consol_parsed and getattr(consol_parsed, "ratios", None):
+                top_ratios = consol_parsed.ratios
+            snapshot = build_latest_snapshot(
+                statement_rows,
+                top_ratios,
+                reporting_basis=CONSOLIDATED,
+                reporting_period="ANNUAL",
+            )
+            metric_date = upsert_latest_fundamental_ratios(cur, stock_id, snapshot, source_id)
         connection.commit()
     fundamental_rows = counts[CONSOLIDATED] + counts[STANDALONE]
     return {
@@ -1409,4 +1564,7 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
         "warnings": parser_warnings,
         "basis_warnings": basis_warnings,
         "force": force,
+        "pruned_rows": pruned,
+        "ratio_snapshot_metric_date": metric_date,
+        "ratio_snapshot_as_of": snapshot.get("as_of"),
     }
