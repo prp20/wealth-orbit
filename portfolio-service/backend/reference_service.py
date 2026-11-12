@@ -1585,14 +1585,6 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
                 raise RuntimeError(f"Fundamentals sync failed for {symbol}: screener_html_unavailable")
             if not any(parsed.fundamental_values or parsed.shareholding for parsed in parsed_by_basis.values()):
                 raise RuntimeError(f"Fundamentals sync failed for {symbol}: screener_parse_empty")
-            # Remove Dec year-ends previously mis-tagged as Oct–Dec quarters.
-            cur.execute(
-                """DELETE FROM market_data.stock_fundamental_values
-                   WHERE stock_id=%s AND reporting_period='QUARTERLY'
-                     AND EXTRACT(MONTH FROM period_end_date)=12
-                     AND EXTRACT(MONTH FROM period_start_date)=10""",
-                (stock_id,),
-            )
             if force:
                 cur.execute("DELETE FROM market_data.stock_fundamental_values WHERE stock_id=%s", (stock_id,))
                 cur.execute("DELETE FROM market_data.stock_shareholding_history WHERE stock_id=%s", (stock_id,))

@@ -69,6 +69,66 @@ def test_parse_period_treats_march_and_december_as_annual():
     assert parse_period("Mar 2024") == (date(2023, 4, 1), date(2024, 3, 31), "ANNUAL")
     assert parse_period("Dec 2024") == (date(2024, 1, 1), date(2024, 12, 31), "ANNUAL")
     assert parse_period("Jun 2024") == (date(2024, 4, 1), date(2024, 6, 30), "QUARTERLY")
+    assert parse_period("TTM") is None
+
+
+def test_parse_period_force_quarterly_keeps_mar_and_dec_as_quarters():
+    assert parse_period("Mar 2024", force_quarterly=True) == (
+        date(2024, 1, 1),
+        date(2024, 3, 31),
+        "QUARTERLY",
+    )
+    assert parse_period("Dec 2023", force_quarterly=True) == (
+        date(2023, 10, 1),
+        date(2023, 12, 31),
+        "QUARTERLY",
+    )
+    assert parse_period("Sep 2023", force_quarterly=True) == (
+        date(2023, 7, 1),
+        date(2023, 9, 30),
+        "QUARTERLY",
+    )
+
+
+def test_parser_reads_quarters_section_as_quarterly_pl():
+    stock_id = uuid4()
+    parsed = ScreenerParser().parse(
+        """
+        <section id="quarters"><table class="data-table">
+          <thead><tr><th>Particulars</th><th>Sep 2023</th><th>Dec 2023</th><th>Mar 2024</th></tr></thead>
+          <tbody>
+            <tr><td>Sales +</td><td>3,334</td><td>3,126</td><td>3,636</td></tr>
+            <tr><td>Net Profit</td><td>104</td><td>110</td><td>150</td></tr>
+          </tbody>
+        </table></section>
+        <section id="profit-loss"><table class="data-table">
+          <thead><tr><th>Particulars</th><th>Mar 2024</th><th>TTM</th></tr></thead>
+          <tbody>
+            <tr><td>Sales</td><td>13,268</td><td>12,000</td></tr>
+          </tbody>
+        </table></section>
+        """,
+        stock_id=stock_id,
+    )
+    quarterly = [
+        item
+        for item in parsed.fundamental_values
+        if item.reporting_period == "QUARTERLY" and item.metric_code == "REVENUE"
+    ]
+    assert [(item.period_end, item.value) for item in quarterly] == [
+        (date(2023, 9, 30), 3334.0),
+        (date(2023, 12, 31), 3126.0),
+        (date(2024, 3, 31), 3636.0),
+    ]
+    assert all(item.statement_type == "PL" for item in quarterly)
+    annual = [
+        item
+        for item in parsed.fundamental_values
+        if item.reporting_period == "ANNUAL" and item.metric_code == "REVENUE"
+    ]
+    assert len(annual) == 1
+    assert annual[0].value == 13268.0
+    assert annual[0].period_end == date(2024, 3, 31)
 
 
 def test_parser_maps_december_year_end_statements_as_annual():
