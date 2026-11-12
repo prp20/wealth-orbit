@@ -9,6 +9,9 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # market_data lives on Supabase Postgres only; local SQLite is the ledger.
+    if op.get_bind().dialect.name != "postgresql":
+        return
     op.execute(
         """
         ALTER TABLE market_data.stock_daily_metrics
@@ -18,6 +21,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if op.get_bind().dialect.name != "postgresql":
+        return
     op.execute(
         """
         ALTER TABLE market_data.stock_daily_metrics
