@@ -106,7 +106,11 @@ def test_seed_stock_technicals_module_exposes_seed():
     assert "def seed(" in technicals
     assert "sync_daily_metrics" in technicals
     assert "sync_technical_indicators" in technicals
+    assert "ThreadPoolExecutor" in technicals
+    assert "workers" in technicals
     assert "latest trading day" in technicals.lower() or "with_technicals" in technicals
+    stocks_runner = (SEED_DIR / "run_seed_stocks.py").read_text(encoding="utf-8")
+    assert "--technicals-workers" in stocks_runner
     trim = (SEED_DIR / "trim_market_history.py").read_text(encoding="utf-8")
     assert "def trim(" in trim
     assert "stock_daily_prices" in trim

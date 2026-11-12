@@ -11,6 +11,11 @@ const FAMILIES: { title: string; match: (code: string) => boolean }[] = [
   { title: 'ATR', match: (code) => code.startsWith('ATR') },
 ];
 
+function familyFor(code: string) {
+  const upper = String(code || '').toUpperCase();
+  return FAMILIES.find((family) => family.match(upper))?.title || 'Other';
+}
+
 function latestBySeries(rows: any[]) {
   const map = new Map<string, any>();
   for (const row of rows) {
@@ -18,9 +23,16 @@ function latestBySeries(rows: any[]) {
     const existing = map.get(key);
     if (!existing || String(row.date) >= String(existing.date)) map.set(key, row);
   }
-  return Array.from(map.values()).sort((a, b) =>
-    String(a.indicator_code).localeCompare(String(b.indicator_code)),
-  );
+  const familyOrder = new Map(FAMILIES.map((family, index) => [family.title, index]));
+  return Array.from(map.values()).sort((a, b) => {
+    const fa = familyFor(a.indicator_code);
+    const fb = familyFor(b.indicator_code);
+    const familyCmp = (familyOrder.get(fa) ?? 99) - (familyOrder.get(fb) ?? 99);
+    if (familyCmp !== 0) return familyCmp;
+    const codeCmp = String(a.indicator_code).localeCompare(String(b.indicator_code));
+    if (codeCmp !== 0) return codeCmp;
+    return String(a.component || '').localeCompare(String(b.component || ''));
+  });
 }
 
 export default function TechnicalsPanel({ symbol }: { symbol: string }) {
@@ -53,28 +65,34 @@ export default function TechnicalsPanel({ symbol }: { symbol: string }) {
       {!technical.isLoading && !latest.length && (
         <div className="empty">No technicals yet. Sync prices first, then refresh this panel.</div>
       )}
-      {FAMILIES.map((family) => {
-        const items = latest.filter((row) => family.match(String(row.indicator_code || '').toUpperCase()));
-        if (!items.length) return null;
-        return (
-          <div key={family.title} className="technical-family">
-            <h3>{family.title}</h3>
-            <div className="metrics compact-metrics">
-              {items.map((row) => (
-                <div className="metric" key={`${row.indicator_code}-${row.indicator_period}-${row.component}`}>
-                  <small>
-                    {row.indicator_code}
-                    {row.indicator_period ? ` (${row.indicator_period})` : ''}
-                    {row.component ? ` · ${row.component}` : ''}
-                  </small>
-                  <strong>{formatRatio(row.indicator_value)}</strong>
-                  <small>{formatDate(row.date)}</small>
-                </div>
+      {latest.length > 0 && (
+        <div className="table-wrap">
+          <table className="stock-table">
+            <thead>
+              <tr>
+                <th>Family</th>
+                <th>Indicator</th>
+                <th>Period</th>
+                <th>Component</th>
+                <th>Value</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {latest.map((row) => (
+                <tr key={`${row.indicator_code}-${row.indicator_period}-${row.component}`}>
+                  <td>{familyFor(row.indicator_code)}</td>
+                  <td>{row.indicator_code}</td>
+                  <td>{row.indicator_period || '—'}</td>
+                  <td>{row.component || '—'}</td>
+                  <td>{formatRatio(row.indicator_value)}</td>
+                  <td>{formatDate(row.date)}</td>
+                </tr>
               ))}
-            </div>
-          </div>
-        );
-      })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }

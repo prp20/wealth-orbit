@@ -88,6 +88,7 @@ def _seed_stocks(args, data_dir: Path) -> None:
             limit=None if master_symbols is not None else args.limit,
             delay_secs=args.technicals_delay,
             symbols=master_symbols,
+            workers=args.technicals_workers,
         )
     else:
         print("[stocks] technicals/metrics skipped (pass --with-technicals to enable)")
@@ -163,8 +164,14 @@ def main():
     parser.add_argument(
         "--technicals-delay",
         type=float,
-        default=0.5,
-        help="Seconds between technicals/metrics symbols",
+        default=0.0,
+        help="Per-worker pause after each technicals/metrics symbol (default 0)",
+    )
+    parser.add_argument(
+        "--technicals-workers",
+        type=int,
+        default=8,
+        help="Parallel workers for technicals/metrics sync (default 8)",
     )
     args = parser.parse_args()
 

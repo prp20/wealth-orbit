@@ -57,7 +57,7 @@ def main():
     parser.add_argument(
         "--with-technicals",
         action="store_true",
-        help="Also sync Yahoo daily metrics (technical indicators are computed on read)",
+        help="Also sync latest-day technicals + Yahoo daily metrics",
     )
     parser.add_argument(
         "--technicals-only",
@@ -73,8 +73,14 @@ def main():
     parser.add_argument(
         "--technicals-delay",
         type=float,
-        default=0.5,
-        help="Seconds between technicals/metrics symbols (default 0.5)",
+        default=0.0,
+        help="Per-worker pause after each technicals/metrics symbol (default 0)",
+    )
+    parser.add_argument(
+        "--technicals-workers",
+        type=int,
+        default=8,
+        help="Parallel workers for technicals/metrics sync (default 8)",
     )
     args = parser.parse_args()
 
@@ -139,6 +145,7 @@ def main():
             limit=None if master_symbols is not None else args.limit,
             delay_secs=args.technicals_delay,
             symbols=master_symbols,
+            workers=args.technicals_workers,
         )
     else:
         print("\n[skipped] Technicals/daily metrics — pass --with-technicals if needed")
