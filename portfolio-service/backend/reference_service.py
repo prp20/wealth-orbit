@@ -168,8 +168,18 @@ def stock_detail_enriched(symbol: str, last_sync_by_kind: dict | None = None):
         ),
         freshness AS (
           SELECT
-            (SELECT MAX(v.period_end_date) FROM market_data.stock_fundamental_values v
-             JOIN base b ON b.stock_id=v.stock_id) AS latest_fundamental_period_end,
+            (
+              SELECT MAX(period_end)
+              FROM (
+                SELECT MAX(v.period_end_date) AS period_end
+                FROM market_data.stock_annual_fundamental_values v
+                JOIN base b ON b.stock_id=v.stock_id
+                UNION ALL
+                SELECT MAX(v.period_end_date) AS period_end
+                FROM market_data.stock_quarterly_fundamental_values v
+                JOIN base b ON b.stock_id=v.stock_id
+              ) ends
+            ) AS latest_fundamental_period_end,
             (SELECT MAX(h.period_end_date) FROM market_data.stock_shareholding_history h
              JOIN base b ON b.stock_id=h.stock_id) AS latest_shareholding_period_end,
             (SELECT MAX(p.trading_date) FROM market_data.stock_daily_prices p
@@ -1389,16 +1399,53 @@ def stock_daily_metrics(symbol: str, from_date=None, to_date=None) -> pd.DataFra
 
 def stock_fundamentals(symbol: str, reporting_period: str = "", reporting_basis: str = "", metric_code: str = "", statement_type: str = "") -> pd.DataFrame:
     from backend.market_data.providers.screener import canonical_statement_type
-    frame = _query("""SELECT v.period_end_date, v.period_start_date, v.reporting_period,
-        v.reporting_basis, r.metric_code, r.metric_name, r.statement_type, r.unit,
-        v.metric_value, v.publication_date, v.version, v.source_id
-        FROM market_data.stock_fundamental_values v
-        JOIN market_data.stock_reference s ON s.stock_id=v.stock_id
-        JOIN market_data.fundamental_metric_reference r ON r.metric_id=v.metric_id
-        WHERE s.trading_symbol=%s AND (%s='' OR v.reporting_period=%s)
-          AND (%s='' OR v.reporting_basis=%s) AND (%s='' OR r.metric_code=%s)
-        ORDER BY v.period_end_date DESC, r.metric_code""",
-        (symbol, reporting_period, reporting_period, reporting_basis, reporting_basis, metric_code, metric_code))
+
+    period = (reporting_period or "").upper()
+    select_cols = """v.period_end_date, v.period_start_date, v.reporting_basis,
+        r.metric_code, r.metric_name, r.statement_type, r.unit,
+        v.metric_value, v.publication_date, v.version, v.source_id"""
+    where = """s.trading_symbol=%s AND (%s='' OR v.reporting_basis=%s)
+          AND (%s='' OR r.metric_code=%s)"""
+    params_tail = (symbol, reporting_basis, reporting_basis, metric_code, metric_code)
+
+    if period == "ANNUAL":
+        frame = _query(
+            f"""SELECT {select_cols}, 'ANNUAL'::text AS reporting_period
+            FROM market_data.stock_annual_fundamental_values v
+            JOIN market_data.stock_reference s ON s.stock_id=v.stock_id
+            JOIN market_data.fundamental_metric_reference r ON r.metric_id=v.metric_id
+            WHERE {where}
+            ORDER BY v.period_end_date DESC, r.metric_code""",
+            params_tail,
+        )
+    elif period == "QUARTERLY":
+        frame = _query(
+            f"""SELECT {select_cols}, 'QUARTERLY'::text AS reporting_period
+            FROM market_data.stock_quarterly_fundamental_values v
+            JOIN market_data.stock_reference s ON s.stock_id=v.stock_id
+            JOIN market_data.fundamental_metric_reference r ON r.metric_id=v.metric_id
+            WHERE {where}
+            ORDER BY v.period_end_date DESC, r.metric_code""",
+            params_tail,
+        )
+    else:
+        frame = _query(
+            f"""SELECT * FROM (
+              SELECT {select_cols}, 'ANNUAL'::text AS reporting_period
+              FROM market_data.stock_annual_fundamental_values v
+              JOIN market_data.stock_reference s ON s.stock_id=v.stock_id
+              JOIN market_data.fundamental_metric_reference r ON r.metric_id=v.metric_id
+              WHERE {where}
+              UNION ALL
+              SELECT {select_cols}, 'QUARTERLY'::text AS reporting_period
+              FROM market_data.stock_quarterly_fundamental_values v
+              JOIN market_data.stock_reference s ON s.stock_id=v.stock_id
+              JOIN market_data.fundamental_metric_reference r ON r.metric_id=v.metric_id
+              WHERE {where}
+            ) u
+            ORDER BY period_end_date DESC, metric_code""",
+            params_tail + params_tail,
+        )
     if frame.empty:
         return frame
     frame = frame.copy()
@@ -1586,7 +1633,14 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
             if not any(parsed.fundamental_values or parsed.shareholding for parsed in parsed_by_basis.values()):
                 raise RuntimeError(f"Fundamentals sync failed for {symbol}: screener_parse_empty")
             if force:
-                cur.execute("DELETE FROM market_data.stock_fundamental_values WHERE stock_id=%s", (stock_id,))
+                cur.execute(
+                    "DELETE FROM market_data.stock_annual_fundamental_values WHERE stock_id=%s",
+                    (stock_id,),
+                )
+                cur.execute(
+                    "DELETE FROM market_data.stock_quarterly_fundamental_values WHERE stock_id=%s",
+                    (stock_id,),
+                )
                 cur.execute("DELETE FROM market_data.stock_shareholding_history WHERE stock_id=%s", (stock_id,))
             from .market_data.sources import ensure_data_source
 
@@ -1645,38 +1699,55 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
                     for code, metric_id, statement_type in cur.fetchall()
                 }
 
-            fundamental_rows = []
+            annual_rows = []
+            quarterly_rows = []
             for parsed in parsed_by_basis.values():
                 for value in parsed.fundamental_values:
                     metric = metric_map.get(value.metric_code)
                     if metric is None:
                         continue
-                    fundamental_rows.append(
-                        (
-                            stock_id,
-                            metric[0],
-                            value.reporting_period,
-                            value.period_start,
-                            value.period_end,
-                            value.reporting_basis,
-                            value.value,
-                            source_id,
-                        )
+                    row = (
+                        stock_id,
+                        metric[0],
+                        value.period_start,
+                        value.period_end,
+                        value.reporting_basis,
+                        value.value,
+                        source_id,
                     )
-            if fundamental_rows:
+                    if value.reporting_period == "ANNUAL":
+                        annual_rows.append(row)
+                    elif value.reporting_period == "QUARTERLY" and value.statement_type == "PL":
+                        quarterly_rows.append(row)
+            if annual_rows:
                 execute_values(
                     cur,
-                    """INSERT INTO market_data.stock_fundamental_values
-                       (stock_id, metric_id, reporting_period, period_start_date, period_end_date,
+                    """INSERT INTO market_data.stock_annual_fundamental_values
+                       (stock_id, metric_id, period_start_date, period_end_date,
                         reporting_basis, metric_value, source_id)
                        VALUES %s
-                       ON CONFLICT (stock_id, metric_id, reporting_period, reporting_basis, period_end_date)
+                       ON CONFLICT (stock_id, metric_id, reporting_basis, period_end_date)
                        DO UPDATE SET metric_value=EXCLUDED.metric_value,
                                      source_id=EXCLUDED.source_id,
                                      updated_at=NOW()""",
-                    fundamental_rows,
+                    annual_rows,
                     page_size=500,
                 )
+            if quarterly_rows:
+                execute_values(
+                    cur,
+                    """INSERT INTO market_data.stock_quarterly_fundamental_values
+                       (stock_id, metric_id, period_start_date, period_end_date,
+                        reporting_basis, metric_value, source_id)
+                       VALUES %s
+                       ON CONFLICT (stock_id, metric_id, reporting_basis, period_end_date)
+                       DO UPDATE SET metric_value=EXCLUDED.metric_value,
+                                     source_id=EXCLUDED.source_id,
+                                     updated_at=NOW()""",
+                    quarterly_rows,
+                    page_size=500,
+                )
+            if annual_rows or quarterly_rows:
                 from backend.market_data.fundamentals_retention import prune_fundamental_periods
 
                 pruned = prune_fundamental_periods(cur, stock_id)
@@ -1729,11 +1800,10 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
             cur.execute(
                 """
                 SELECT r.metric_code, v.period_end_date, v.metric_value
-                FROM market_data.stock_fundamental_values v
+                FROM market_data.stock_annual_fundamental_values v
                 JOIN market_data.fundamental_metric_reference r ON r.metric_id = v.metric_id
                 WHERE v.stock_id=%s
                   AND v.reporting_basis=%s
-                  AND v.reporting_period='ANNUAL'
                   AND r.statement_type IN ('PL','BS','CF')
                 """,
                 (stock_id, CONSOLIDATED),

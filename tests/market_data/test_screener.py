@@ -31,7 +31,7 @@ def test_build_company_url_uses_slug_then_symbol_without_exchange_suffix():
     assert build_company_url("HDFCBANK", None, "CONSOLIDATED").endswith("consolidated/")
 
 
-def test_parser_maps_annual_and_quarterly_values_and_reports_unknown_labels():
+def test_parser_maps_annual_values_skips_mid_year_pl_and_reports_unknown_labels():
     stock_id = uuid4()
     parsed = ScreenerParser().parse(
         """
@@ -47,22 +47,39 @@ def test_parser_maps_annual_and_quarterly_values_and_reports_unknown_labels():
         stock_id=stock_id,
     )
 
+    # Mid-year Jun column on #profit-loss is skipped (annual table only).
     assert [(item.metric_code, item.value) for item in parsed.fundamental_values] == [
         ("REVENUE", 1200.0),
-        ("REVENUE", 350.0),
         ("NET_PROFIT", -30.0),
-        ("NET_PROFIT", 15.0),
     ]
     assert parsed.fundamental_values[0].period_start == date(2023, 4, 1)
     assert parsed.fundamental_values[0].period_end == date(2024, 3, 31)
     assert parsed.fundamental_values[0].reporting_period == "ANNUAL"
     assert parsed.fundamental_values[0].statement_type == "PL"
-    assert parsed.fundamental_values[1].period_start == date(2024, 4, 1)
-    assert parsed.fundamental_values[1].period_end == date(2024, 6, 30)
-    assert parsed.fundamental_values[1].reporting_period == "QUARTERLY"
+    assert all(item.reporting_period == "ANNUAL" for item in parsed.fundamental_values)
     assert parsed.warnings == [
         {"kind": "unmapped_fundamental_label", "section": "profit-loss", "label": "Odd Provider Label"}
     ]
+
+
+def test_parser_skips_mid_year_balance_sheet_columns():
+    parsed = ScreenerParser().parse(
+        """
+        <section id="balance-sheet"><table class="data-table">
+          <thead><tr><th>Particulars</th><th>Mar 2024</th><th>Sep 2024</th></tr></thead>
+          <tbody>
+            <tr><td>Equity Capital</td><td>100</td><td>110</td></tr>
+            <tr><td>Total Assets</td><td>500</td><td>520</td></tr>
+          </tbody>
+        </table></section>
+        """,
+        stock_id=uuid4(),
+    )
+    assert [(item.metric_code, item.period_end, item.value) for item in parsed.fundamental_values] == [
+        ("EQUITY_CAPITAL", date(2024, 3, 31), 100.0),
+        ("TOTAL_ASSETS", date(2024, 3, 31), 500.0),
+    ]
+    assert all(item.reporting_period == "ANNUAL" for item in parsed.fundamental_values)
 
 
 def test_parse_period_treats_march_and_december_as_annual():

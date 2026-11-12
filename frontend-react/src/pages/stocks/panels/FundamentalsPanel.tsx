@@ -4,7 +4,7 @@ import { api } from '../../../api';
 import SyncJobButton from '../../../components/SyncJobButton';
 import { formatStatementValue } from '../../../lib/format';
 
-const STATEMENT_SECTIONS = [
+const ANNUAL_SECTIONS = [
   { id: 'PL', title: 'Profit & loss' },
   { id: 'BS', title: 'Balance sheet' },
   { id: 'CF', title: 'Cash flow' },
@@ -49,31 +49,31 @@ const LINE_ORDER = [
 ];
 
 const METRIC_LABELS: Record<string, string> = {
-  REVENUE: 'Revenue',
-  TOTAL_EXPENSES: 'Total expenses',
-  OPERATING_PROFIT: 'Operating profit',
-  OPERATING_MARGIN: 'Operating margin',
-  OTHER_INCOME: 'Other income',
+  REVENUE: 'Sales',
+  TOTAL_EXPENSES: 'Expenses',
+  OPERATING_PROFIT: 'Operating Profit',
+  OPERATING_MARGIN: 'OPM %',
+  OTHER_INCOME: 'Other Income',
   DEPRECIATION: 'Depreciation',
   INTEREST_EXPENSE: 'Interest',
   PROFIT_BEFORE_TAX: 'Profit before tax',
-  TAX_RATE: 'Tax',
-  NET_PROFIT: 'Net profit',
-  EPS: 'EPS',
-  EQUITY_CAPITAL: 'Equity capital',
+  TAX_RATE: 'Tax %',
+  NET_PROFIT: 'Net Profit',
+  EPS: 'EPS in Rs',
+  EQUITY_CAPITAL: 'Equity Capital',
   RESERVES: 'Reserves',
   BORROWINGS: 'Borrowings',
-  OTHER_LIABILITIES: 'Other liabilities',
-  TOTAL_LIABILITIES: 'Total liabilities',
-  FIXED_ASSETS: 'Fixed assets',
+  OTHER_LIABILITIES: 'Other Liabilities',
+  TOTAL_LIABILITIES: 'Total Liabilities',
+  FIXED_ASSETS: 'Fixed Assets',
   CWIP: 'CWIP',
   INVESTMENTS: 'Investments',
-  OTHER_ASSETS: 'Other assets',
-  TOTAL_ASSETS: 'Total assets',
-  CASH_FROM_OPERATING_ACTIVITIES: 'Cash from operations',
-  CASH_FROM_INVESTING_ACTIVITIES: 'Cash from investing',
-  CASH_FROM_FINANCING_ACTIVITIES: 'Cash from financing',
-  NET_CASH_FLOW: 'Net cash flow',
+  OTHER_ASSETS: 'Other Assets',
+  TOTAL_ASSETS: 'Total Assets',
+  CASH_FROM_OPERATING_ACTIVITIES: 'Cash from Operating Activity',
+  CASH_FROM_INVESTING_ACTIVITIES: 'Cash from Investing Activity',
+  CASH_FROM_FINANCING_ACTIVITIES: 'Cash from Financing Activity',
+  NET_CASH_FLOW: 'Net Cash Flow',
   ROE: 'Return on equity',
   ROCE: 'Return on capital',
   PAT_MARGIN: 'PAT margin',
@@ -205,6 +205,7 @@ export default function FundamentalsPanel({ symbol }: { symbol: string }) {
   const definitions = summary.data?.definitions || {};
   const latestRatios = summary.data?.latest_ratios || {};
   const ratioSnapshot = summary.data?.ratio_snapshot;
+  const isQuarterly = period === 'QUARTERLY';
 
   return (
     <section className="panel">
@@ -212,9 +213,9 @@ export default function FundamentalsPanel({ symbol }: { symbol: string }) {
         <div>
           <h2>Fundamentals</h2>
           <p className="panel-subtitle">
-            Statements are stored as reported (up to 6 annual and 6 quarterly columns). Ratio trends are
-            computed on read from those statements. Consolidated includes subsidiaries; standalone is the
-            parent only — they are never mixed.
+            Annual and quarterly statements are stored separately (up to 6 columns each). Quarterly matches
+            Screener Quarterly Results; annual matches yearly Profit &amp; loss, Balance sheet, and Cash
+            flow. Consolidated includes subsidiaries; standalone is the parent only — they are never mixed.
           </p>
         </div>
         <SyncJobButton
@@ -242,8 +243,12 @@ export default function FundamentalsPanel({ symbol }: { symbol: string }) {
       </div>
       {lines.isLoading && <div className="loading">Loading fundamentals…</div>}
       {lines.error && <div className="empty">{(lines.error as Error).message}</div>}
+      {!lines.isLoading && isQuarterly && (
+        <StatementTable title="Quarterly Results" rows={rows.filter((row: any) => row.statement_type === 'PL')} />
+      )}
       {!lines.isLoading &&
-        STATEMENT_SECTIONS.map((section) => (
+        !isQuarterly &&
+        ANNUAL_SECTIONS.map((section) => (
           <StatementTable
             key={section.id}
             title={section.title}

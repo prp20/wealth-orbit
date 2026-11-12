@@ -83,8 +83,7 @@ def trim(*, years: int = DEFAULT_YEARS, dry_run: bool = False, vacuum: bool = Fa
             print(f"  stock_daily_prices older than cutoff: {old_prices:,}")
             print(f"  stock_technical_indicators non-latest rows: {old_technicals:,}")
             print(f"  stock_daily_metrics non-latest rows: {old_metrics:,}")
-            print(f"  stock_fundamental_values surplus periods: {old_fundamentals:,}")
-            print(f"  index_daily_history older than cutoff: {old_index:,}")
+            print(f"  annual+quarterly fundamental surplus periods: {old_fundamentals:,}")            print(f"  index_daily_history older than cutoff: {old_index:,}")
             print(f"  mutual_fund_nav_history older than cutoff: {old_nav:,}")
 
             if dry_run:

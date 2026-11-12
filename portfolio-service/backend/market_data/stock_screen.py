@@ -156,11 +156,10 @@ def build_stock_metrics_snapshot(*, require_metrics: bool = False) -> pd.DataFra
                    PARTITION BY v.stock_id, r.metric_code
                    ORDER BY v.period_end_date DESC
                  ) AS rn
-          FROM market_data.stock_fundamental_values v
+          FROM market_data.stock_annual_fundamental_values v
           JOIN market_data.fundamental_metric_reference r ON r.metric_id = v.metric_id
           JOIN base b ON b.stock_id = v.stock_id
-          WHERE v.reporting_period = 'ANNUAL'
-            AND v.reporting_basis = 'CONSOLIDATED'
+          WHERE v.reporting_basis = 'CONSOLIDATED'
             AND r.metric_code = ANY (ARRAY[
               'DEBT_TO_EQUITY','INTEREST_COVERAGE','OPERATING_MARGIN','ROE','ROCE',
               'NET_PROFIT','REVENUE','SALES','CASH_FROM_OPERATING_ACTIVITIES',

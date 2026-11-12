@@ -68,6 +68,9 @@ SECTION_STATEMENT_TYPE = {
 # Sections whose every dated column is a quarter (Mar/Dec are quarters, not FY).
 FORCE_QUARTERLY_SECTIONS = frozenset({"quarters"})
 
+# Annual statement tables: only Mar/Dec year-ends are stored (skip mid-year columns).
+ANNUAL_ONLY_SECTIONS = frozenset({"profit-loss", "balance-sheet", "cash-flow"})
+
 
 def metric_statement_types() -> dict[str, str]:
     """Canonical statement for each Screener metric code, independent of a bad stored tag."""
@@ -157,8 +160,8 @@ def parse_period(period: str, *, force_quarterly: bool = False) -> tuple[date, d
     """Parse a Screener header into FY/quarter boundaries based on the header month.
 
     For annual statement tables (profit-loss / balance-sheet / cash-flow), Indian
-    March year-ends and calendar December year-ends are ANNUAL. Other months are
-    QUARTERLY (e.g. mid-year balance-sheet columns).
+    March year-ends and calendar December year-ends are ANNUAL. Other months return
+    QUARTERLY so callers can skip them for annual-only sections.
 
     For the ``quarters`` table, pass ``force_quarterly=True`` so Mar/Dec columns
     stay quarterly results and never overwrite annual PL.
@@ -232,6 +235,7 @@ class ScreenerParser:
                 continue
             periods, rows = self._table(section)
             force_quarterly = section_id in FORCE_QUARTERLY_SECTIONS
+            annual_only = section_id in ANNUAL_ONLY_SECTIONS
             parsed_periods = [
                 parse_period(period, force_quarterly=force_quarterly) for period in periods
             ]
@@ -246,6 +250,10 @@ class ScreenerParser:
                     if period is None or number is None:
                         continue
                     start, end, reporting_period = period
+                    # Annual statement tables never write mid-year columns into quarterly storage.
+                    if annual_only and reporting_period != "ANNUAL":
+                        continue
+                    # Quarterly Results (#quarters) are PL only by section map.
                     values.append(FundamentalValue(
                         stock_id, metric_code, reporting_period, start, end, self.reporting_basis,
                         number, checksum({"label": label, "period": periods[index], "value": cell, "basis": self.reporting_basis, "section": section_id}),
