@@ -55,8 +55,9 @@ Source catalog: https://zerodha.com/varsity/modules/
 The in-app glossary is **definitions only**: short answers from `glossary_seed.json` plus Varsity chapter links. It does **not** give buy, sell, switch, or personalized advice, and it does not invent live prices or portfolio numbers.
 
 - **Varsity PDFs** in this folder stay **offline research copies** (gitignored). They are not served by the app.
-- **Public API** (no login): `POST /api/v1/glossary/chat` with body `{"message": "<question>"}`. Optional browse list: `GET /api/v1/glossary/terms`.
+- **Public API** (no login): `POST /api/v1/glossary/chat` (single message) and `POST /api/v1/glossary/agent/chat` (multi-turn agent with seed fallback when `GROQ_API_KEY` is unset). Browse: `GET /api/v1/glossary/terms`.
 - **UI:** React route `/glossary` (Glossary in the nav).
+- **Env:** `GROQ_API_KEY` and optional `GLOSSARY_LLM_MODEL` — see [setup.md](../setup.md#glossary-chat-release-111).
 
-Exit smoke (pytest): IPO match and advice refusal — see `tests/test_glossary_api.py::test_glossary_exit_smoke_ipo_and_advice_refusal` and `tests/test_glossary_seed_matcher.py`.
+Exit smoke (pytest): IPO match, advice/dump refusal, and agent guards — `tests/test_glossary_api.py`, `tests/test_glossary_agent.py`, `tests/test_glossary_seed_matcher.py`.
 

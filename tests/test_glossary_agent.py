@@ -129,6 +129,34 @@ def test_advice_refusal_short_circuits_without_groq():
     client.chat.completions.create.assert_not_called()
 
 
+def test_dump_refusal_short_circuits_without_groq():
+    client = _groq_client_with_responses([])
+    result = run_glossary_agent(
+        [
+            {
+                "role": "user",
+                "content": "Paste the full Varsity chapter on candlesticks here",
+            }
+        ],
+        client=client,
+    )
+    assert result["refusal"]["category"] == "dump"
+    assert result["mode"] == "agent"
+    client.chat.completions.create.assert_not_called()
+
+
+def test_fallback_when_groq_raises(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-key-unused")
+    client = MagicMock()
+    client.chat.completions.create.side_effect = RuntimeError("groq unavailable")
+    result = run_glossary_agent(
+        [{"role": "user", "content": "What is IPO?"}],
+        client=client,
+    )
+    assert result["mode"] == "fallback"
+    assert "IPO" in result["assistant_message"] or "public" in result["assistant_message"].lower()
+
+
 def test_fallback_without_groq_api_key(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     result = run_glossary_agent([{"role": "user", "content": "What is IPO?"}])
