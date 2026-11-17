@@ -23,6 +23,7 @@ dependencies = [
     "requests>=2.31.0",
     "pyotp>=2.9.0",
     "growwapi>=1.5.0",
+    "groq>=1.7.0",
 ]
 
 [dependency-groups]

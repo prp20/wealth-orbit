@@ -12,6 +12,7 @@ import FundScreenerPage from '../pages/funds/FundScreenerPage';
 import FundComparePage from '../pages/funds/FundComparePage';
 import DashboardPage from '../pages/DashboardPage';
 import IndexesPage from '../pages/IndexesPage';
+import GlossaryChatPage from '../pages/GlossaryChatPage';
 import PortfolioPage from '../pages/PortfolioPage';
 import { clearRecent } from '../lib/recent';
 
@@ -111,6 +112,7 @@ function Shell() {
           <NavLink to="/mutualfunds">Mutual funds</NavLink>
           <NavLink to="/stocks">Stocks</NavLink>
           <NavLink to="/indexes">Indexes</NavLink>
+          <NavLink to="/glossary">Glossary</NavLink>
         </nav>
         <div className="account-footer">
           {signedIn ? (
@@ -142,6 +144,7 @@ function Shell() {
           <Route path="/stocks/screen" element={<StockScreenerPage />} />
           <Route path="/stocks/:symbol" element={<StockDetailPage />} />
           <Route path="/indexes" element={<IndexesPage />} />
+          <Route path="/glossary" element={<GlossaryChatPage />} />
           <Route path="*" element={<Navigate replace to="/portfolio" />} />
         </Routes>
       </main>

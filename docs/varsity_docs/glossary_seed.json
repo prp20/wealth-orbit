@@ -1,0 +1,357 @@
+{
+  "version": 1,
+  "purpose": "Curated glossary seed for Nivesh release 1.11. Definitions are original Nivesh wording; sources cite Zerodha Varsity chapters for further reading only. Do not embed Varsity full text in the product.",
+  "terms": [
+    {
+      "term": "IPO",
+      "aliases": ["Initial Public Offering"],
+      "definition": "The first sale of a company's shares to the public, after which the stock can usually trade on an exchange.",
+      "sources": [
+        {
+          "module": 1,
+          "chapter": "The IPO Markets (Part 1)",
+          "url": "https://zerodha.com/varsity/chapter/the-ipo-markets-part-1/"
+        },
+        {
+          "module": 1,
+          "chapter": "The IPO Markets (Part 2)",
+          "url": "https://zerodha.com/varsity/chapter/the-ipo-markets-part-2/"
+        }
+      ]
+    },
+    {
+      "term": "Index",
+      "aliases": ["Stock market index", "Nifty", "Sensex"],
+      "definition": "A statistical basket that tracks a defined set of securities so investors can follow market or segment performance in one number.",
+      "sources": [
+        {
+          "module": 1,
+          "chapter": "Stock market index explained: Sensex, Nifty & how they work",
+          "url": "https://zerodha.com/varsity/chapter/the-stock-markets-index/"
+        }
+      ]
+    },
+    {
+      "term": "Clearing and settlement",
+      "aliases": ["Settlement"],
+      "definition": "The post-trade process that confirms trades, nets obligations, and transfers securities and cash between parties on the settlement cycle.",
+      "sources": [
+        {
+          "module": 1,
+          "chapter": "Clearing and Settlement Process",
+          "url": "https://zerodha.com/varsity/chapter/clearing-and-settlement-process/"
+        }
+      ]
+    },
+    {
+      "term": "Corporate action",
+      "aliases": ["Dividend", "Bonus", "Split"],
+      "definition": "A company-initiated event (such as dividend, bonus issue, or split) that can change share count, price, or cash returned to shareholders.",
+      "sources": [
+        {
+          "module": 1,
+          "chapter": "Corporate actions and impact on stock prices",
+          "url": "https://zerodha.com/varsity/chapter/five-corporate-actions-and-its-impact-on-stock-prices/"
+        }
+      ]
+    },
+    {
+      "term": "Candlestick",
+      "aliases": ["Candle chart"],
+      "definition": "A price chart element that shows open, high, low, and close for a period in one body-and-wick shape used in technical analysis.",
+      "sources": [
+        {
+          "module": 2,
+          "chapter": "Getting Started with Candlesticks",
+          "url": "https://zerodha.com/varsity/chapter/getting-started-candlesticks/"
+        }
+      ]
+    },
+    {
+      "term": "Support and resistance",
+      "aliases": ["Support", "Resistance"],
+      "definition": "Price zones where buying interest (support) or selling interest (resistance) has repeatedly slowed or reversed a move.",
+      "sources": [
+        {
+          "module": 2,
+          "chapter": "The Support and Resistance",
+          "url": "https://zerodha.com/varsity/chapter/support-resistance/"
+        }
+      ]
+    },
+    {
+      "term": "Moving average",
+      "aliases": ["SMA", "EMA"],
+      "definition": "A smoothed average of recent prices used to reduce noise and summarize trend direction over a chosen lookback.",
+      "sources": [
+        {
+          "module": 2,
+          "chapter": "Moving Averages",
+          "url": "https://zerodha.com/varsity/chapter/moving-averages/"
+        }
+      ]
+    },
+    {
+      "term": "Technical indicator",
+      "aliases": ["RSI", "MACD", "Bollinger Bands"],
+      "definition": "A calculated series derived from price and/or volume that summarizes momentum, trend, or volatility for research—not a trade recommendation.",
+      "sources": [
+        {
+          "module": 2,
+          "chapter": "Indicators (Part 1)",
+          "url": "https://zerodha.com/varsity/chapter/indicators-part-1/"
+        },
+        {
+          "module": 2,
+          "chapter": "Indicators (Part 2)",
+          "url": "https://zerodha.com/varsity/chapter/indicators-part-2/"
+        }
+      ]
+    },
+    {
+      "term": "Fundamental analysis",
+      "aliases": ["FA"],
+      "definition": "Evaluating a business using financial statements, ratios, and qualitative factors to form a long-term view of value—not a short-term price call.",
+      "sources": [
+        {
+          "module": 3,
+          "chapter": "Introduction to Fundamental Analysis",
+          "url": "https://zerodha.com/varsity/chapter/introduction-fundamental-analysis/"
+        }
+      ]
+    },
+    {
+      "term": "Profit and loss statement",
+      "aliases": ["P&L", "Income statement"],
+      "definition": "A financial statement that summarizes revenues, expenses, and profit or loss over a reporting period.",
+      "sources": [
+        {
+          "module": 3,
+          "chapter": "Understanding the P&L Statement (Part 1)",
+          "url": "https://zerodha.com/varsity/chapter/understanding-pl-statement-part1/"
+        }
+      ]
+    },
+    {
+      "term": "Balance sheet",
+      "aliases": [],
+      "definition": "A snapshot of assets, liabilities, and equity at a point in time, showing what a company owns and owes.",
+      "sources": [
+        {
+          "module": 3,
+          "chapter": "Understanding Balance Sheet Statement (Part 1)",
+          "url": "https://zerodha.com/varsity/chapter/understanding-balance-sheet-statement-part-1/"
+        }
+      ]
+    },
+    {
+      "term": "Cash flow statement",
+      "aliases": ["Cash flow"],
+      "definition": "A statement that explains cash inflows and outflows from operating, investing, and financing activities over a period.",
+      "sources": [
+        {
+          "module": 3,
+          "chapter": "The Cash Flow statement",
+          "url": "https://zerodha.com/varsity/chapter/cash-flow-statement/"
+        }
+      ]
+    },
+    {
+      "term": "Financial ratios",
+      "aliases": ["PE", "ROE", "Debt-to-equity"],
+      "definition": "Metrics built from financial statements that help compare profitability, leverage, liquidity, or valuation across periods or peers.",
+      "sources": [
+        {
+          "module": 3,
+          "chapter": "The Financial Ratio Analysis (Part 1)",
+          "url": "https://zerodha.com/varsity/chapter/financial-ratio-analysis/"
+        }
+      ]
+    },
+    {
+      "term": "DCF",
+      "aliases": ["Discounted cash flow"],
+      "definition": "A valuation approach that estimates intrinsic value by discounting expected future cash flows to today using a required rate of return.",
+      "sources": [
+        {
+          "module": 3,
+          "chapter": "DCF Primer",
+          "url": "https://zerodha.com/varsity/chapter/dcf-primer/"
+        }
+      ]
+    },
+    {
+      "term": "Capital gains tax (India investors)",
+      "aliases": ["LTCG", "STCG"],
+      "definition": "Tax rules that can differ for short-term vs long-term gains on securities; classification and rates depend on asset type and holding period under current law.",
+      "sources": [
+        {
+          "module": 7,
+          "chapter": "Taxation for Investors",
+          "url": "https://zerodha.com/varsity/chapter/taxation-for-investors/"
+        }
+      ]
+    },
+    {
+      "term": "Turnover (trading tax context)",
+      "aliases": [],
+      "definition": "In Indian market-tax discussions, a measure of trading activity used when classifying business vs investment income and preparing returns—definitions depend on activity type.",
+      "sources": [
+        {
+          "module": 7,
+          "chapter": "Turnover, Balance Sheet, and P&L",
+          "url": "https://zerodha.com/varsity/chapter/turnover-balance-sheet-and-pl/"
+        }
+      ]
+    },
+    {
+      "term": "Value at Risk",
+      "aliases": ["VaR"],
+      "definition": "A risk statistic that estimates a loss threshold that is not expected to be exceeded with a chosen confidence level over a defined horizon—under model assumptions.",
+      "sources": [
+        {
+          "module": 9,
+          "chapter": "Value at Risk",
+          "url": "https://zerodha.com/varsity/chapter/var/"
+        }
+      ]
+    },
+    {
+      "term": "Position sizing",
+      "aliases": [],
+      "definition": "Choosing how large a position to take relative to capital and risk limits so a single loss cannot dominate the portfolio.",
+      "sources": [
+        {
+          "module": 9,
+          "chapter": "Position Sizing for active trader",
+          "url": "https://zerodha.com/varsity/chapter/position-sizing/"
+        }
+      ]
+    },
+    {
+      "term": "NAV",
+      "aliases": ["Net Asset Value"],
+      "definition": "The per-unit value of a mutual fund scheme, typically assets minus liabilities divided by units outstanding, published for a given as-of date.",
+      "sources": [
+        {
+          "module": 11,
+          "chapter": "Concept of fund & NAV",
+          "url": "https://zerodha.com/varsity/chapter/concept-of-fund-nav/"
+        }
+      ]
+    },
+    {
+      "term": "Mutual fund",
+      "aliases": ["MF"],
+      "definition": "A pooled investment vehicle that invests unitholders' money in a portfolio of securities according to a stated mandate.",
+      "sources": [
+        {
+          "module": 11,
+          "chapter": "Introduction to Mutual Funds",
+          "url": "https://zerodha.com/varsity/chapter/introduction-to-mutual-funds/"
+        }
+      ]
+    },
+    {
+      "term": "Expense ratio",
+      "aliases": ["TER", "Direct plan", "Regular plan"],
+      "definition": "The annual fund operating cost charged to the scheme, expressed as a percentage of assets; direct plans usually exclude distributor commissions that regular plans include.",
+      "sources": [
+        {
+          "module": 11,
+          "chapter": "Mutual fund Expense Ratio, Direct, and Regular plans",
+          "url": "https://zerodha.com/varsity/chapter/mutual-fund-expense-ratio-direct-and-regular-plans/"
+        }
+      ]
+    },
+    {
+      "term": "Index fund",
+      "aliases": [],
+      "definition": "A fund designed to track a market index by holding a representative basket rather than actively picking securities to beat the index.",
+      "sources": [
+        {
+          "module": 11,
+          "chapter": "Index Funds",
+          "url": "https://zerodha.com/varsity/chapter/introduction-to-index-funds/"
+        }
+      ]
+    },
+    {
+      "term": "ETF",
+      "aliases": ["Exchange-traded fund"],
+      "definition": "A fund that usually tracks an index or basket and trades on an exchange like a stock during market hours.",
+      "sources": [
+        {
+          "module": 11,
+          "chapter": "Exchange-traded funds (ETF)",
+          "url": "https://zerodha.com/varsity/chapter/exchange-traded-funds-etf/"
+        }
+      ]
+    },
+    {
+      "term": "Asset allocation",
+      "aliases": [],
+      "definition": "How portfolio capital is split across asset classes (for example equity, debt, cash) to match goals, horizon, and risk tolerance.",
+      "sources": [
+        {
+          "module": 11,
+          "chapter": "Asset Allocation, An Introduction",
+          "url": "https://zerodha.com/varsity/chapter/asset-allocation-an-introduction/"
+        }
+      ]
+    },
+    {
+      "term": "Sharpe ratio",
+      "aliases": [],
+      "definition": "A risk-adjusted return measure that compares excess return over a risk-free rate to the volatility (standard deviation) of returns.",
+      "sources": [
+        {
+          "module": 11,
+          "chapter": "Mutual Fund Beta, SD, and Sharpe Ratio",
+          "url": "https://zerodha.com/varsity/chapter/mutual-fund-risk-metrics/"
+        }
+      ]
+    },
+    {
+      "term": "Insurance (personal finance)",
+      "aliases": ["Term insurance", "Health insurance"],
+      "definition": "A contract that transfers specified financial risks (such as mortality or medical costs) to an insurer in exchange for premiums—distinct from investing for returns.",
+      "sources": [
+        {
+          "module": 14,
+          "chapter": "Introduction",
+          "url": "https://zerodha.com/varsity/chapter/introduction/"
+        },
+        {
+          "module": 14,
+          "chapter": "A mighty defence",
+          "url": "https://zerodha.com/varsity/chapter/a-mighty-defence/"
+        }
+      ]
+    },
+    {
+      "term": "NPS",
+      "aliases": ["National Pension System"],
+      "definition": "A voluntary, regulated retirement savings system in India with defined contribution accounts and rules for investing, exit, and withdrawals.",
+      "sources": [
+        {
+          "module": 17,
+          "chapter": "Introduction to NPS",
+          "url": "https://zerodha.com/varsity/chapter/national-pension-system-nps/"
+        }
+      ]
+    },
+    {
+      "term": "NPS Tier II",
+      "aliases": [],
+      "definition": "A voluntary, more flexible NPS account layer alongside the primary Tier I retirement account, with different withdrawal and tax characteristics.",
+      "sources": [
+        {
+          "module": 17,
+          "chapter": "NPS Tier II Account",
+          "url": "https://zerodha.com/varsity/chapter/nps-tier-ii-account/"
+        }
+      ]
+    }
+  ]
+}

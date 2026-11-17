@@ -245,3 +245,37 @@ sqlite3 portfolio-service/portfolio.db "UPDATE users SET password_hash = NULL WH
 ```
 
 Sign-up refuses a name that is already stored. Use another name, or remove that user from the file before creating the account again.
+
+## Glossary chat (release 1.11)
+
+The **Glossary** page explains curated investing terms only. Facts come from [docs/varsity_docs/glossary_seed.json](varsity_docs/glossary_seed.json) with Zerodha Varsity chapter links—not live prices, portfolio data, or full chapter/PDF text.
+
+- **Scope:** definitions and citations; buy/sell/switch advice and Varsity dump/redistribute requests are refused.
+- **Varsity PDFs** under `docs/varsity_docs/` are local offline copies (gitignored) for authoring—they are not shipped or served by the API.
+- **Modes:** with `GROQ_API_KEY` set, multi-turn chat uses a Groq tool-calling agent over the seed (`mode: agent`). Without a key, or if Groq errors, the API falls back to the deterministic seed matcher (`mode: fallback`). The single-turn endpoint always uses the matcher.
+
+Optional environment variables (see [.env.example](../.env.example)):
+
+| Variable | Purpose |
+|----------|---------|
+| `GROQ_API_KEY` | Groq API key for glossary agent mode (empty → seed fallback) |
+| `GLOSSARY_LLM_MODEL` | Groq chat model (default `openai/gpt-oss-120b`) |
+
+- **Public endpoints** (no session):
+  - `POST /api/v1/glossary/chat` — one message: `{"message": "What is IPO?"}` → `kind`, `definition`, `sources`.
+  - `POST /api/v1/glossary/agent/chat` — multi-turn: `{"messages": [{"role":"user","content":"What is NAV?"}]}` → `assistant_message`, `mode`, optional `citations`.
+  - `GET /api/v1/glossary/terms` — browse curated terms.
+
+With the API running on port 8000:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/v1/glossary/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"What is IPO?"}'
+```
+
+Release exit checks:
+
+```bash
+uv run pytest tests/test_glossary_agent.py tests/test_glossary_api.py tests/test_glossary_seed_matcher.py -q
+```

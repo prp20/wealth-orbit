@@ -69,6 +69,11 @@ from backend.reference_service import (  # noqa: E402
     sync_stock_fundamentals,
 )
 from backend.services import InsufficientHoldingsError  # noqa: E402
+from backend.glossary import (  # noqa: E402
+    answer_glossary_message,
+    cached_glossary_terms,
+    run_glossary_agent,
+)
 
 __all__ = [
     "Holding", "Portfolio", "Transaction", "TransactionType", "User",
@@ -90,4 +95,5 @@ __all__ = [
     "METRIC_PERIODS", "SCREEN_SORT_COLUMNS",
     "STOCK_SCREEN_SORT_COLUMNS", "stock_screen",
     "list_screens", "refresh_screens", "run_screen",
+    "answer_glossary_message", "cached_glossary_terms", "run_glossary_agent",
 ]
