@@ -88,6 +88,7 @@ def test_build_stock_metrics_snapshot_applies_derived_fields(monkeypatch):
     monkeypatch.setattr(stock_screen, "_query", lambda sql: raw)
     frame = stock_screen.build_stock_metrics_snapshot()
     row = frame.iloc[0]
+    assert row["sma_50"] == pytest.approx(95.0)
     assert bool(row["price_above_sma_50"]) is True
     assert row["rel_volume_20"] == pytest.approx(2.0)
     assert row["pct_from_52w_high"] == pytest.approx(100.0 / 110.0 - 1.0)

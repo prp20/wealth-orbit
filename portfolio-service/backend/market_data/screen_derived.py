@@ -4,7 +4,6 @@ from __future__ import annotations
 import pandas as pd
 
 DERIVED_FROM_OHLC_INPUTS = (
-    "sma_50",
     "latest_volume",
     "vol_avg_20",
     "high_52w",
