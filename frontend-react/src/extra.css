@@ -265,6 +265,18 @@ button.text-link:disabled{opacity:.55;cursor:wait}
 .dialog-error{background:#fcf8f7;border:1px solid #f0e4e1;border-radius:8px;padding:10px 12px;color:#8a4b3d;font-size:13px;margin-bottom:10px}
 .dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
 .panel-sync{flex-wrap:wrap}
+.glossary-chat-banner{margin:0;padding:10px 12px;border-radius:10px;background:#f3faf6;border:1px solid #c6e4d5;color:#2f5c48;font-size:13px;line-height:1.45}
+.glossary-chat-mode-note{margin:10px 0 0;font-size:12px;color:#718089;font-style:italic}
+.glossary-agent-prose{margin:0;white-space:pre-wrap}
+.glossary-citation-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.glossary-citation-chip{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid #dbe5e1;background:#fff;color:#2f6b52;font-size:12px;font-weight:600;text-decoration:none}
+.glossary-citation-chip:hover{border-color:#9bcdb7;background:#f3faf6}
+.glossary-suggestion-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+.glossary-suggestion-chips>span{font-size:12px;color:#718089;font-weight:600}
+.glossary-suggestion-chips button,.glossary-suggestion-chips-inline button{border:1px solid #dbe5e1;background:#fff;border-radius:999px;padding:6px 12px;color:#2f6b52;font-size:12px;font-weight:600;cursor:pointer}
+.glossary-suggestion-chips button:hover,.glossary-suggestion-chips-inline button:hover{border-color:#9bcdb7;background:#f3faf6}
+.glossary-suggestion-chips button:disabled,.glossary-suggestion-chips-inline button:disabled{opacity:.5;cursor:wait}
+.glossary-suggestion-chips-inline{display:flex;flex-wrap:wrap;gap:8px}
 .glossary-chat-panel{display:flex;flex-direction:column;gap:14px;min-height:min(70vh,640px)}
 .glossary-chat-log{flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:4px 2px 8px;min-height:280px;max-height:min(58vh,520px)}
 .glossary-chat-empty{color:#55706b;font-size:14px;line-height:1.5;padding:12px 4px}

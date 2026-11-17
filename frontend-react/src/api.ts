@@ -399,6 +399,8 @@ export const api = {
   sectors: () => get<string[]>('/market-data/sectors'),
   filters: (kind: string) => get<string[]>(`/market-data/filters/${kind}`),
   glossaryChat: (message: string) => postJson<GlossaryChatResult>('/glossary/chat', { message }),
+  glossaryAgentChat: (messages: GlossaryAgentChatMessage[]) =>
+    postJson<GlossaryAgentChatResult>('/glossary/agent/chat', { messages }),
   glossaryTerms: () => get<GlossaryTermListItem[]>('/glossary/terms'),
 };
 
@@ -446,4 +448,23 @@ export type GlossaryChatResult =
 export type GlossaryTermListItem = {
   term: string;
   aliases: string[];
+};
+
+export type GlossaryAgentChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+export type GlossaryCitation = GlossarySource & {
+  term?: string | null;
+};
+
+export type GlossaryAgentChatResult = {
+  assistant_message: string;
+  mode: 'agent' | 'fallback';
+  citations?: GlossaryCitation[];
+  refusal?: {
+    category?: string | null;
+    reason?: string | null;
+  };
 };

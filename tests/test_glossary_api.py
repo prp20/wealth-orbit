@@ -2,6 +2,7 @@
 
 from fastapi.testclient import TestClient
 
+from backend_api.app import glossary_routes
 from backend_api.app.main import app
 
 
@@ -52,6 +53,43 @@ def test_glossary_chat_refuses_advice_without_auth():
 def test_glossary_chat_rejects_empty_message():
     with TestClient(app) as client:
         response = client.post("/api/v1/glossary/chat", json={"message": ""})
+    assert response.status_code == 422
+
+
+def test_glossary_agent_chat_returns_mocked_agent_payload(monkeypatch):
+    def fake_run_glossary_agent(messages):
+        assert messages == [
+            {"role": "user", "content": "What is NAV?"},
+        ]
+        return {
+            "assistant_message": "NAV is the per-unit market value of a mutual fund scheme.",
+            "mode": "agent",
+            "citations": [
+                {
+                    "module": 9,
+                    "chapter": "NAV",
+                    "url": "https://zerodha.com/varsity/chapter/nav/",
+                    "term": "NAV",
+                }
+            ],
+        }
+
+    monkeypatch.setattr(glossary_routes, "run_glossary_agent", fake_run_glossary_agent)
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/glossary/agent/chat",
+            json={"messages": [{"role": "user", "content": "What is NAV?"}]},
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mode"] == "agent"
+    assert "NAV" in body["assistant_message"]
+    assert body["citations"][0]["term"] == "NAV"
+
+
+def test_glossary_agent_chat_rejects_empty_history():
+    with TestClient(app) as client:
+        response = client.post("/api/v1/glossary/agent/chat", json={"messages": []})
     assert response.status_code == 422
 
 
