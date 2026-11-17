@@ -121,6 +121,64 @@ def test_dry_run_builtin_quality_value():
     assert "BBB" not in symbols
 
 
+def test_dry_run_filters_price_above_sma_200(tmp_path: Path):
+    plugin = tmp_path / "above_sma200.py"
+    plugin.write_text(
+        textwrap.dedent(
+            """
+            from nivesh_screens import col
+            SCREEN_ID = "above_sma200"
+            SCREEN_META = {
+                "name": "Above SMA200",
+                "version": "1.0.0",
+                "description": "dry-run derived filter",
+                "asset_class": "stock",
+                "parameters": [],
+            }
+            def screen(stocks, params):
+                mask = col(stocks, "price_above_sma_200") == True
+                return stocks.loc[mask]
+            """
+        ).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    result = dry_run_screen(plugin, timeout_seconds=15)
+    assert result.get("ok") is True, result
+    symbols = set(result.get("symbols") or [])
+    assert "AAA" in symbols
+    assert "BBB" not in symbols
+
+
+def test_dry_run_filters_rel_volume_20(tmp_path: Path):
+    plugin = tmp_path / "rel_vol.py"
+    plugin.write_text(
+        textwrap.dedent(
+            """
+            from nivesh_screens import col
+            SCREEN_ID = "rel_vol"
+            SCREEN_META = {
+                "name": "Relative volume",
+                "version": "1.0.0",
+                "description": "dry-run derived filter",
+                "asset_class": "stock",
+                "parameters": [],
+            }
+            def screen(stocks, params):
+                rv = col(stocks, "rel_volume_20")
+                return stocks.loc[rv.notna() & (rv > 1.0)]
+            """
+        ).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    result = dry_run_screen(plugin, timeout_seconds=15)
+    assert result.get("ok") is True, result
+    symbols = set(result.get("symbols") or [])
+    assert "AAA" in symbols
+    assert "BBB" not in symbols
+
+
 def test_run_screen_honest_empty_snapshot(monkeypatch):
     import backend.screen_plugins.runner as runner
 

@@ -143,7 +143,28 @@ def build_stock_metrics_snapshot(*, require_metrics: bool = False) -> pd.DataFra
           JOIN base b ON b.stock_id = p.stock_id
           ORDER BY p.stock_id, p.trading_date DESC
         ),
-        sma_50 AS (
+        latest_stored_sma AS (
+          SELECT t.stock_id,
+                 MAX(t.indicator_value) FILTER (
+                   WHERE t.indicator_code = 'SMA' AND t.indicator_period = 50
+                 ) AS sma_50,
+                 MAX(t.indicator_value) FILTER (
+                   WHERE t.indicator_code = 'SMA' AND t.indicator_period = 200
+                 ) AS sma_200
+          FROM market_data.stock_technical_indicators t
+          JOIN base b ON b.stock_id = t.stock_id
+          JOIN (
+            SELECT stock_id, MAX(trading_date) AS trading_date
+            FROM market_data.stock_technical_indicators
+            GROUP BY stock_id
+          ) md ON md.stock_id = t.stock_id AND md.trading_date = t.trading_date
+          WHERE t.indicator_code = 'SMA'
+            AND t.component = 'VALUE'
+            AND t.indicator_period IN (50, 200)
+          GROUP BY t.stock_id
+        ),
+        -- Prefer latest stored SMA (tech sync SSOT); OHLC rolling averages fill gaps only.
+        ohlc_sma_50 AS (
           SELECT stock_id, AVG(px) AS sma_50
           FROM (
             SELECT p.stock_id,
@@ -157,7 +178,7 @@ def build_stock_metrics_snapshot(*, require_metrics: bool = False) -> pd.DataFra
           GROUP BY stock_id
           HAVING COUNT(*) >= 40
         ),
-        sma_200 AS (
+        ohlc_sma_200 AS (
           SELECT stock_id, AVG(px) AS sma_200
           FROM (
             SELECT p.stock_id,
@@ -265,7 +286,8 @@ def build_stock_metrics_snapshot(*, require_metrics: bool = False) -> pd.DataFra
         )
         SELECT b.trading_symbol, b.company_name, b.exchange, b.sector_name, b.industry_name,
                b.market_cap_class, lp.price_close,
-               sma50.sma_50, sma.sma_200,
+               COALESCE(lss.sma_50, ohlc50.sma_50) AS sma_50,
+               COALESCE(lss.sma_200, ohlc200.sma_200) AS sma_200,
                lb.latest_volume, va.vol_avg_20, r52.high_52w, r52.low_52w,
                bb.bb_upper, bb.bb_lower,
                lm.market_cap,
@@ -287,8 +309,9 @@ def build_stock_metrics_snapshot(*, require_metrics: bool = False) -> pd.DataFra
         FROM base b
         LEFT JOIN latest_metrics lm ON lm.stock_id = b.stock_id
         LEFT JOIN latest_price lp ON lp.stock_id = b.stock_id
-        LEFT JOIN sma_50 sma50 ON sma50.stock_id = b.stock_id
-        LEFT JOIN sma_200 sma ON sma.stock_id = b.stock_id
+        LEFT JOIN latest_stored_sma lss ON lss.stock_id = b.stock_id
+        LEFT JOIN ohlc_sma_50 ohlc50 ON ohlc50.stock_id = b.stock_id
+        LEFT JOIN ohlc_sma_200 ohlc200 ON ohlc200.stock_id = b.stock_id
         LEFT JOIN latest_bar lb ON lb.stock_id = b.stock_id
         LEFT JOIN vol_avg_20 va ON va.stock_id = b.stock_id
         LEFT JOIN range_52w r52 ON r52.stock_id = b.stock_id

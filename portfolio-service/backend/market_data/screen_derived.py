@@ -12,6 +12,28 @@ DERIVED_FROM_OHLC_INPUTS = (
     "bb_lower",
 )
 
+# Inputs that must be present (from SQL or stored technicals) before derived flags are trustworthy.
+OHLC_OVERLAY_INPUT_COLUMNS: tuple[str, ...] = (
+    "sma_50",
+    "sma_200",
+    "latest_volume",
+    "vol_avg_20",
+    "high_52w",
+    "low_52w",
+)
+
+
+def overlay_input_null_mask(frame: pd.DataFrame) -> pd.Series:
+    """True where any overlay input needed for derived technicals is missing."""
+    if frame.empty:
+        return pd.Series(dtype=bool)
+    mask = pd.Series(False, index=frame.index)
+    for column in OHLC_OVERLAY_INPUT_COLUMNS:
+        if column not in frame.columns:
+            return pd.Series(True, index=frame.index)
+        mask |= pd.to_numeric(frame[column], errors="coerce").isna()
+    return mask
+
 DERIVED_SCREEN_COLUMNS: tuple[str, ...] = (
     "sma_50",
     "price_above_sma_50",

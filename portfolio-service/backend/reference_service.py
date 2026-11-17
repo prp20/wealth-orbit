@@ -1549,6 +1549,7 @@ _TECHNICAL_COLUMNS = [
     "component",
     "indicator_value",
     "calculation_status",
+    "calculation_version",
     "calculated_at",
 ]
 
@@ -1575,7 +1576,7 @@ def _load_stored_technicals(symbol: str, indicator: str = "") -> tuple[pd.DataFr
                 cur.execute(
                     """SELECT t.trading_date AS date, t.indicator_code, t.indicator_period,
                               t.parameters::text AS parameters, t.component, t.indicator_value,
-                              t.calculation_status, t.calculated_at
+                              t.calculation_status, t.calculation_version, t.calculated_at
                        FROM market_data.stock_technical_indicators t
                        JOIN market_data.stock_reference s ON s.stock_id = t.stock_id
                        WHERE s.trading_symbol=%s AND s.is_active=TRUE

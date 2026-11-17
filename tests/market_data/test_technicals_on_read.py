@@ -152,6 +152,7 @@ def test_resolve_stored_returns_persisted_rows_without_recompute():
                 "component": "",
                 "indicator_value": 55.0,
                 "calculation_status": "CURRENT",
+                "calculation_version": stock_sync.TECHNICAL_CALCULATION_VERSION,
                 "calculated_at": date(2024, 6, 1),
             }
         ]
@@ -164,7 +165,48 @@ def test_resolve_stored_returns_persisted_rows_without_recompute():
         frame, err = reference_service._resolve_stored_technical_indicators("HDFCBANK")
     assert err is None
     assert len(frame) == 1
+    assert frame.iloc[0]["calculation_version"] == stock_sync.TECHNICAL_CALCULATION_VERSION
     sync_mock.assert_not_called()
+
+
+def test_stock_technical_indicators_view_exposes_calculation_version():
+    stored = pd.DataFrame(
+        [
+            {
+                "date": date(2024, 6, 1),
+                "indicator_code": "SMA",
+                "indicator_period": 50,
+                "parameters": '{"period": 50}',
+                "component": "VALUE",
+                "indicator_value": 101.5,
+                "calculation_status": "CURRENT",
+                "calculation_version": stock_sync.TECHNICAL_CALCULATION_VERSION,
+                "calculated_at": date(2024, 6, 1),
+            }
+        ]
+    )
+    with (
+        patch.object(reference_service, "_load_stored_technicals", return_value=(stored, date(2024, 6, 1))),
+        patch.object(reference_service, "_last_ohlc_date", return_value=date(2024, 6, 1)),
+    ):
+        payload = reference_service.stock_technical_indicators_view("HDFCBANK")
+    assert len(payload["records"]) == 1
+    assert payload["records"][0]["calculation_version"] == stock_sync.TECHNICAL_CALCULATION_VERSION
+
+
+def test_load_stored_technicals_selects_migration_017_calculation_version():
+    source = Path(reference_service.__file__).read_text(encoding="utf-8")
+    block = source.split("def _load_stored_technicals", 1)[1].split("def _last_ohlc_date", 1)[0]
+    assert "t.calculation_version" in block
+    migration = (
+        Path(__file__).resolve().parents[2]
+        / "migrations"
+        / "alembic"
+        / "versions"
+        / "017_stock_technical_calculation_version.py"
+    )
+    assert migration.is_file()
+    assert "calculation_version" in migration.read_text(encoding="utf-8")
 
 
 def test_resolve_stored_skips_sync_when_stale_but_rows_exist():
