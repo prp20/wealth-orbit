@@ -10,10 +10,14 @@ import re
 from typing import Any
 
 from .daily_metrics import _as_float, _metric_number
+from .latest_snapshot import prune_non_latest_metric_dates
 
 CALC_VERSION = "calc_v1"
 CONSOLIDATED = "CONSOLIDATED"
 STANDALONE = "STANDALONE"
+
+# ``stock_daily_metrics.roce`` / ``.roe`` and bag ``ratios.ROCE`` / ``ratios.ROE`` use fractions.
+_FRACTION_RATIO_CODES = frozenset({"ROE", "ROCE"})
 
 # Screener #top-ratios label → canonical ratio code (fill gaps only).
 TOP_RATIOS_FALLBACK = {
@@ -95,8 +99,8 @@ def calc_v1_from_period(
         operating_margin = _div(operating_profit, revenue, as_percent=True)
 
     out: dict[str, float | None] = {
-        "ROE": _div(net_profit, equity, as_percent=True),
-        "ROCE": _div(operating_profit, capital_employed, as_percent=True),
+        "ROE": _div(net_profit, equity, as_percent=False),
+        "ROCE": _div(operating_profit, capital_employed, as_percent=False),
         "PAT_MARGIN": _div(net_profit, revenue, as_percent=True),
         "OPERATING_MARGIN": _as_float(operating_margin),
         "DEBT_TO_EQUITY": _div(borrowings, equity),
@@ -141,7 +145,8 @@ def merge_top_ratios_fallback(
         number = _metric_number(cleaned)
         if number is None:
             continue
-        # Screener often shows ROE/ROCE/margins already as percent points.
+        if code in _FRACTION_RATIO_CODES:
+            number = number / 100.0
         merged[code] = number
     return merged
 
@@ -279,6 +284,10 @@ def upsert_latest_fundamental_ratios(cur, stock_id, snapshot: dict[str, Any], so
         "methods": snapshot.get("methods") or {},
         "updated_at": date_cls.today().isoformat(),
     }
+    if isinstance(prior_bag, dict):
+        prior_sources = prior_bag.get("provider_metric_sources")
+        if isinstance(prior_sources, dict) and prior_sources:
+            payload["provider_metric_sources"] = dict(prior_sources)
     # Ensure JSON-serializable floats/None
     json.dumps(payload, allow_nan=False)
 
@@ -295,11 +304,5 @@ def upsert_latest_fundamental_ratios(cur, stock_id, snapshot: dict[str, Any], so
         """,
         (stock_id, metric_date, Json(payload), "CALCULATED", source_id),
     )
-    cur.execute(
-        """
-        DELETE FROM market_data.stock_daily_metrics
-        WHERE stock_id=%s AND metric_date <> %s
-        """,
-        (stock_id, metric_date),
-    )
+    prune_non_latest_metric_dates(cur, stock_id, metric_date)
     return str(metric_date)

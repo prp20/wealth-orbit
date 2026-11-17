@@ -12,7 +12,7 @@ from .portfolio_backend import (filter_values, mutual_funds, mutual_fund_detail,
     mutual_fund_benchmark, mutual_fund_benchmark_history,
     benchmark_list, benchmark_history, benchmark_snapshot, sync_home_indexes,
     stock_history, stocks, stock_daily_metrics, stock_fundamentals,
-    stock_shareholding, stock_technical_indicators, sync_stock_fundamentals,
+    stock_shareholding, stock_technical_indicators_view, sync_stock_fundamentals,
     mutual_fund_similar_enriched, mutual_fund_screen, mutual_fund_compare,
     mutual_fund_holdings_snapshot, mutual_fund_overlap, mutual_fund_managers,
     compute_metrics, has_nav_history, sync_nav, recompute_metrics, sync_benchmark, sync_enrichment,
@@ -689,7 +689,7 @@ def stock_screens_list(runnable_only: bool = Query(False)):
 
 
 @router.post("/stocks/screens/refresh")
-def stock_screens_refresh():
+def stock_screens_refresh(_user=Depends(current_user)):
     data = refresh_screens()
     return {
         "asset_class": data.get("asset_class"),
@@ -704,7 +704,11 @@ class RunStockScreenBody(BaseModel):
 
 
 @router.post("/stocks/screens/{screen_id}/run")
-def stock_screen_run(screen_id: str, body: RunStockScreenBody | None = None):
+def stock_screen_run(
+    screen_id: str,
+    body: RunStockScreenBody | None = None,
+    _user=Depends(current_user),
+):
     result = run_screen(screen_id, (body.params if body else None) or {})
     if not result.get("ok"):
         error = result.get("error") or "screen failed"
@@ -814,4 +818,4 @@ def stock_shareholding_route(symbol: str, from_date: date | None = None, to_date
 
 @router.get("/stocks/{symbol}/technical-indicators")
 def stock_technical_route(symbol: str, indicator: str = Query(""), from_date: date | None = None, to_date: date | None = None):
-    return stock_technical_indicators(symbol, indicator.upper(), from_date, to_date).to_dict(orient="records")
+    return stock_technical_indicators_view(symbol, indicator.upper(), from_date, to_date)

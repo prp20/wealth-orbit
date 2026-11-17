@@ -164,21 +164,59 @@ function LatestRatiosStrip({
         {` · ${method}`}
         {snapshot?.computed_on_read ? ' · computed on read' : ' · stored snapshot'}
       </p>
+      <div className="ratio-kv-grid" role="table" aria-label="Latest ratios">
+        {entries.map(([code, value]) => (
+          <div className="ratio-kv" role="row" key={code} title={definitions[code] || ''}>
+            <span className="ratio-kv-label" role="rowheader">
+              {METRIC_LABELS[code] || code}
+            </span>
+            <span className="ratio-kv-value" role="cell">
+              {formatStatementValue(code, value)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RatioGroupTable({
+  title,
+  metrics,
+  columnPeriods,
+  definitions,
+}: {
+  title: string;
+  metrics: Record<string, Record<string, unknown>>;
+  columnPeriods: string[];
+  definitions: Record<string, string>;
+}) {
+  return (
+    <div className="fundamentals-group">
+      <h3>{title}</h3>
       <div className="table-wrap statement-table-wrap">
         <table className="stock-table statement-table">
           <thead>
             <tr>
-              <th>Metric</th>
-              <th className="num">Value</th>
+              <th>Line</th>
+              {columnPeriods.map((item) => (
+                <th key={item} className="num">
+                  {String(item).slice(0, 10)}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {entries.map(([code, value]) => (
+            {Object.entries(metrics).map(([code, values]) => (
               <tr key={code}>
                 <th scope="row" title={definitions[code] || ''}>
                   {METRIC_LABELS[code] || code}
                 </th>
-                <td className="num">{formatStatementValue(code, value)}</td>
+                {columnPeriods.map((item) => (
+                  <td key={item} className="num">
+                    {formatStatementValue(code, values[item])}
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>
@@ -273,8 +311,8 @@ export default function FundamentalsPanel({ symbol }: { symbol: string }) {
           />
         ))}
       <LatestRatiosStrip ratios={latestRatios} snapshot={ratioSnapshot} definitions={definitions} />
-      {periods.length > 0 &&
-        RATIO_GROUPS.map((group) => {
+      {periods.length > 0 && (() => {
+        const rendered = RATIO_GROUPS.map((group) => {
           const metrics = groups[group] as Record<string, Record<string, unknown>> | undefined;
           if (!metrics) return null;
           const hasAny = Object.values(metrics).some((values) =>
@@ -289,40 +327,31 @@ export default function FundamentalsPanel({ symbol }: { symbol: string }) {
                     Object.values(metrics).flatMap((values) => Object.keys(values || {})),
                   ),
                 ).sort((a, b) => b.localeCompare(a));
-          return (
-            <div key={group} className="fundamentals-group">
-              <h3>{GROUP_LABELS[group]}</h3>
-              <div className="table-wrap statement-table-wrap">
-                <table className="stock-table statement-table">
-                  <thead>
-                    <tr>
-                      <th>Line</th>
-                      {columnPeriods.map((item: string) => (
-                        <th key={item} className="num">
-                          {String(item).slice(0, 10)}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(metrics).map(([code, values]) => (
-                      <tr key={code}>
-                        <th scope="row" title={definitions[code] || ''}>
-                          {METRIC_LABELS[code] || code}
-                        </th>
-                        {columnPeriods.map((item: string) => (
-                          <td key={item} className="num">
-                            {formatStatementValue(code, values[item])}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          );
-        })}
+          return {
+            group,
+            wide: group === 'growth' || columnPeriods.length > 2,
+            node: (
+              <RatioGroupTable
+                key={group}
+                title={GROUP_LABELS[group]}
+                metrics={metrics}
+                columnPeriods={columnPeriods}
+                definitions={definitions}
+              />
+            ),
+          };
+        }).filter(Boolean) as Array<{ group: string; wide: boolean; node: React.ReactNode }>;
+        const compact = rendered.filter((item) => !item.wide);
+        const wide = rendered.filter((item) => item.wide);
+        return (
+          <>
+            {compact.length > 0 && (
+              <div className="ratio-groups-grid">{compact.map((item) => item.node)}</div>
+            )}
+            {wide.map((item) => item.node)}
+          </>
+        );
+      })()}
     </section>
   );
 }

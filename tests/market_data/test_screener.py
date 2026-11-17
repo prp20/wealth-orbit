@@ -235,6 +235,47 @@ def test_parser_keeps_consolidated_and_standalone_rows_distinct():
     assert all(item.statement_type == "CF" for item in standalone.fundamental_values)
 
 
+def test_parser_merges_top_ratios_ul_and_ratios_section_latest_column():
+    """AFCONS-like page: ``ul#top-ratios`` plus ``section#ratios`` table (ROCE % fallback)."""
+    html = """
+    <ul id="top-ratios">
+      <li><span class="name">Market Cap</span><span class="number">8,163 Cr.</span></li>
+      <li><span class="name">Stock P/E</span><span class="number">58.0</span></li>
+      <li><span class="name">Book Value</span><span class="number">149</span></li>
+    </ul>
+    <section id="ratios" class="card card-large">
+      <table class="data-table responsive-text-nowrap">
+        <thead>
+          <tr><th class="text"></th><th>Mar 2024</th><th>Mar 2025</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Debtor Days</td><td>93</td><td>105</td></tr>
+          <tr><td>ROCE %</td><td>12%</td><td>14%</td></tr>
+          <tr><td>ROE %</td><td>4%</td><td>5%</td></tr>
+        </tbody>
+      </table>
+    </section>
+    """
+    parsed = ScreenerParser(CONSOLIDATED).parse(html, stock_id=uuid4())
+    assert parsed.ratios["Market Cap"] == "8,163 Cr."
+    assert parsed.ratios["Stock P/E"] == "58.0"
+    assert parsed.ratios["ROCE"] == "14%"
+    assert parsed.ratios["ROE"] == "5%"
+    # Headline panel wins when both panels expose the same mapped label.
+    parsed_with_dup = ScreenerParser().parse(
+        """
+        <ul id="top-ratios">
+          <li><span class="name">ROCE</span><span class="number">13.9%</span></li>
+        </ul>
+        <section id="ratios"><table class="data-table"><tbody>
+          <tr><td>ROCE %</td><td>10%</td><td>11%</td></tr>
+        </tbody></table></section>
+        """,
+        stock_id=uuid4(),
+    )
+    assert parsed_with_dup.ratios["ROCE"] == "13.9%"
+
+
 def test_parser_maps_shareholding_and_leaves_absent_categories_null():
     parsed = ScreenerParser().parse(
         """

@@ -48,9 +48,11 @@ Sparse fundamentals mean required `.notna()` filters shrink results until sync f
 
 Identity: `trading_symbol`, `company_name`, `exchange`, `sector_name`, `industry_name`, `market_cap_class`
 
-Prices / technicals: `price_close`, `sma_200`
+Prices / technicals: `price_close`, `sma_50`, `sma_200`, `price_above_sma_50`, `price_above_sma_200`, `pct_from_sma_50`, `pct_from_sma_200`, `sma50_above_sma200`, `rel_volume_20`, `pct_from_52w_high`, `pct_from_52w_low`, `bb_percent_b`
 
 Daily metrics: `market_cap`, `market_cap_cr`, `stock_pe`, `price_to_book`, `dividend_yield`, `book_value`, `roce`, `roe`, `enterprise_value`, `ebitda_ttm`, `ev_ebitda`, `ev_sales`, `net_debt`, `fcf_yield`, `peg`, `earnings_yield`, `metrics_date`
+
+**ROCE** on the snapshot comes from the latest `stock_daily_metrics` row: Screener.in consolidated `#ratios` when fundamentals are synced, merged with Yahoo valuation fields where configured. Null until that sync fills the row — never back-filled from ephemeral technical compute.
 
 Fundamentals / derived: `debt_to_equity`, `interest_coverage`, `operating_margin`, `roa`, `asset_turnover`, `profit_growth_3y`, `sales_growth_3y`, `cfo`, `net_profit`
 

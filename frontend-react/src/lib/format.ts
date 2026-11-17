@@ -82,6 +82,7 @@ const RATIO_CODES = new Set([
 
 export function formatStatementValue(code: string, value: unknown): string {
   if (code === 'EPS') return formatInr(value);
+  if (code === 'ROE' || code === 'ROCE') return formatPct(value);
   if (PERCENT_POINT_CODES.has(code)) return formatPercentPoints(value);
   if (RATIO_CODES.has(code)) return formatRatio(value);
   return formatCrore(value);

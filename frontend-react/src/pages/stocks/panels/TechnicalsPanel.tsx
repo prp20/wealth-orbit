@@ -1,11 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../../../api';
+import { api, StockTechnicalIndicatorsPayload } from '../../../api';
+import InfoTip from '../../../components/InfoTip';
 import SyncJobButton from '../../../components/SyncJobButton';
 import { formatDate, formatRatio } from '../../../lib/format';
 
 const FAMILIES: { title: string; match: (code: string) => boolean }[] = [
   { title: 'RSI', match: (code) => code.startsWith('RSI') },
-  { title: 'SMA / EMA', match: (code) => code.startsWith('SMA') || code.startsWith('EMA') },
+  { title: 'SMA', match: (code) => code.startsWith('SMA') },
+  { title: 'EMA', match: (code) => code.startsWith('EMA') },
+  { title: 'Stochastic', match: (code) => code.startsWith('STOCH') },
   { title: 'MACD', match: (code) => code.startsWith('MACD') },
   { title: 'Bollinger', match: (code) => code.startsWith('BB') || code.includes('BOLL') },
   { title: 'ATR', match: (code) => code.startsWith('ATR') },
@@ -40,17 +43,33 @@ export default function TechnicalsPanel({ symbol }: { symbol: string }) {
     queryKey: ['stock-technical', symbol],
     queryFn: () => api.stockTechnical(symbol),
   });
-  const rows = technical.data || [];
+  const payload: StockTechnicalIndicatorsPayload | undefined = technical.data;
+  const rows = payload?.records || [];
+  const syncError = payload?.sync_error || null;
   const latest = latestBySeries(rows);
 
   return (
     <section className="panel">
       <div className="panel-heading">
         <div>
-          <h2>Technicals</h2>
+          <div className="fundamentals-title-row">
+            <h2>Technicals</h2>
+            <InfoTip label="About technical indicators">
+              <p>
+                Values come from the latest stored OHLCV snapshot only (SMA 20/50/200, EMA 20/50,
+                RSI, MACD, Bollinger, ATR, Stochastic). Missing data stays empty — we do not compute
+                ephemeral values on read.
+              </p>
+              <p>
+                These are <strong>research metrics</strong> for screening and review, not investment
+                advice or trade signals.
+              </p>
+              <p>Interactive chart overlays and drawings are out of scope (planned for a later release).</p>
+            </InfoTip>
+          </div>
           <p className="panel-subtitle">
-            Core indicators (SMA/EMA, RSI, MACD, Bollinger, ATR) computed from OHLCV and stored for
-            the latest trading day only.
+            Research metrics from stored indicators for the latest trading day — not advice. Chart overlays
+            are out of scope.
           </p>
         </div>
         <SyncJobButton
@@ -62,8 +81,17 @@ export default function TechnicalsPanel({ symbol }: { symbol: string }) {
       </div>
       {technical.isLoading && <div className="loading">Loading technicals…</div>}
       {technical.error && <div className="empty">{(technical.error as Error).message}</div>}
-      {!technical.isLoading && !latest.length && (
-        <div className="empty">No technicals yet. Sync prices first, then refresh this panel.</div>
+      {!technical.isLoading && !technical.error && syncError && (
+        <div className="empty" role="alert">
+          {latest.length
+            ? `Stored indicators are behind the latest price bar. Refresh to update. (${syncError})`
+            : `No stored technical indicators yet. Sync prices first, then refresh this panel. (${syncError})`}
+        </div>
+      )}
+      {!technical.isLoading && !technical.error && !syncError && !latest.length && (
+        <div className="empty">
+          No stored technical indicators yet. Sync prices first, then refresh this panel.
+        </div>
       )}
       {latest.length > 0 && (
         <div className="table-wrap">

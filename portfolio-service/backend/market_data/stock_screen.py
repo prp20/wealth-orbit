@@ -9,6 +9,8 @@ import pandas as pd
 
 from backend.reference_service import _query
 
+from .screen_derived import DERIVED_FROM_OHLC_INPUTS, apply_derived_screen_fields
+
 # Columns plugins and the results grid may use. Keep screens/README.md in sync.
 SNAPSHOT_COLUMNS: tuple[str, ...] = (
     "trading_symbol",
@@ -18,7 +20,17 @@ SNAPSHOT_COLUMNS: tuple[str, ...] = (
     "industry_name",
     "market_cap_class",
     "price_close",
+    "sma_50",
     "sma_200",
+    "price_above_sma_50",
+    "price_above_sma_200",
+    "pct_from_sma_50",
+    "pct_from_sma_200",
+    "sma50_above_sma200",
+    "rel_volume_20",
+    "pct_from_52w_high",
+    "pct_from_52w_low",
+    "bb_percent_b",
     "market_cap",
     "market_cap_cr",
     "stock_pe",
@@ -66,6 +78,8 @@ STOCK_SCREEN_SORT_COLUMNS = {
     "roa": "roa",
     "ev_ebitda": "ev_ebitda",
     "price_close": "price_close",
+    "rel_volume_20": "rel_volume_20",
+    "pct_from_52w_high": "pct_from_52w_high",
     "profit_growth_3y": "profit_growth_3y",
     "sales_growth_3y": "sales_growth_3y",
     "debt_to_equity": "debt_to_equity",
@@ -129,7 +143,42 @@ def build_stock_metrics_snapshot(*, require_metrics: bool = False) -> pd.DataFra
           JOIN base b ON b.stock_id = p.stock_id
           ORDER BY p.stock_id, p.trading_date DESC
         ),
-        sma_200 AS (
+        latest_stored_sma AS (
+          SELECT t.stock_id,
+                 MAX(t.indicator_value) FILTER (
+                   WHERE t.indicator_code = 'SMA' AND t.indicator_period = 50
+                 ) AS sma_50,
+                 MAX(t.indicator_value) FILTER (
+                   WHERE t.indicator_code = 'SMA' AND t.indicator_period = 200
+                 ) AS sma_200
+          FROM market_data.stock_technical_indicators t
+          JOIN base b ON b.stock_id = t.stock_id
+          JOIN (
+            SELECT stock_id, MAX(trading_date) AS trading_date
+            FROM market_data.stock_technical_indicators
+            GROUP BY stock_id
+          ) md ON md.stock_id = t.stock_id AND md.trading_date = t.trading_date
+          WHERE t.indicator_code = 'SMA'
+            AND t.component = 'VALUE'
+            AND t.indicator_period IN (50, 200)
+          GROUP BY t.stock_id
+        ),
+        -- Prefer latest stored SMA (tech sync SSOT); OHLC rolling averages fill gaps only.
+        ohlc_sma_50 AS (
+          SELECT stock_id, AVG(px) AS sma_50
+          FROM (
+            SELECT p.stock_id,
+                   COALESCE(p.adj_close, p.close) AS px,
+                   ROW_NUMBER() OVER (PARTITION BY p.stock_id ORDER BY p.trading_date DESC) AS rn
+            FROM market_data.stock_daily_prices p
+            JOIN base b ON b.stock_id = p.stock_id
+            WHERE COALESCE(p.adj_close, p.close) IS NOT NULL
+          ) ranked
+          WHERE rn <= 50
+          GROUP BY stock_id
+          HAVING COUNT(*) >= 40
+        ),
+        ohlc_sma_200 AS (
           SELECT stock_id, AVG(px) AS sma_200
           FROM (
             SELECT p.stock_id,
@@ -142,6 +191,55 @@ def build_stock_metrics_snapshot(*, require_metrics: bool = False) -> pd.DataFra
           WHERE rn <= 200
           GROUP BY stock_id
           HAVING COUNT(*) >= 150
+        ),
+        latest_bar AS (
+          SELECT DISTINCT ON (p.stock_id)
+                 p.stock_id, p.volume AS latest_volume
+          FROM market_data.stock_daily_prices p
+          JOIN base b ON b.stock_id = p.stock_id
+          WHERE p.volume IS NOT NULL
+          ORDER BY p.stock_id, p.trading_date DESC
+        ),
+        vol_avg_20 AS (
+          SELECT stock_id, AVG(volume) AS vol_avg_20
+          FROM (
+            SELECT p.stock_id, p.volume,
+                   ROW_NUMBER() OVER (PARTITION BY p.stock_id ORDER BY p.trading_date DESC) AS rn
+            FROM market_data.stock_daily_prices p
+            JOIN base b ON b.stock_id = p.stock_id
+            WHERE p.volume IS NOT NULL
+          ) ranked
+          WHERE rn <= 20
+          GROUP BY stock_id
+          HAVING COUNT(*) >= 15
+        ),
+        range_52w AS (
+          SELECT stock_id, MAX(hi) AS high_52w, MIN(lo) AS low_52w
+          FROM (
+            SELECT p.stock_id, p.high AS hi, p.low AS lo,
+                   ROW_NUMBER() OVER (PARTITION BY p.stock_id ORDER BY p.trading_date DESC) AS rn
+            FROM market_data.stock_daily_prices p
+            JOIN base b ON b.stock_id = p.stock_id
+            WHERE p.high IS NOT NULL AND p.low IS NOT NULL
+          ) ranked
+          WHERE rn <= 252
+          GROUP BY stock_id
+          HAVING COUNT(*) >= 200
+        ),
+        latest_bb AS (
+          SELECT t.stock_id,
+                 MAX(t.indicator_value) FILTER (WHERE t.component = 'UPPER') AS bb_upper,
+                 MAX(t.indicator_value) FILTER (WHERE t.component = 'LOWER') AS bb_lower
+          FROM market_data.stock_technical_indicators t
+          JOIN base b ON b.stock_id = t.stock_id
+          JOIN (
+            SELECT stock_id, MAX(trading_date) AS trading_date
+            FROM market_data.stock_technical_indicators
+            GROUP BY stock_id
+          ) md ON md.stock_id = t.stock_id AND md.trading_date = t.trading_date
+          WHERE t.indicator_code = 'BB'
+            AND t.component IN ('UPPER', 'LOWER')
+          GROUP BY t.stock_id
         ),
         latest_share AS (
           SELECT DISTINCT ON (h.stock_id)
@@ -187,7 +285,11 @@ def build_stock_metrics_snapshot(*, require_metrics: bool = False) -> pd.DataFra
           GROUP BY stock_id
         )
         SELECT b.trading_symbol, b.company_name, b.exchange, b.sector_name, b.industry_name,
-               b.market_cap_class, lp.price_close, sma.sma_200,
+               b.market_cap_class, lp.price_close,
+               COALESCE(lss.sma_50, ohlc50.sma_50) AS sma_50,
+               COALESCE(lss.sma_200, ohlc200.sma_200) AS sma_200,
+               lb.latest_volume, va.vol_avg_20, r52.high_52w, r52.low_52w,
+               bb.bb_upper, bb.bb_lower,
                lm.market_cap,
                CASE WHEN lm.market_cap IS NULL THEN NULL ELSE lm.market_cap / 10000000.0 END AS market_cap_cr,
                lm.stock_pe, lm.price_to_book, lm.dividend_yield,
@@ -207,7 +309,13 @@ def build_stock_metrics_snapshot(*, require_metrics: bool = False) -> pd.DataFra
         FROM base b
         LEFT JOIN latest_metrics lm ON lm.stock_id = b.stock_id
         LEFT JOIN latest_price lp ON lp.stock_id = b.stock_id
-        LEFT JOIN sma_200 sma ON sma.stock_id = b.stock_id
+        LEFT JOIN latest_stored_sma lss ON lss.stock_id = b.stock_id
+        LEFT JOIN ohlc_sma_50 ohlc50 ON ohlc50.stock_id = b.stock_id
+        LEFT JOIN ohlc_sma_200 ohlc200 ON ohlc200.stock_id = b.stock_id
+        LEFT JOIN latest_bar lb ON lb.stock_id = b.stock_id
+        LEFT JOIN vol_avg_20 va ON va.stock_id = b.stock_id
+        LEFT JOIN range_52w r52 ON r52.stock_id = b.stock_id
+        LEFT JOIN latest_bb bb ON bb.stock_id = b.stock_id
         LEFT JOIN latest_share sh ON sh.stock_id = b.stock_id
         LEFT JOIN latest_fund lf ON lf.stock_id = b.stock_id
         ORDER BY b.trading_symbol
@@ -264,6 +372,9 @@ def build_stock_metrics_snapshot(*, require_metrics: bool = False) -> pd.DataFra
     frame["sales_growth_3y"] = sales_growth
     frame["roa"] = roa
     frame["asset_turnover"] = asset_turnover
+
+    frame = apply_derived_screen_fields(frame)
+    frame = frame.drop(columns=[c for c in DERIVED_FROM_OHLC_INPUTS if c in frame.columns], errors="ignore")
 
     for column in SNAPSHOT_COLUMNS:
         if column not in frame.columns:

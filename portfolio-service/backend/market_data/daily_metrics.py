@@ -17,6 +17,48 @@ PROVIDER_METRIC_LABELS = {
     "ROE": "roe",
 }
 
+# Mapped provider keys → ``stock_daily_metrics`` column names.
+PROVIDER_METRIC_COLUMNS = {
+    "market_cap": "market_cap",
+    "pe_ratio": "stock_pe",
+    "pb_ratio": "price_to_book",
+    "dividend_yield": "dividend_yield",
+    "book_value": "book_value",
+    "roce": "roce",
+    "roe": "roe",
+}
+
+SCREENER_PROVIDER_SOURCE = "screener"
+
+# Yahoo sync fills these; when Yahoo is NULL, keep the latest stored row (e.g. Screener).
+YAHOO_MERGE_PRESERVE_COLUMNS = (
+    "market_cap",
+    "stock_pe",
+    "price_to_book",
+    "dividend_yield",
+    "book_value",
+    "roce",
+    "roe",
+)
+
+# Screen snapshot stores profitability ratios as fractions (0.139 = 13.9%).
+_SCREENER_FRACTION_METRIC_KEYS = frozenset({"roce", "roe"})
+_YAHOO_PROFITABILITY_FRACTION_MAX = 1.5
+
+
+def merge_yahoo_daily_fields(
+    yahoo: dict[str, float | None],
+    prior: dict[str, float | None] | None,
+) -> dict[str, float | None]:
+    """Keep non-null provider metrics on the latest row when Yahoo omits them."""
+    merged = dict(yahoo)
+    if not prior:
+        return merged
+    for key in YAHOO_MERGE_PRESERVE_COLUMNS:
+        if merged.get(key) is None and prior.get(key) is not None:
+            merged[key] = prior[key]
+    return merged
+
 
 def provider_metrics_from_ratios(ratios: dict[str, str]) -> tuple[dict[str, float], list[dict[str, str]]]:
     """Map a Screener ratio panel to canonical daily-metric fields without guessing unknown fields."""
@@ -26,18 +68,168 @@ def provider_metrics_from_ratios(ratios: dict[str, str]) -> tuple[dict[str, floa
         target = PROVIDER_METRIC_LABELS.get(label)
         if target is None:
             continue
-        number = _metric_number(raw_value)
+        number = _metric_number(raw_value, label=label)
         if number is None:
             warnings.append({"kind": "invalid_provider_metric", "label": label, "value": raw_value})
         else:
+            if target in _SCREENER_FRACTION_METRIC_KEYS:
+                number = number / 100.0
             metrics[target] = number
     return metrics, warnings
 
 
-def _metric_number(value: str) -> float | None:
+def merge_screener_provider_fields(
+    existing: dict[str, float | None],
+    screener: dict[str, float],
+) -> tuple[dict[str, float | None], list[str]]:
+    """Fill only NULL provider metric columns; never overwrite Yahoo/provider values."""
+    merged = dict(existing)
+    filled: list[str] = []
+    for key, value in screener.items():
+        column = PROVIDER_METRIC_COLUMNS.get(key)
+        if column is None:
+            continue
+        if merged.get(column) is None and value is not None:
+            merged[column] = value
+            filled.append(column)
+    return merged, filled
+
+
+def upsert_screener_provider_metrics(
+    cur,
+    stock_id,
+    ratios: dict[str, str],
+    source_id,
+    *,
+    metric_date_fallback=None,
+) -> str | None:
+    """Persist Screener ``#ratios`` / ``#top-ratios`` onto the single latest metrics row."""
+    from datetime import date as date_cls
+
+    from .latest_snapshot import prune_non_latest_metric_dates
+
+    provider_values, _warnings = provider_metrics_from_ratios(ratios)
+    if not provider_values:
+        return None
+
+    cur.execute(
+        """
+        SELECT metric_date, market_cap, stock_pe, price_to_book, dividend_yield, book_value, roce, roe,
+               fundamental_ratios
+        FROM market_data.stock_daily_metrics
+        WHERE stock_id=%s
+        ORDER BY metric_date DESC
+        LIMIT 1
+        """,
+        (stock_id,),
+    )
+    row = cur.fetchone()
+    prior = {
+        "market_cap": None,
+        "stock_pe": None,
+        "price_to_book": None,
+        "dividend_yield": None,
+        "book_value": None,
+        "roce": None,
+        "roe": None,
+    }
+    prior_bag = None
+    if row:
+        metric_date = row[0]
+        prior = {
+            "market_cap": row[1],
+            "stock_pe": row[2],
+            "price_to_book": row[3],
+            "dividend_yield": row[4],
+            "book_value": row[5],
+            "roce": row[6],
+            "roe": row[7],
+        }
+        prior_bag = row[8] if len(row) > 8 else None
+    else:
+        metric_date = metric_date_fallback or date_cls.today()
+
+    merged, filled_columns = merge_screener_provider_fields(prior, provider_values)
+    if not filled_columns and row:
+        prune_non_latest_metric_dates(cur, stock_id, metric_date)
+        return str(metric_date)
+
+    bag = dict(prior_bag) if isinstance(prior_bag, dict) else {}
+    if filled_columns:
+        sources = dict(bag.get("provider_metric_sources") or {})
+        for column in filled_columns:
+            sources[column] = SCREENER_PROVIDER_SOURCE
+        bag["provider_metric_sources"] = sources
+
+    from psycopg2.extras import Json
+
+    if row:
+        cur.execute(
+            """
+            UPDATE market_data.stock_daily_metrics
+            SET market_cap=%s, stock_pe=%s, price_to_book=%s, dividend_yield=%s,
+                book_value=%s, roce=%s, roe=%s,
+                fundamental_ratios=CASE
+                    WHEN %s::jsonb IS NOT NULL THEN COALESCE(fundamental_ratios, '{}'::jsonb) || %s::jsonb
+                    ELSE fundamental_ratios
+                END,
+                updated_at=NOW()
+            WHERE stock_id=%s AND metric_date=%s
+            """,
+            (
+                merged["market_cap"],
+                merged["stock_pe"],
+                merged["price_to_book"],
+                merged["dividend_yield"],
+                merged["book_value"],
+                merged["roce"],
+                merged["roe"],
+                Json(bag) if bag else None,
+                Json(bag) if bag else None,
+                stock_id,
+                metric_date,
+            ),
+        )
+    else:
+        cur.execute(
+            """
+            INSERT INTO market_data.stock_daily_metrics
+              (stock_id, metric_date, market_cap, stock_pe, price_to_book, dividend_yield,
+               book_value, roce, roe, calculation_method, source_id, fundamental_ratios)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'PROVIDER',%s,%s)
+            """,
+            (
+                stock_id,
+                metric_date,
+                merged["market_cap"],
+                merged["stock_pe"],
+                merged["price_to_book"],
+                merged["dividend_yield"],
+                merged["book_value"],
+                merged["roce"],
+                merged["roe"],
+                source_id,
+                Json(bag) if bag else None,
+            ),
+        )
+    prune_non_latest_metric_dates(cur, stock_id, metric_date)
+    return str(metric_date)
+
+
+def _screener_market_cap_is_crores(value: str) -> bool:
+    return bool(re.search(r"\bCr\.?", value, flags=re.IGNORECASE))
+
+
+def _metric_number(value: str, *, label: str | None = None) -> float | None:
     # Screener's market-cap display includes a unit suffix (e.g. "1,25,000 Cr.").
+    is_crores = label == "Market Cap" and _screener_market_cap_is_crores(value)
     cleaned = re.sub(r"\s*(?:Cr\.?|₹)\s*$", "", value, flags=re.IGNORECASE)
-    return normalize_number(cleaned)
+    number = normalize_number(cleaned)
+    if number is None:
+        return None
+    if is_crores:
+        number *= 10_000_000
+    return number
 
 
 def _as_float(raw) -> float | None:
@@ -66,6 +258,24 @@ def net_debt_from_parts(total_debt: float | None, total_cash: float | None) -> f
 # Values in [0, 0.2) are treated as that fraction. Values in [0.2, 100] are treated
 # as already-percent points so a true 0.8% yield is not scaled to 80%.
 _YAHOO_YIELD_FRACTION_MAX = 0.2
+
+
+def normalize_yahoo_profitability_ratio(raw) -> float | None:
+    """Store Yahoo ROE/ROCE as fractions (0.139 = 13.9%).
+
+    Values with |x| > 1.5 are treated as percent points and divided by 100.
+    Rejects absurd inputs (|raw| > 100 or |stored| > 1.5 after normalization).
+    """
+    number = _as_float(raw)
+    if number is None:
+        return None
+    if abs(number) > 100:
+        return None
+    if abs(number) > _YAHOO_PROFITABILITY_FRACTION_MAX:
+        number = number / 100.0
+    if abs(number) > _YAHOO_PROFITABILITY_FRACTION_MAX:
+        return None
+    return number
 
 
 def normalize_yahoo_dividend_yield(raw) -> float | None:
@@ -110,8 +320,8 @@ def yahoo_daily_metric_fields(info: dict) -> dict:
         "price_to_book": _as_float(info.get("priceToBook")),
         "dividend_yield": normalize_yahoo_dividend_yield(info.get("dividendYield")),
         "book_value": _as_float(info.get("bookValue")),
-        "roce": _as_float(info.get("returnOnCapitalEmployed")),
-        "roe": _as_float(info.get("returnOnEquity")),
+        "roce": normalize_yahoo_profitability_ratio(info.get("returnOnCapitalEmployed")),
+        "roe": normalize_yahoo_profitability_ratio(info.get("returnOnEquity")),
         "enterprise_value": enterprise_value,
         "ebitda_ttm": ebitda_ttm,
         "ev_ebitda": ev_ebitda,

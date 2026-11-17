@@ -121,6 +121,64 @@ def test_dry_run_builtin_quality_value():
     assert "BBB" not in symbols
 
 
+def test_dry_run_filters_price_above_sma_200(tmp_path: Path):
+    plugin = tmp_path / "above_sma200.py"
+    plugin.write_text(
+        textwrap.dedent(
+            """
+            from nivesh_screens import col
+            SCREEN_ID = "above_sma200"
+            SCREEN_META = {
+                "name": "Above SMA200",
+                "version": "1.0.0",
+                "description": "dry-run derived filter",
+                "asset_class": "stock",
+                "parameters": [],
+            }
+            def screen(stocks, params):
+                mask = col(stocks, "price_above_sma_200") == True
+                return stocks.loc[mask]
+            """
+        ).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    result = dry_run_screen(plugin, timeout_seconds=15)
+    assert result.get("ok") is True, result
+    symbols = set(result.get("symbols") or [])
+    assert "AAA" in symbols
+    assert "BBB" not in symbols
+
+
+def test_dry_run_filters_rel_volume_20(tmp_path: Path):
+    plugin = tmp_path / "rel_vol.py"
+    plugin.write_text(
+        textwrap.dedent(
+            """
+            from nivesh_screens import col
+            SCREEN_ID = "rel_vol"
+            SCREEN_META = {
+                "name": "Relative volume",
+                "version": "1.0.0",
+                "description": "dry-run derived filter",
+                "asset_class": "stock",
+                "parameters": [],
+            }
+            def screen(stocks, params):
+                rv = col(stocks, "rel_volume_20")
+                return stocks.loc[rv.notna() & (rv > 1.0)]
+            """
+        ).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    result = dry_run_screen(plugin, timeout_seconds=15)
+    assert result.get("ok") is True, result
+    symbols = set(result.get("symbols") or [])
+    assert "AAA" in symbols
+    assert "BBB" not in symbols
+
+
 def test_run_screen_honest_empty_snapshot(monkeypatch):
     import backend.screen_plugins.runner as runner
 
@@ -161,6 +219,10 @@ def test_routes_and_ui_wire_stock_screener():
     assert '@router.get("/stocks/screens")' in routes
     assert '@router.post("/stocks/screens/refresh")' in routes
     assert '@router.post("/stocks/screens/{screen_id}/run")' in routes
+    refresh_block = routes.split('@router.post("/stocks/screens/refresh")', 1)[1].split("@router", 1)[0]
+    run_block = routes.split('@router.post("/stocks/screens/{screen_id}/run")', 1)[1].split("@router", 1)[0]
+    assert "Depends(current_user)" in refresh_block
+    assert "Depends(current_user)" in run_block
     app = (ROOT / "frontend-react" / "src" / "app" / "App.tsx").read_text(encoding="utf-8")
     assert 'path="/stocks/screen"' in app
     assert "StockScreenerPage" in app
@@ -191,7 +253,28 @@ def test_snapshot_exposes_expanded_columns():
         "debt_to_equity",
         "profit_growth_3y",
         "promoter_holding",
+        "sma_50",
         "sma_200",
+        "price_above_sma_200",
+        "rel_volume_20",
+        "pct_from_52w_high",
+        "bb_percent_b",
         "roa",
+        "roce",
+        "sma50_above_sma200",
+        "price_above_sma_50",
     ):
         assert column in SNAPSHOT_COLUMNS
+
+
+def test_technicals_panel_honesty_copy():
+    technicals = (
+        ROOT / "frontend-react" / "src" / "pages" / "stocks" / "panels" / "TechnicalsPanel.tsx"
+    ).read_text(encoding="utf-8")
+    assert "research metrics" in technicals.lower()
+    assert "not advice" in technicals.lower()
+    assert "ephemeral" in technicals.lower()
+    assert "No stored technical indicators yet" in technicals
+    assert "role=\"alert\"" in technicals
+    assert "behind the latest price bar" in technicals
+    assert "Stochastic" in technicals
