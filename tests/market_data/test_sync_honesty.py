@@ -206,3 +206,99 @@ def test_sync_stock_fundamentals_persists_both_bases_without_clobber(monkeypatch
     assert any("stock_quarterly_fundamental_values" in sql for sql in value_sql)
     assert len(quarterly_inserts) == 3  # consol Sep+Mar, standalone Sep
     assert all("ON CONFLICT" in sql for sql in value_sql)
+
+
+def test_sync_stock_fundamentals_uses_standalone_ratios_when_consolidated_missing(monkeypatch):
+    stock_id = uuid4()
+    source_id = uuid4()
+    screener_calls: list[dict] = []
+
+    class FakeCursor:
+        def __init__(self):
+            self.last_sql = ""
+
+        def execute(self, sql, params=None):
+            self.last_sql = " ".join(sql.split())
+
+        def fetchone(self):
+            if "FROM market_data.stock_reference" in self.last_sql:
+                return (stock_id,)
+            if "FROM market_data.stock_daily_metrics" in self.last_sql and "ORDER BY metric_date DESC" in self.last_sql:
+                return None
+            return None
+
+        def fetchall(self):
+            if "FROM market_data.fundamental_metric_reference" in self.last_sql:
+                return []
+            return []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    class FakeConn:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def cursor(self):
+            return FakeCursor()
+
+        def commit(self):
+            return None
+
+    ratios_panel = """
+    <ul id="top-ratios">
+      <li class="flex flex-space-between"><span class="name">ROCE</span><span class="number">13.9%</span></li>
+      <li class="flex flex-space-between"><span class="name">ROE</span><span class="number">5.61%</span></li>
+    </ul>
+  """
+    html_by_basis = {
+        "CONSOLIDATED": """
+            <section id="quarters"><table class="data-table">
+              <thead><tr><th>Particulars</th><th>Mar 2024</th></tr></thead>
+              <tbody><tr><td>Sales +</td><td>1,000</td></tr></tbody>
+            </table></section>
+            """,
+        "STANDALONE": ratios_panel
+        + """
+            <section id="quarters"><table class="data-table">
+              <thead><tr><th>Particulars</th><th>Mar 2024</th></tr></thead>
+              <tbody><tr><td>Sales +</td><td>850</td></tr></tbody>
+            </table></section>
+            """,
+    }
+
+    def fake_fetch(url, *_args, **_kwargs):
+        if "consolidated" in url:
+            return html_by_basis["CONSOLIDATED"]
+        return html_by_basis["STANDALONE"]
+
+    def fake_execute_values(cur, sql, argslist, template=None, page_size=100, fetch=False):
+        return None
+
+    def recording_upsert(cur, stock_id_arg, ratios, source_id_arg, **kwargs):
+        screener_calls.append(ratios)
+        return None
+
+    monkeypatch.setattr(reference_service.psycopg2, "connect", lambda *a, **k: FakeConn())
+    monkeypatch.setattr(reference_service, "execute_values", fake_execute_values)
+    monkeypatch.setattr("backend.market_data.providers.screener.fetch_html", fake_fetch)
+    monkeypatch.setattr(
+        "backend.market_data.sources.ensure_data_source",
+        lambda _cur, _name: source_id,
+    )
+    monkeypatch.setattr(
+        "backend.market_data.daily_metrics.upsert_screener_provider_metrics",
+        recording_upsert,
+    )
+
+    result = reference_service.sync_stock_fundamentals("STANDRAT")
+    assert result["status"] == "completed"
+    assert len(screener_calls) == 1
+    assert screener_calls[0]["ROCE"] == "13.9%"
+    assert screener_calls[0]["ROE"] == "5.61%"

@@ -43,6 +43,7 @@ YAHOO_MERGE_PRESERVE_COLUMNS = (
 
 # Screen snapshot stores profitability ratios as fractions (0.139 = 13.9%).
 _SCREENER_FRACTION_METRIC_KEYS = frozenset({"roce", "roe"})
+_YAHOO_PROFITABILITY_FRACTION_MAX = 1.5
 
 
 def merge_yahoo_daily_fields(
@@ -259,6 +260,24 @@ def net_debt_from_parts(total_debt: float | None, total_cash: float | None) -> f
 _YAHOO_YIELD_FRACTION_MAX = 0.2
 
 
+def normalize_yahoo_profitability_ratio(raw) -> float | None:
+    """Store Yahoo ROE/ROCE as fractions (0.139 = 13.9%).
+
+    Values with |x| > 1.5 are treated as percent points and divided by 100.
+    Rejects absurd inputs (|raw| > 100 or |stored| > 1.5 after normalization).
+    """
+    number = _as_float(raw)
+    if number is None:
+        return None
+    if abs(number) > 100:
+        return None
+    if abs(number) > _YAHOO_PROFITABILITY_FRACTION_MAX:
+        number = number / 100.0
+    if abs(number) > _YAHOO_PROFITABILITY_FRACTION_MAX:
+        return None
+    return number
+
+
 def normalize_yahoo_dividend_yield(raw) -> float | None:
     """Store Yahoo dividendYield once as percent points for NSE tickers.
 
@@ -301,8 +320,8 @@ def yahoo_daily_metric_fields(info: dict) -> dict:
         "price_to_book": _as_float(info.get("priceToBook")),
         "dividend_yield": normalize_yahoo_dividend_yield(info.get("dividendYield")),
         "book_value": _as_float(info.get("bookValue")),
-        "roce": _as_float(info.get("returnOnCapitalEmployed")),
-        "roe": _as_float(info.get("returnOnEquity")),
+        "roce": normalize_yahoo_profitability_ratio(info.get("returnOnCapitalEmployed")),
+        "roe": normalize_yahoo_profitability_ratio(info.get("returnOnEquity")),
         "enterprise_value": enterprise_value,
         "ebitda_ttm": ebitda_ttm,
         "ev_ebitda": ev_ebitda,

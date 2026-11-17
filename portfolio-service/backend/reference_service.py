@@ -1879,7 +1879,12 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
             )
 
             consol_parsed = parsed_by_basis.get(CONSOLIDATED)
-            screener_ratios = consol_parsed.ratios if consol_parsed else {}
+            stand_parsed = parsed_by_basis.get(STANDALONE)
+            screener_ratios: dict[str, str] = {}
+            if consol_parsed and consol_parsed.ratios:
+                screener_ratios = consol_parsed.ratios
+            elif stand_parsed and stand_parsed.ratios:
+                screener_ratios = stand_parsed.ratios
             if screener_ratios:
                 upsert_screener_provider_metrics(cur, stock_id, screener_ratios, source_id)
 

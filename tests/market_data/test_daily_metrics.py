@@ -13,10 +13,12 @@ from backend.market_data.daily_metrics import (
     merge_yahoo_daily_fields,
     net_debt_from_parts,
     normalize_yahoo_dividend_yield,
+    normalize_yahoo_profitability_ratio,
     provider_metrics_from_ratios,
     upsert_screener_provider_metrics,
     yahoo_daily_metric_fields,
 )
+from backend.market_data.fundamental_ratios import build_latest_snapshot, upsert_latest_fundamental_ratios
 from backend.market_data import sync as stock_sync
 from backend.market_data.providers.screener import ScreenerParser
 from pathlib import Path as _Path
@@ -62,6 +64,43 @@ def test_net_debt_requires_both_sides_and_keeps_zero():
     assert net_debt_from_parts(0, 10) == -10
     assert net_debt_from_parts(float("nan"), 10) is None
     assert net_debt_from_parts(100, "bad") is None
+
+
+def test_normalize_yahoo_profitability_ratio_stores_fractions():
+    assert normalize_yahoo_profitability_ratio(0.139) == pytest.approx(0.139)
+    assert normalize_yahoo_profitability_ratio(13.9) == pytest.approx(0.139)
+    assert normalize_yahoo_profitability_ratio(1.2) == pytest.approx(1.2)
+    assert normalize_yahoo_profitability_ratio(150) is None
+    assert normalize_yahoo_profitability_ratio(200) is None
+    assert normalize_yahoo_profitability_ratio(None) is None
+    assert normalize_yahoo_profitability_ratio(float("nan")) is None
+
+
+def test_yahoo_daily_metric_fields_normalizes_roe_roce():
+    fields = yahoo_daily_metric_fields(
+        {
+            "returnOnEquity": 18.5,
+            "returnOnCapitalEmployed": 0.139,
+        }
+    )
+    assert fields["roe"] == pytest.approx(0.185)
+    assert fields["roce"] == pytest.approx(0.139)
+
+
+def test_afcons_screener_column_and_bag_roce_agree():
+    fixture = (_Path(__file__).resolve().parents[1] / "fixtures/screener/afcons_ratios.html").read_text()
+    stock_id = uuid4()
+    parsed = ScreenerParser().parse(fixture, stock_id=stock_id)
+    cur = _ScreenerMetricsCursor()
+    upsert_screener_provider_metrics(
+        cur, stock_id, parsed.ratios, "screener-src-id", metric_date_fallback=date(2024, 3, 31)
+    )
+    snapshot = build_latest_snapshot([], parsed.ratios, reporting_basis="CONSOLIDATED")
+    upsert_latest_fundamental_ratios(cur, stock_id, snapshot, "screener-src-id")
+    row = next(iter(cur.rows.values()))
+    assert row["roce"] == pytest.approx(0.139)
+    assert row["fundamental_ratios"]["ratios"]["ROCE"] == pytest.approx(0.139)
+    assert row["fundamental_ratios"]["ratios"]["ROE"] == pytest.approx(0.0561)
 
 
 def test_normalize_yahoo_dividend_yield_stores_percent_points_once():
@@ -144,6 +183,26 @@ class _ScreenerMetricsCursor:
             return
         if text.startswith("INSERT INTO market_data.stock_daily_metrics"):
             stock_id, metric_date = params[0], params[1]
+            if len(params) == 5:
+                bag_val = params[2].adapted if hasattr(params[2], "adapted") else params[2]
+                key = (stock_id, metric_date)
+                existing = self.rows.get(key)
+                if existing:
+                    existing["fundamental_ratios"] = bag_val
+                else:
+                    self.rows[key] = {
+                        "stock_id": stock_id,
+                        "metric_date": metric_date,
+                        "market_cap": None,
+                        "stock_pe": None,
+                        "price_to_book": None,
+                        "dividend_yield": None,
+                        "book_value": None,
+                        "roce": None,
+                        "roe": None,
+                        "fundamental_ratios": bag_val,
+                    }
+                return
             bag = params[-1]
             bag_val = bag.adapted if hasattr(bag, "adapted") else bag
             self.rows[(stock_id, metric_date)] = {

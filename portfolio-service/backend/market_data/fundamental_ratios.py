@@ -16,6 +16,9 @@ CALC_VERSION = "calc_v1"
 CONSOLIDATED = "CONSOLIDATED"
 STANDALONE = "STANDALONE"
 
+# ``stock_daily_metrics.roce`` / ``.roe`` and bag ``ratios.ROCE`` / ``ratios.ROE`` use fractions.
+_FRACTION_RATIO_CODES = frozenset({"ROE", "ROCE"})
+
 # Screener #top-ratios label → canonical ratio code (fill gaps only).
 TOP_RATIOS_FALLBACK = {
     "ROE": "ROE",
@@ -96,8 +99,8 @@ def calc_v1_from_period(
         operating_margin = _div(operating_profit, revenue, as_percent=True)
 
     out: dict[str, float | None] = {
-        "ROE": _div(net_profit, equity, as_percent=True),
-        "ROCE": _div(operating_profit, capital_employed, as_percent=True),
+        "ROE": _div(net_profit, equity, as_percent=False),
+        "ROCE": _div(operating_profit, capital_employed, as_percent=False),
         "PAT_MARGIN": _div(net_profit, revenue, as_percent=True),
         "OPERATING_MARGIN": _as_float(operating_margin),
         "DEBT_TO_EQUITY": _div(borrowings, equity),
@@ -142,7 +145,8 @@ def merge_top_ratios_fallback(
         number = _metric_number(cleaned)
         if number is None:
             continue
-        # Screener often shows ROE/ROCE/margins already as percent points.
+        if code in _FRACTION_RATIO_CODES:
+            number = number / 100.0
         merged[code] = number
     return merged
 

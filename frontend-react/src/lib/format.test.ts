@@ -16,6 +16,8 @@ describe('formatStatementValue', () => {
     expect(formatStatementValue('OPERATING_MARGIN', 18.2)).toBe('18.20%');
     expect(formatStatementValue('REVENUE', 125000)).toBe('1,25,000 Cr');
     expect(formatStatementValue('DEBT_TO_EQUITY', 0.42)).toBe('0.42');
+    expect(formatStatementValue('ROCE', 0.139)).toBe('13.90%');
+    expect(formatStatementValue('ROE', 0.0561)).toBe('5.61%');
   });
 });
 

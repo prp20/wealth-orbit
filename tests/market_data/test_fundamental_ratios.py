@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "portfolio-service"))
 
 from backend.market_data.fundamental_ratios import (
@@ -33,8 +35,8 @@ def test_calc_v1_profitability_leverage_efficiency():
     prior = {"REVENUE": 80.0, "EPS": 1.0}
     ratios = calc_v1_from_period(period, prior=prior)
     assert ratios["PAT_MARGIN"] == 20.0
-    assert ratios["ROE"] == 40.0  # 20 / 50
-    assert ratios["ROCE"] == 40.0  # 30 / 75
+    assert ratios["ROE"] == pytest.approx(0.40)  # 20 / 50
+    assert ratios["ROCE"] == pytest.approx(0.40)  # 30 / 75
     assert ratios["DEBT_TO_EQUITY"] == 0.5
     assert ratios["INTEREST_COVERAGE"] == 6.0
     assert ratios["ASSET_TURNOVER"] == 0.5
@@ -45,12 +47,12 @@ def test_calc_v1_profitability_leverage_efficiency():
 
 
 def test_top_ratios_fallback_fills_gaps_only():
-    computed = {"ROE": 12.0, "CURRENT_RATIO": None, "DEBT_TO_EQUITY": None}
+    computed = {"ROE": 0.12, "CURRENT_RATIO": None, "DEBT_TO_EQUITY": None}
     merged = merge_top_ratios_fallback(
         computed,
         {"ROE": "99%", "Current Ratio": "1.5", "Debt to equity": "0.8"},
     )
-    assert merged["ROE"] == 12.0  # computed wins
+    assert merged["ROE"] == pytest.approx(0.12)  # computed wins
     assert merged["CURRENT_RATIO"] == 1.5
     assert merged["DEBT_TO_EQUITY"] == 0.8
 
@@ -113,7 +115,7 @@ def test_build_latest_snapshot_prefers_computed():
     snap = build_latest_snapshot(rows, {"ROE": "1%"}, reporting_basis="CONSOLIDATED")
     assert snap["as_of"] == "2024-03-31"
     assert snap["calculation_method"] == CALC_VERSION
-    assert snap["ratios"]["ROE"] == 40.0
+    assert snap["ratios"]["ROE"] == pytest.approx(0.40)
     assert snap["methods"]["ROE"] == CALC_VERSION
     assert snap["ratios"]["REVENUE_GROWTH"] == 25.0
 
@@ -157,7 +159,7 @@ def test_upsert_latest_fundamental_ratios_is_idempotent_one_row():
         "reporting_basis": "CONSOLIDATED",
         "reporting_period": "ANNUAL",
         "calculation_method": CALC_VERSION,
-        "ratios": {"ROE": 40.0},
+        "ratios": {"ROE": 0.40},
         "methods": {"ROE": CALC_VERSION},
     }
     first = upsert_latest_fundamental_ratios(cur, stock_id, snapshot, "src")
@@ -182,7 +184,7 @@ def test_upsert_skips_empty_snapshot_and_preserves_prior_bag():
         "reporting_basis": "CONSOLIDATED",
         "reporting_period": "ANNUAL",
         "calculation_method": CALC_VERSION,
-        "ratios": {"ROE": 40.0},
+        "ratios": {"ROE": 0.40},
         "methods": {"ROE": CALC_VERSION},
     }
     assert upsert_latest_fundamental_ratios(cur, stock_id, good, "src") == "2024-03-31"
@@ -202,7 +204,7 @@ def test_upsert_skips_empty_snapshot_and_preserves_prior_bag():
     empty_with_as_of["as_of"] = "2024-03-31"
     assert upsert_latest_fundamental_ratios(cur, stock_id, empty_with_as_of, "src") == "2024-03-31"
     assert len(cur.writes) == writes_before
-    assert cur.bag["ratios"]["ROE"] == 40.0
+    assert cur.bag["ratios"]["ROE"] == pytest.approx(0.40)
 
 
 def test_upsert_latest_fundamental_ratios_preserves_provider_metric_sources():
@@ -211,18 +213,25 @@ def test_upsert_latest_fundamental_ratios_preserves_provider_metric_sources():
     cur.latest = "2024-06-01"
     cur.bag = {
         "provider_metric_sources": {"roce": "screener", "roe": "screener"},
-        "ratios": {"ROE": 10.0},
+        "ratios": {"ROE": 0.10},
     }
     snapshot = {
         "as_of": "2024-03-31",
         "reporting_basis": "CONSOLIDATED",
         "reporting_period": "ANNUAL",
         "calculation_method": CALC_VERSION,
-        "ratios": {"ROE": 42.0, "ROCE": 35.0},
+        "ratios": {"ROE": 0.42, "ROCE": 0.35},
         "methods": {"ROE": CALC_VERSION, "ROCE": CALC_VERSION},
     }
     upsert_latest_fundamental_ratios(cur, stock_id, snapshot, "src")
     sources = cur.bag.get("provider_metric_sources") or {}
     assert sources["roce"] == "screener"
     assert sources["roe"] == "screener"
-    assert cur.bag["ratios"]["ROCE"] == 35.0
+    assert cur.bag["ratios"]["ROCE"] == pytest.approx(0.35)
+
+
+def test_screener_roce_fallback_matches_fraction_contract():
+    snapshot = build_latest_snapshot([], {"ROCE": "13.9%", "ROE": "5.61%"}, reporting_basis="CONSOLIDATED")
+    assert snapshot["ratios"]["ROCE"] == pytest.approx(0.139)
+    assert snapshot["ratios"]["ROE"] == pytest.approx(0.0561)
+    assert snapshot["methods"]["ROCE"] == "screener_top_ratios"
