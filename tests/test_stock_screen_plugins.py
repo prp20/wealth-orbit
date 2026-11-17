@@ -161,6 +161,10 @@ def test_routes_and_ui_wire_stock_screener():
     assert '@router.get("/stocks/screens")' in routes
     assert '@router.post("/stocks/screens/refresh")' in routes
     assert '@router.post("/stocks/screens/{screen_id}/run")' in routes
+    refresh_block = routes.split('@router.post("/stocks/screens/refresh")', 1)[1].split("@router", 1)[0]
+    run_block = routes.split('@router.post("/stocks/screens/{screen_id}/run")', 1)[1].split("@router", 1)[0]
+    assert "Depends(current_user)" in refresh_block
+    assert "Depends(current_user)" in run_block
     app = (ROOT / "frontend-react" / "src" / "app" / "App.tsx").read_text(encoding="utf-8")
     assert 'path="/stocks/screen"' in app
     assert "StockScreenerPage" in app
@@ -213,4 +217,6 @@ def test_technicals_panel_honesty_copy():
     assert "not advice" in technicals.lower()
     assert "ephemeral" in technicals.lower()
     assert "No stored technical indicators yet" in technicals
+    assert "role=\"alert\"" in technicals
+    assert "behind the latest price bar" in technicals
     assert "Stochastic" in technicals

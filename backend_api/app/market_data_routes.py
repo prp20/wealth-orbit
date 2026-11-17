@@ -689,7 +689,7 @@ def stock_screens_list(runnable_only: bool = Query(False)):
 
 
 @router.post("/stocks/screens/refresh")
-def stock_screens_refresh():
+def stock_screens_refresh(_user=Depends(current_user)):
     data = refresh_screens()
     return {
         "asset_class": data.get("asset_class"),
@@ -704,7 +704,11 @@ class RunStockScreenBody(BaseModel):
 
 
 @router.post("/stocks/screens/{screen_id}/run")
-def stock_screen_run(screen_id: str, body: RunStockScreenBody | None = None):
+def stock_screen_run(
+    screen_id: str,
+    body: RunStockScreenBody | None = None,
+    _user=Depends(current_user),
+):
     result = run_screen(screen_id, (body.params if body else None) or {})
     if not result.get("ok"):
         error = result.get("error") or "screen failed"
