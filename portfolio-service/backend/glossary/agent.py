@@ -255,6 +255,62 @@ def _build_completion_messages(messages: list[dict[str, Any]]) -> list[dict[str,
     return seeded
 
 
+def _payload_from_prose(text: str, tool_trace: list[dict[str, Any]]) -> dict[str, Any]:
+    refusal = _refusal_from_tool_trace(tool_trace)
+    citations = _collect_citations(tool_trace)
+    payload: dict[str, Any] = {
+        "assistant_message": text,
+        "mode": "agent",
+    }
+    if citations:
+        payload["citations"] = citations
+    if tool_trace:
+        payload["tool_trace"] = tool_trace
+    if refusal:
+        payload["refusal"] = refusal
+    return payload
+
+
+def _finalize_after_tools(
+    *,
+    client: Groq,
+    model: str,
+    timeout: float,
+    chat_messages: list[dict[str, Any]],
+    tool_trace: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """
+    Produce the user-facing answer after seed tools ran.
+
+    Do not use tool_choice=none — gpt-oss on Groq still emits tool calls and returns 400.
+    Try one tool-free completion for prose; otherwise synthesize from tool results.
+    """
+    try:
+        completion = client.chat.completions.create(
+            model=model,
+            messages=[
+                *chat_messages,
+                {
+                    "role": "user",
+                    "content": (
+                        "Using only the glossary tool results already provided, "
+                        "write a clear final answer for the user. Do not call any tools."
+                    ),
+                },
+            ],
+            timeout=timeout,
+        )
+        text = _message_text(completion.choices[0].message)
+        if text:
+            return _payload_from_prose(text, tool_trace)
+    except Exception as exc:
+        logger.info(
+            "Glossary final prose pass failed (%s); synthesizing from tools",
+            type(exc).__name__,
+        )
+    return _synthesize_from_tool_trace(tool_trace)
+
+
 def _run_agent_loop(
     messages: list[dict[str, Any]],
     *,
@@ -266,30 +322,21 @@ def _run_agent_loop(
     matcher = GlossaryMatcher()
     tool_trace: list[dict[str, Any]] = []
 
-    for round_index in range(MAX_TOOL_ROUNDS):
-        # Once we have seed facts (or on the last round with any tools), force prose.
-        force_final = bool(tool_trace) and (
-            _tool_facts_ready(tool_trace) or round_index == MAX_TOOL_ROUNDS - 1
+    for _ in range(MAX_TOOL_ROUNDS):
+        completion = client.chat.completions.create(
+            model=model,
+            messages=chat_messages,
+            tools=GLOSSARY_TOOL_SCHEMAS,
+            tool_choice="auto",
+            timeout=timeout,
         )
-        create_kwargs: dict[str, Any] = {
-            "model": model,
-            "messages": chat_messages,
-            "timeout": timeout,
-        }
-        if force_final:
-            create_kwargs["tool_choice"] = "none"
-        else:
-            create_kwargs["tools"] = GLOSSARY_TOOL_SCHEMAS
-            create_kwargs["tool_choice"] = "auto"
-
-        completion = client.chat.completions.create(**create_kwargs)
         choice = completion.choices[0].message
         text = _message_text(choice)
         assistant_record: dict[str, Any] = {
             "role": "assistant",
             "content": text or (choice.content or ""),
         }
-        tool_calls = [] if force_final else list(choice.tool_calls or [])
+        tool_calls = list(choice.tool_calls or [])
         if tool_calls:
             assistant_record["tool_calls"] = [
                 {
@@ -305,22 +352,19 @@ def _run_agent_loop(
         chat_messages.append(assistant_record)
 
         if not tool_calls:
-            if not text and tool_trace:
+            if tool_trace and not text:
                 return _synthesize_from_tool_trace(tool_trace)
-            refusal = _refusal_from_tool_trace(tool_trace)
-            citations = _collect_citations(tool_trace)
-            payload: dict[str, Any] = {
+            if tool_trace:
+                return _payload_from_prose(
+                    text
+                    or "I could not generate a glossary answer. Please rephrase your question.",
+                    tool_trace,
+                )
+            return {
                 "assistant_message": text
                 or "I could not generate a glossary answer. Please rephrase your question.",
                 "mode": "agent",
             }
-            if citations:
-                payload["citations"] = citations
-            if tool_trace:
-                payload["tool_trace"] = tool_trace
-            if refusal:
-                payload["refusal"] = refusal
-            return payload
 
         for call in tool_calls:
             name = call.function.name
@@ -334,6 +378,15 @@ def _run_agent_loop(
                     "name": name,
                     "content": json.dumps(result),
                 }
+            )
+
+        if _tool_facts_ready(tool_trace):
+            return _finalize_after_tools(
+                client=client,
+                model=model,
+                timeout=timeout,
+                chat_messages=chat_messages,
+                tool_trace=tool_trace,
             )
 
     logger.warning("Glossary agent exceeded max tool rounds (%s); synthesizing from tools", MAX_TOOL_ROUNDS)

@@ -117,7 +117,8 @@ def test_agent_tool_round_then_answer(monkeypatch: pytest.MonkeyPatch):
     assert len(result.get("tool_trace", [])) == 1
     assert client.chat.completions.create.call_count == 2
     second_kwargs = client.chat.completions.create.call_args_list[1].kwargs
-    assert second_kwargs.get("tool_choice") == "none"
+    assert "tools" not in second_kwargs
+    assert second_kwargs.get("tool_choice") is None
 
 
 def test_agent_synthesizes_when_final_content_empty(monkeypatch: pytest.MonkeyPatch):
@@ -150,6 +151,42 @@ def test_agent_synthesizes_when_final_content_empty(monkeypatch: pytest.MonkeyPa
     assert result["mode"] == "agent"
     assert "IPO" in result["assistant_message"]
     assert "public" in result["assistant_message"].lower() or "shares" in result["assistant_message"].lower()
+    assert result.get("citations")
+
+
+def test_agent_synthesizes_when_tool_choice_none_rejected(monkeypatch: pytest.MonkeyPatch):
+    """gpt-oss may 400 if forced tool_choice=none; finalize must recover via synthesis."""
+    monkeypatch.setenv("GROQ_API_KEY", "test-key-unused")
+    first = _FakeCompletion(
+        [
+            _FakeChoice(
+                _FakeChoiceMessage(
+                    content=None,
+                    tool_calls=[
+                        _FakeToolCall(
+                            id="call_1",
+                            type="function",
+                            function=_FakeFunction(
+                                name="get_glossary_term",
+                                arguments='{"term_or_alias": "IPO"}',
+                            ),
+                        )
+                    ],
+                )
+            )
+        ]
+    )
+    client = MagicMock()
+    client.chat.completions.create.side_effect = [
+        first,
+        RuntimeError("Tool choice is none, but model called a tool"),
+    ]
+    result = run_glossary_agent(
+        [{"role": "user", "content": "What is IPO?"}],
+        client=client,
+    )
+    assert result["mode"] == "agent"
+    assert "IPO" in result["assistant_message"]
     assert result.get("citations")
 
 
