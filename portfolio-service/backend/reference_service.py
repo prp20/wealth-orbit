@@ -1625,16 +1625,24 @@ def _latest_technical_sync_job_error(symbol: str) -> str | None:
         return None
 
 
+def _technical_snapshot_stale_hint(symbol: str, snap: date | None, last_ohlc: date | None) -> str | None:
+    """Opaque hint when stored technicals exist but lag the latest OHLC bar."""
+    if snap is None or last_ohlc is None or snap >= last_ohlc:
+        return None
+    job_error = _latest_technical_sync_job_error(symbol)
+    return job_error or "technicals_stale_run_sync"
+
+
 def _resolve_stored_technical_indicators(
     symbol: str, indicator: str = ""
 ) -> tuple[pd.DataFrame, str | None]:
     """Load persisted latest-day technicals only; never sync, prune, or compute on read."""
     indicator = indicator.upper() if indicator else ""
-    stored, _snap = _load_stored_technicals(symbol, indicator)
-    if not stored.empty:
-        return stored.reset_index(drop=True), None
-
+    stored, snap = _load_stored_technicals(symbol, indicator)
     last_ohlc = _last_ohlc_date(symbol)
+    if not stored.empty:
+        stale_hint = _technical_snapshot_stale_hint(symbol, snap, last_ohlc)
+        return stored.reset_index(drop=True), stale_hint
     if last_ohlc is None:
         return _empty_technicals(), "sync_prices_before_technicals"
     job_error = _latest_technical_sync_job_error(symbol)
@@ -1657,9 +1665,10 @@ def stock_technical_indicators_view(symbol: str, indicator: str = "", from_date=
     """API payload: stored rows plus an opaque sync hint when the snapshot is missing."""
     _ = from_date, to_date
     frame, sync_error = _resolve_stored_technical_indicators(symbol, indicator)
-    if not frame.empty:
-        return {"records": frame.to_dict(orient="records"), "sync_error": None, "stored_only": True}
-    return {"records": [], "sync_error": sync_error or "technical_indicators_not_stored", "stored_only": True}
+    records = frame.to_dict(orient="records") if not frame.empty else []
+    if not records:
+        sync_error = sync_error or "technical_indicators_not_stored"
+    return {"records": records, "sync_error": sync_error, "stored_only": True}
 
 def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
     """Fetch Screener consolidated and standalone statements in one job.

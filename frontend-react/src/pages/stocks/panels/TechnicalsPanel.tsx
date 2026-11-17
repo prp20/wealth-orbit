@@ -81,10 +81,16 @@ export default function TechnicalsPanel({ symbol }: { symbol: string }) {
       </div>
       {technical.isLoading && <div className="loading">Loading technicals…</div>}
       {technical.error && <div className="empty">{(technical.error as Error).message}</div>}
-      {!technical.isLoading && !technical.error && !latest.length && (
+      {!technical.isLoading && !technical.error && syncError && (
+        <div className="empty" role="alert">
+          {latest.length
+            ? `Stored indicators are behind the latest price bar. Refresh to update. (${syncError})`
+            : `No stored technical indicators yet. Sync prices first, then refresh this panel. (${syncError})`}
+        </div>
+      )}
+      {!technical.isLoading && !technical.error && !syncError && !latest.length && (
         <div className="empty">
           No stored technical indicators yet. Sync prices first, then refresh this panel.
-          {syncError ? ` (${syncError})` : ''}
         </div>
       )}
       {latest.length > 0 && (
