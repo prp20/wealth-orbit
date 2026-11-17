@@ -33,7 +33,7 @@ Rules:
 """
 
 MAX_TOOL_ROUNDS = 4
-DEFAULT_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_MODEL = "openai/gpt-oss-120b"
 DEFAULT_TIMEOUT_SECONDS = 45.0
 
 

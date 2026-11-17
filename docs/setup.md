@@ -259,7 +259,7 @@ Optional environment variables (see [.env.example](../.env.example)):
 | Variable | Purpose |
 |----------|---------|
 | `GROQ_API_KEY` | Groq API key for glossary agent mode (empty → seed fallback) |
-| `GLOSSARY_LLM_MODEL` | Groq chat model (default `llama-3.3-70b-versatile`) |
+| `GLOSSARY_LLM_MODEL` | Groq chat model (default `openai/gpt-oss-120b`) |
 
 - **Public endpoints** (no session):
   - `POST /api/v1/glossary/chat` — one message: `{"message": "What is IPO?"}` → `kind`, `definition`, `sources`.
