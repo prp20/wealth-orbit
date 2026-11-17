@@ -12,7 +12,7 @@ from .portfolio_backend import (filter_values, mutual_funds, mutual_fund_detail,
     mutual_fund_benchmark, mutual_fund_benchmark_history,
     benchmark_list, benchmark_history, benchmark_snapshot, sync_home_indexes,
     stock_history, stocks, stock_daily_metrics, stock_fundamentals,
-    stock_shareholding, stock_technical_indicators, sync_stock_fundamentals,
+    stock_shareholding, stock_technical_indicators_view, sync_stock_fundamentals,
     mutual_fund_similar_enriched, mutual_fund_screen, mutual_fund_compare,
     mutual_fund_holdings_snapshot, mutual_fund_overlap, mutual_fund_managers,
     compute_metrics, has_nav_history, sync_nav, recompute_metrics, sync_benchmark, sync_enrichment,
@@ -814,4 +814,4 @@ def stock_shareholding_route(symbol: str, from_date: date | None = None, to_date
 
 @router.get("/stocks/{symbol}/technical-indicators")
 def stock_technical_route(symbol: str, indicator: str = Query(""), from_date: date | None = None, to_date: date | None = None):
-    return stock_technical_indicators(symbol, indicator.upper(), from_date, to_date).to_dict(orient="records")
+    return stock_technical_indicators_view(symbol, indicator.upper(), from_date, to_date)

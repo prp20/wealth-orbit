@@ -182,8 +182,8 @@ def stock_detail_enriched(symbol: str, last_sync_by_kind: dict | None = None):
             ) AS latest_fundamental_period_end,
             (SELECT MAX(h.period_end_date) FROM market_data.stock_shareholding_history h
              JOIN base b ON b.stock_id=h.stock_id) AS latest_shareholding_period_end,
-            (SELECT MAX(p.trading_date) FROM market_data.stock_daily_prices p
-             JOIN base b ON b.stock_id=p.stock_id) AS latest_technical_calculated_at
+            (SELECT MAX(t.trading_date) FROM market_data.stock_technical_indicators t
+             JOIN base b ON b.stock_id=t.stock_id) AS latest_technical_calculated_at
         )
         SELECT b.*,
                lp.date AS price_date, lp.close AS price_close, lp.raw_close, lp.adj_close AS price_adj_close,
@@ -1636,20 +1636,39 @@ def _technicals_from_ohlc_frame(frame: pd.DataFrame, indicator: str = "") -> pd.
     return out[_TECHNICAL_COLUMNS].reset_index(drop=True)
 
 
-def stock_technical_indicators(symbol: str, indicator: str = "", from_date=None, to_date=None) -> pd.DataFrame:
-    """Return latest-day technicals from Postgres; refresh from OHLC when stale/missing.
+def _opaque_technical_refresh_error(exc: BaseException) -> str:
+    text = str(exc).strip()
+    if not text or "://" in text:
+        return "technical_sync_failed"
+    return text[:120]
 
-    ``from_date`` / ``to_date`` are retained for API compatibility but ignored — only the
-    latest trading-day snapshot is stored and returned.
-    """
-    _ = from_date, to_date
+
+def _latest_technical_sync_job_error(symbol: str) -> str | None:
+    try:
+        from backend_api.app.sync_queue import latest_job
+
+        job = latest_job("STOCK", symbol, "TECHNICAL")
+        if not job:
+            return None
+        if str(job.get("status") or "").upper() != "FAILED":
+            return None
+        err = job.get("last_error")
+        return str(err)[:120] if err else "technical_sync_failed"
+    except Exception:
+        return None
+
+
+def _resolve_stored_technical_indicators(
+    symbol: str, indicator: str = ""
+) -> tuple[pd.DataFrame, str | None]:
+    """Load persisted latest-day technicals; attempt sync when stale; never compute ephemeral rows."""
+    indicator = indicator.upper() if indicator else ""
     stored, snap = _load_stored_technicals(symbol, indicator)
     last_ohlc = _last_ohlc_date(symbol)
     if not stored.empty and snap is not None and last_ohlc is not None and snap >= last_ohlc:
-        return stored.reset_index(drop=True)
+        return stored.reset_index(drop=True), None
 
-    # Refresh from OHLC only when the price table is reachable; otherwise fall back
-    # to an in-memory compute (tests / offline) without hanging on DB writes.
+    refresh_error: str | None = None
     if last_ohlc is not None:
         try:
             from backend.market_data.sync import sync_technical_indicators
@@ -1657,12 +1676,40 @@ def stock_technical_indicators(symbol: str, indicator: str = "", from_date=None,
             sync_technical_indicators(symbol)
             stored, _snap = _load_stored_technicals(symbol, indicator)
             if not stored.empty:
-                return stored.reset_index(drop=True)
-        except Exception:
-            pass
+                return stored.reset_index(drop=True), None
+        except Exception as exc:
+            refresh_error = _opaque_technical_refresh_error(exc)
 
-    frame = stock_history(symbol, None, None)
-    return _technicals_from_ohlc_frame(frame, indicator)
+    stored, _snap = _load_stored_technicals(symbol, indicator)
+    if not stored.empty:
+        return stored.reset_index(drop=True), None
+    if refresh_error:
+        return _empty_technicals(), refresh_error
+    if last_ohlc is None:
+        return _empty_technicals(), "sync_prices_before_technicals"
+    job_error = _latest_technical_sync_job_error(symbol)
+    if job_error:
+        return _empty_technicals(), job_error
+    return _empty_technicals(), "technical_indicators_not_stored"
+
+
+def stock_technical_indicators(symbol: str, indicator: str = "", from_date=None, to_date=None) -> pd.DataFrame:
+    """Return stored latest-day technicals only (no ephemeral OHLC compute on read).
+
+    ``from_date`` / ``to_date`` are retained for API compatibility but ignored.
+    """
+    _ = from_date, to_date
+    frame, _sync_error = _resolve_stored_technical_indicators(symbol, indicator)
+    return frame
+
+
+def stock_technical_indicators_view(symbol: str, indicator: str = "", from_date=None, to_date=None) -> dict:
+    """API payload: stored rows plus an opaque sync hint when the snapshot is missing."""
+    _ = from_date, to_date
+    frame, sync_error = _resolve_stored_technical_indicators(symbol, indicator)
+    if not frame.empty:
+        return {"records": frame.to_dict(orient="records"), "sync_error": None, "stored_only": True}
+    return {"records": [], "sync_error": sync_error or "technical_indicators_not_stored", "stored_only": True}
 
 def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
     """Fetch Screener consolidated and standalone statements in one job.

@@ -1,10 +1,10 @@
-"""Technicals are computed from OHLC and persisted for the latest trading day only."""
+"""Technicals on read return stored latest-day rows only (no ephemeral OHLC compute)."""
 from __future__ import annotations
 
 import sys
 from datetime import date, timedelta
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
@@ -28,7 +28,7 @@ def _ohlc_frame(days: int = 40) -> pd.DataFrame:
     )
 
 
-def test_stock_technical_indicators_falls_back_to_history_compute():
+def test_stock_technical_indicators_empty_without_ephemeral_compute():
     history = pd.DataFrame(
         {
             "date": [date(2024, 1, i) for i in range(1, 31)],
@@ -48,12 +48,35 @@ def test_stock_technical_indicators_falls_back_to_history_compute():
         patch.object(reference_service, "stock_history", return_value=history),
     ):
         frame = reference_service.stock_technical_indicators("HDFCBANK")
-    assert not frame.empty
-    assert "indicator_value" in frame.columns
-    assert "SMA" in set(frame["indicator_code"])
-    assert "MACD" in set(frame["indicator_code"])
-    assert (frame["calculation_status"] == "CURRENT").all()
-    assert frame["date"].nunique() == 1
+    assert frame.empty
+
+
+def test_stock_technical_indicators_view_reports_sync_error_when_not_stored():
+    with (
+        patch.object(reference_service, "_load_stored_technicals", return_value=(reference_service._empty_technicals(), None)),
+        patch.object(reference_service, "_last_ohlc_date", return_value=None),
+        patch.object(reference_service, "_latest_technical_sync_job_error", return_value=None),
+    ):
+        payload = reference_service.stock_technical_indicators_view("HDFCBANK")
+    assert payload["records"] == []
+    assert payload["stored_only"] is True
+    assert payload["sync_error"] == "sync_prices_before_technicals"
+
+
+def test_stock_technical_indicators_view_surfaces_failed_sync_job():
+    with (
+        patch.object(reference_service, "_load_stored_technicals", return_value=(reference_service._empty_technicals(), None)),
+        patch.object(reference_service, "_last_ohlc_date", return_value=date(2024, 6, 1)),
+        patch.object(stock_sync, "sync_technical_indicators", side_effect=RuntimeError("db read-only")),
+        patch.object(
+            reference_service,
+            "_latest_technical_sync_job_error",
+            return_value="yahoo_empty_info",
+        ),
+    ):
+        payload = reference_service.stock_technical_indicators_view("HDFCBANK")
+    assert payload["records"] == []
+    assert payload["sync_error"] == "db read-only"
 
 
 def test_sync_technical_indicators_persists_latest_day(monkeypatch):
@@ -113,3 +136,31 @@ def test_latest_indicator_rows_keeps_only_last_date():
     assert trading_date == frame["date"].max()
     assert set(str(d)[:10] for d in rows["date"].tolist()) == {str(trading_date)}
     assert "STOCH" in set(rows["indicator_code"])
+    assert "SMA" in set(rows["indicator_code"])
+    assert {50, 200} <= set(rows.loc[rows["indicator_code"] == "SMA", "indicator_period"])
+
+
+def test_resolve_stored_returns_persisted_rows_without_recompute():
+    stored = pd.DataFrame(
+        [
+            {
+                "date": date(2024, 6, 1),
+                "indicator_code": "RSI",
+                "indicator_period": 14,
+                "parameters": "{}",
+                "component": "",
+                "indicator_value": 55.0,
+                "calculation_status": "CURRENT",
+                "calculated_at": date(2024, 6, 1),
+            }
+        ]
+    )
+    with (
+        patch.object(reference_service, "_load_stored_technicals", return_value=(stored, date(2024, 6, 1))),
+        patch.object(reference_service, "_last_ohlc_date", return_value=date(2024, 6, 1)),
+        patch.object(stock_sync, "sync_technical_indicators", MagicMock()) as sync_mock,
+    ):
+        frame, err = reference_service._resolve_stored_technical_indicators("HDFCBANK")
+    assert err is None
+    assert len(frame) == 1
+    sync_mock.assert_not_called()

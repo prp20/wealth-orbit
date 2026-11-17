@@ -78,6 +78,12 @@ export type SyncJobByKind = {
   progress_percent?: number | null;
 };
 
+export type StockTechnicalIndicatorsPayload = {
+  records: any[];
+  sync_error?: string | null;
+  stored_only?: boolean;
+};
+
 function parseJobResult(job: SyncJob | SyncJobByKind | null | undefined): Record<string, unknown> | null {
   if (!job || !('result' in job)) return null;
   let result = job.result;
@@ -268,7 +274,7 @@ export const api = {
   },
   stockShareholding: (id: string) => get<any[]>(`/market-data/stocks/${encodeURIComponent(id)}/shareholding`),
   stockTechnical: (id: string, indicator = '') =>
-    get<any[]>(
+    get<StockTechnicalIndicatorsPayload>(
       `/market-data/stocks/${encodeURIComponent(id)}/technical-indicators${
         indicator ? `?indicator=${encodeURIComponent(indicator)}` : ''
       }`,
