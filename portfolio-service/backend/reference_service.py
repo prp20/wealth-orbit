@@ -1866,10 +1866,16 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
                     page_size=200,
                 )
 
+            from backend.market_data.daily_metrics import upsert_screener_provider_metrics
             from backend.market_data.fundamental_ratios import (
                 build_latest_snapshot,
                 upsert_latest_fundamental_ratios,
             )
+
+            consol_parsed = parsed_by_basis.get(CONSOLIDATED)
+            screener_ratios = consol_parsed.ratios if consol_parsed else {}
+            if screener_ratios:
+                upsert_screener_provider_metrics(cur, stock_id, screener_ratios, source_id)
 
             # Consol annual statements → latest ratio snapshot (SA computed on read).
             cur.execute(
@@ -1891,10 +1897,7 @@ def sync_stock_fundamentals(symbol: str, force: bool = False) -> dict:
                 }
                 for code, period_end, value in cur.fetchall()
             ]
-            top_ratios = {}
-            consol_parsed = parsed_by_basis.get(CONSOLIDATED)
-            if consol_parsed and getattr(consol_parsed, "ratios", None):
-                top_ratios = consol_parsed.ratios
+            top_ratios = screener_ratios
             snapshot = build_latest_snapshot(
                 statement_rows,
                 top_ratios,

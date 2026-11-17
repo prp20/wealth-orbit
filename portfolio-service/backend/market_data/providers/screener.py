@@ -262,6 +262,12 @@ class ScreenerParser:
         shareholding = self._shareholding(soup, stock_id)
         return ScreenerParseResult(values, shareholding, self._ratios(soup), warnings)
 
+    # Screener ``#ratios`` table labels → ``PROVIDER_METRIC_LABELS`` keys (latest column).
+    _RATIOS_SECTION_LABELS = {
+        "ROCE %": "ROCE",
+        "ROE %": "ROE",
+    }
+
     @staticmethod
     def _table(section: Any) -> tuple[list[str], list[tuple[str, list[str]]]]:
         table = section.find("table", class_="data-table")
@@ -301,11 +307,24 @@ class ScreenerParser:
 
     @staticmethod
     def _ratios(soup: Any) -> dict[str, str]:
+        """Merge Screener ``#top-ratios`` headline panel and ``#ratios`` table (latest period)."""
         ratios: dict[str, str] = {}
-        section = soup.find("section", id="top-ratios")
-        for block in section.find_all("li") if section else []:
+        panel = soup.find(id="top-ratios")
+        for block in panel.find_all("li") if panel else []:
             label = block.find("span", class_="name")
             value = block.find("span", class_="number")
             if label and value:
                 ratios[label.get_text(" ", strip=True)] = value.get_text(" ", strip=True)
+        section = soup.find("section", id="ratios")
+        table = section.find("table", class_="data-table") if section else None
+        body = table.find("tbody") if table else None
+        for row in body.find_all("tr") if body else []:
+            cells = row.find_all("td")
+            if len(cells) < 2:
+                continue
+            raw_label = cells[0].get_text(" ", strip=True)
+            label = ScreenerParser._RATIOS_SECTION_LABELS.get(raw_label, raw_label)
+            latest_value = cells[-1].get_text(" ", strip=True)
+            if latest_value and label not in ratios:
+                ratios[label] = latest_value
         return ratios

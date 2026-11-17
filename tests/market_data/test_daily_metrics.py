@@ -1,16 +1,22 @@
 import math
 import sys
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "portfolio-service"))
 
 from backend.market_data.daily_metrics import (
     calculate_fallback_metrics,
+    merge_screener_provider_fields,
     net_debt_from_parts,
     normalize_yahoo_dividend_yield,
     provider_metrics_from_ratios,
+    upsert_screener_provider_metrics,
     yahoo_daily_metric_fields,
 )
+from backend.market_data.providers.screener import ScreenerParser
+from pathlib import Path as _Path
+from uuid import uuid4
 
 
 def test_provider_metrics_normalizes_supported_screener_ratio_labels():
@@ -88,6 +94,134 @@ def test_yahoo_daily_metric_fields_never_store_forward_peg():
     assert fields["net_debt"] == 60
     assert "pegRatio" not in fields
     assert "forwardPegRatio" not in fields
+
+
+def test_merge_screener_provider_fields_fills_nulls_only():
+    merged, filled = merge_screener_provider_fields(
+        {"roce": None, "stock_pe": 18.0, "roe": None},
+        {"roce": 13.9, "pe_ratio": 99.0, "roe": 5.6},
+    )
+    assert merged["roce"] == 13.9
+    assert merged["stock_pe"] == 18.0
+    assert merged["roe"] == 5.6
+    assert set(filled) == {"roce", "roe"}
+
+
+class _ScreenerMetricsCursor:
+    def __init__(self) -> None:
+        self.rows: dict[tuple, dict] = {}
+        self._fetch = False
+
+    def execute(self, sql, params=None) -> None:
+        text = " ".join(sql.split())
+        if "ORDER BY metric_date DESC" in text and "SELECT metric_date" in text:
+            self._fetch = True
+            return
+        if text.startswith("UPDATE market_data.stock_daily_metrics"):
+            stock_id, metric_date = params[-2], params[-1]
+            key = (stock_id, metric_date)
+            row = self.rows[key]
+            row.update(
+                {
+                    "market_cap": params[0],
+                    "stock_pe": params[1],
+                    "price_to_book": params[2],
+                    "dividend_yield": params[3],
+                    "book_value": params[4],
+                    "roce": params[5],
+                    "roe": params[6],
+                }
+            )
+            if params[7] is not None:
+                patch = params[7].adapted if hasattr(params[7], "adapted") else params[7]
+                base = row.get("fundamental_ratios") or {}
+                row["fundamental_ratios"] = {**base, **patch}
+            return
+        if text.startswith("INSERT INTO market_data.stock_daily_metrics"):
+            stock_id, metric_date = params[0], params[1]
+            bag = params[-1]
+            bag_val = bag.adapted if hasattr(bag, "adapted") else bag
+            self.rows[(stock_id, metric_date)] = {
+                "stock_id": stock_id,
+                "metric_date": metric_date,
+                "market_cap": params[2],
+                "stock_pe": params[3],
+                "price_to_book": params[4],
+                "dividend_yield": params[5],
+                "book_value": params[6],
+                "roce": params[7],
+                "roe": params[8],
+                "fundamental_ratios": bag_val,
+            }
+            return
+        if "DELETE FROM market_data.stock_daily_metrics" in text and params:
+            stock_id, keep = params
+            for key in list(self.rows):
+                if key[0] == stock_id and key[1] != keep:
+                    del self.rows[key]
+
+    def fetchone(self):
+        if not self._fetch:
+            return None
+        self._fetch = False
+        if not self.rows:
+            return None
+        key = max(self.rows, key=lambda item: item[1])
+        row = self.rows[key]
+        return (
+            row["metric_date"],
+            row.get("market_cap"),
+            row.get("stock_pe"),
+            row.get("price_to_book"),
+            row.get("dividend_yield"),
+            row.get("book_value"),
+            row.get("roce"),
+            row.get("roe"),
+            row.get("fundamental_ratios"),
+        )
+
+
+def test_afcons_fixture_roce_lands_on_latest_metrics_row():
+    fixture = (_Path(__file__).resolve().parents[1] / "fixtures/screener/afcons_ratios.html").read_text()
+    stock_id = uuid4()
+    parsed = ScreenerParser().parse(fixture, stock_id=stock_id)
+    cur = _ScreenerMetricsCursor()
+    metric_date = upsert_screener_provider_metrics(
+        cur, stock_id, parsed.ratios, "screener-src-id", metric_date_fallback=None
+    )
+    assert metric_date is not None
+    only = next(iter(cur.rows.values()))
+    assert only["roce"] == 13.9
+    assert only["roe"] == 5.61
+    assert only["fundamental_ratios"]["provider_metric_sources"]["roce"] == "screener"
+
+
+def test_screener_metrics_do_not_overwrite_existing_yahoo_roce():
+    stock_id = uuid4()
+    cur = _ScreenerMetricsCursor()
+    metric_day = date(2024, 6, 1)
+    cur.rows[(stock_id, metric_day)] = {
+        "stock_id": stock_id,
+        "metric_date": metric_day,
+        "market_cap": 1e9,
+        "stock_pe": 20.0,
+        "price_to_book": None,
+        "dividend_yield": None,
+        "book_value": None,
+        "roce": 9.5,
+        "roe": None,
+        "fundamental_ratios": None,
+    }
+    upsert_screener_provider_metrics(
+        cur,
+        stock_id,
+        {"ROCE": "99%", "ROE": "12%", "Stock P/E": "30"},
+        "screener-src-id",
+    )
+    row = cur.rows[(stock_id, metric_day)]
+    assert row["roce"] == 9.5
+    assert row["stock_pe"] == 20.0
+    assert row["roe"] == 12.0
 
 
 def test_yahoo_daily_metric_fields_null_bad_conversions_instead_of_raising():

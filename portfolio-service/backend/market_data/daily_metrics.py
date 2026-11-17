@@ -17,6 +17,19 @@ PROVIDER_METRIC_LABELS = {
     "ROE": "roe",
 }
 
+# Mapped provider keys → ``stock_daily_metrics`` column names.
+PROVIDER_METRIC_COLUMNS = {
+    "market_cap": "market_cap",
+    "pe_ratio": "stock_pe",
+    "pb_ratio": "price_to_book",
+    "dividend_yield": "dividend_yield",
+    "book_value": "book_value",
+    "roce": "roce",
+    "roe": "roe",
+}
+
+SCREENER_PROVIDER_SOURCE = "screener"
+
 
 def provider_metrics_from_ratios(ratios: dict[str, str]) -> tuple[dict[str, float], list[dict[str, str]]]:
     """Map a Screener ratio panel to canonical daily-metric fields without guessing unknown fields."""
@@ -32,6 +45,143 @@ def provider_metrics_from_ratios(ratios: dict[str, str]) -> tuple[dict[str, floa
         else:
             metrics[target] = number
     return metrics, warnings
+
+
+def merge_screener_provider_fields(
+    existing: dict[str, float | None],
+    screener: dict[str, float],
+) -> tuple[dict[str, float | None], list[str]]:
+    """Fill only NULL provider metric columns; never overwrite Yahoo/provider values."""
+    merged = dict(existing)
+    filled: list[str] = []
+    for key, value in screener.items():
+        column = PROVIDER_METRIC_COLUMNS.get(key)
+        if column is None:
+            continue
+        if merged.get(column) is None and value is not None:
+            merged[column] = value
+            filled.append(column)
+    return merged, filled
+
+
+def upsert_screener_provider_metrics(
+    cur,
+    stock_id,
+    ratios: dict[str, str],
+    source_id,
+    *,
+    metric_date_fallback=None,
+) -> str | None:
+    """Persist Screener ``#ratios`` / ``#top-ratios`` onto the single latest metrics row."""
+    from datetime import date as date_cls
+
+    from .latest_snapshot import prune_non_latest_metric_dates
+
+    provider_values, _warnings = provider_metrics_from_ratios(ratios)
+    if not provider_values:
+        return None
+
+    cur.execute(
+        """
+        SELECT metric_date, market_cap, stock_pe, price_to_book, dividend_yield, book_value, roce, roe,
+               fundamental_ratios
+        FROM market_data.stock_daily_metrics
+        WHERE stock_id=%s
+        ORDER BY metric_date DESC
+        LIMIT 1
+        """,
+        (stock_id,),
+    )
+    row = cur.fetchone()
+    prior = {
+        "market_cap": None,
+        "stock_pe": None,
+        "price_to_book": None,
+        "dividend_yield": None,
+        "book_value": None,
+        "roce": None,
+        "roe": None,
+    }
+    prior_bag = None
+    if row:
+        metric_date = row[0]
+        prior = {
+            "market_cap": row[1],
+            "stock_pe": row[2],
+            "price_to_book": row[3],
+            "dividend_yield": row[4],
+            "book_value": row[5],
+            "roce": row[6],
+            "roe": row[7],
+        }
+        prior_bag = row[8] if len(row) > 8 else None
+    else:
+        metric_date = metric_date_fallback or date_cls.today()
+
+    merged, filled_columns = merge_screener_provider_fields(prior, provider_values)
+    if not filled_columns and row:
+        return str(metric_date)
+
+    bag = dict(prior_bag) if isinstance(prior_bag, dict) else {}
+    if filled_columns:
+        sources = dict(bag.get("provider_metric_sources") or {})
+        for column in filled_columns:
+            sources[column] = SCREENER_PROVIDER_SOURCE
+        bag["provider_metric_sources"] = sources
+
+    from psycopg2.extras import Json
+
+    if row:
+        cur.execute(
+            """
+            UPDATE market_data.stock_daily_metrics
+            SET market_cap=%s, stock_pe=%s, price_to_book=%s, dividend_yield=%s,
+                book_value=%s, roce=%s, roe=%s,
+                fundamental_ratios=CASE
+                    WHEN %s::jsonb IS NOT NULL THEN COALESCE(fundamental_ratios, '{}'::jsonb) || %s::jsonb
+                    ELSE fundamental_ratios
+                END,
+                updated_at=NOW()
+            WHERE stock_id=%s AND metric_date=%s
+            """,
+            (
+                merged["market_cap"],
+                merged["stock_pe"],
+                merged["price_to_book"],
+                merged["dividend_yield"],
+                merged["book_value"],
+                merged["roce"],
+                merged["roe"],
+                Json(bag) if bag else None,
+                Json(bag) if bag else None,
+                stock_id,
+                metric_date,
+            ),
+        )
+    else:
+        cur.execute(
+            """
+            INSERT INTO market_data.stock_daily_metrics
+              (stock_id, metric_date, market_cap, stock_pe, price_to_book, dividend_yield,
+               book_value, roce, roe, calculation_method, source_id, fundamental_ratios)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'PROVIDER',%s,%s)
+            """,
+            (
+                stock_id,
+                metric_date,
+                merged["market_cap"],
+                merged["stock_pe"],
+                merged["price_to_book"],
+                merged["dividend_yield"],
+                merged["book_value"],
+                merged["roce"],
+                merged["roe"],
+                source_id,
+                Json(bag) if bag else None,
+            ),
+        )
+    prune_non_latest_metric_dates(cur, stock_id, metric_date)
+    return str(metric_date)
 
 
 def _metric_number(value: str) -> float | None:
