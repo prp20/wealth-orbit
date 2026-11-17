@@ -32,7 +32,7 @@ Rules:
 - Answer in clear prose; you may reference Varsity chapter URLs returned by tools.
 """
 
-MAX_TOOL_ROUNDS = 4
+MAX_TOOL_ROUNDS = 6
 DEFAULT_MODEL = "openai/gpt-oss-120b"
 DEFAULT_TIMEOUT_SECONDS = 45.0
 
@@ -89,6 +89,96 @@ def _refusal_from_tool_trace(tool_trace: list[dict[str, Any]]) -> dict[str, Any]
                 "reason": result.get("message") or result.get("reason"),
             }
     return None
+
+
+def _found_term_payloads(tool_trace: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    found: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for entry in tool_trace:
+        if entry.get("name") != "get_glossary_term":
+            continue
+        result = entry.get("result")
+        if not isinstance(result, dict) or not result.get("found"):
+            continue
+        term = str(result.get("term") or "")
+        if not term or term in seen:
+            continue
+        seen.add(term)
+        found.append(result)
+    return found
+
+
+def _tool_facts_ready(tool_trace: list[dict[str, Any]]) -> bool:
+    """True when the model has enough seed facts to answer without more tools."""
+    if _refusal_from_tool_trace(tool_trace) is not None:
+        return True
+    return bool(_found_term_payloads(tool_trace))
+
+
+def _message_text(choice_message: Any) -> str:
+    """Extract visible assistant text (gpt-oss may leave content empty)."""
+    content = getattr(choice_message, "content", None)
+    if isinstance(content, str) and content.strip():
+        return content.strip()
+    for attr in ("reasoning", "reasoning_content"):
+        value = getattr(choice_message, attr, None)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _synthesize_from_tool_trace(tool_trace: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build a prose reply from tool results when the model never emits final content."""
+    refusal = _refusal_from_tool_trace(tool_trace)
+    if refusal is not None:
+        return {
+            "assistant_message": str(refusal.get("reason") or ""),
+            "mode": "agent",
+            "refusal": refusal,
+            "tool_trace": tool_trace,
+        }
+
+    found = _found_term_payloads(tool_trace)
+    if found:
+        parts = [f"**{item['term']}** — {item.get('definition') or ''}".strip() for item in found]
+        payload: dict[str, Any] = {
+            "assistant_message": "\n\n".join(parts),
+            "mode": "agent",
+            "tool_trace": tool_trace,
+        }
+        citations = _collect_citations(tool_trace)
+        if citations:
+            payload["citations"] = citations
+        return payload
+
+    for entry in reversed(tool_trace):
+        if entry.get("name") != "search_glossary":
+            continue
+        result = entry.get("result")
+        if not isinstance(result, dict):
+            continue
+        matches = result.get("matches") or []
+        if not matches:
+            continue
+        lines = [
+            f"- **{m.get('term')}**: {m.get('definition_preview') or ''}".strip()
+            for m in matches[:5]
+            if isinstance(m, dict)
+        ]
+        return {
+            "assistant_message": "Here are related glossary terms:\n" + "\n".join(lines),
+            "mode": "agent",
+            "tool_trace": tool_trace,
+        }
+
+    return {
+        "assistant_message": (
+            "I looked in the glossary seed but could not finish a clear answer. "
+            "Try asking for one term by name."
+        ),
+        "mode": "agent",
+        "tool_trace": tool_trace,
+    }
 
 
 def _assistant_payload_from_fallback(result: GlossaryResult) -> dict[str, Any]:
@@ -176,20 +266,30 @@ def _run_agent_loop(
     matcher = GlossaryMatcher()
     tool_trace: list[dict[str, Any]] = []
 
-    for _ in range(MAX_TOOL_ROUNDS):
-        completion = client.chat.completions.create(
-            model=model,
-            messages=chat_messages,
-            tools=GLOSSARY_TOOL_SCHEMAS,
-            tool_choice="auto",
-            timeout=timeout,
+    for round_index in range(MAX_TOOL_ROUNDS):
+        # Once we have seed facts (or on the last round with any tools), force prose.
+        force_final = bool(tool_trace) and (
+            _tool_facts_ready(tool_trace) or round_index == MAX_TOOL_ROUNDS - 1
         )
+        create_kwargs: dict[str, Any] = {
+            "model": model,
+            "messages": chat_messages,
+            "timeout": timeout,
+        }
+        if force_final:
+            create_kwargs["tool_choice"] = "none"
+        else:
+            create_kwargs["tools"] = GLOSSARY_TOOL_SCHEMAS
+            create_kwargs["tool_choice"] = "auto"
+
+        completion = client.chat.completions.create(**create_kwargs)
         choice = completion.choices[0].message
+        text = _message_text(choice)
         assistant_record: dict[str, Any] = {
             "role": "assistant",
-            "content": choice.content or "",
+            "content": text or (choice.content or ""),
         }
-        tool_calls = choice.tool_calls or []
+        tool_calls = [] if force_final else list(choice.tool_calls or [])
         if tool_calls:
             assistant_record["tool_calls"] = [
                 {
@@ -205,10 +305,12 @@ def _run_agent_loop(
         chat_messages.append(assistant_record)
 
         if not tool_calls:
+            if not text and tool_trace:
+                return _synthesize_from_tool_trace(tool_trace)
             refusal = _refusal_from_tool_trace(tool_trace)
             citations = _collect_citations(tool_trace)
             payload: dict[str, Any] = {
-                "assistant_message": (choice.content or "").strip()
+                "assistant_message": text
                 or "I could not generate a glossary answer. Please rephrase your question.",
                 "mode": "agent",
             }
@@ -234,7 +336,9 @@ def _run_agent_loop(
                 }
             )
 
-    logger.warning("Glossary agent exceeded max tool rounds (%s)", MAX_TOOL_ROUNDS)
+    logger.warning("Glossary agent exceeded max tool rounds (%s); synthesizing from tools", MAX_TOOL_ROUNDS)
+    if tool_trace:
+        return _synthesize_from_tool_trace(tool_trace)
     raise RuntimeError("glossary_agent_max_tool_rounds")
 
 

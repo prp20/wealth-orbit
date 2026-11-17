@@ -116,6 +116,41 @@ def test_agent_tool_round_then_answer(monkeypatch: pytest.MonkeyPatch):
     assert result.get("citations")
     assert len(result.get("tool_trace", [])) == 1
     assert client.chat.completions.create.call_count == 2
+    second_kwargs = client.chat.completions.create.call_args_list[1].kwargs
+    assert second_kwargs.get("tool_choice") == "none"
+
+
+def test_agent_synthesizes_when_final_content_empty(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-key-unused")
+    first = _FakeCompletion(
+        [
+            _FakeChoice(
+                _FakeChoiceMessage(
+                    content=None,
+                    tool_calls=[
+                        _FakeToolCall(
+                            id="call_1",
+                            type="function",
+                            function=_FakeFunction(
+                                name="get_glossary_term",
+                                arguments='{"term_or_alias": "IPO"}',
+                            ),
+                        )
+                    ],
+                )
+            )
+        ]
+    )
+    second = _FakeCompletion([_FakeChoice(_FakeChoiceMessage(content="", tool_calls=[]))])
+    client = _groq_client_with_responses([first, second])
+    result = run_glossary_agent(
+        [{"role": "user", "content": "What is IPO?"}],
+        client=client,
+    )
+    assert result["mode"] == "agent"
+    assert "IPO" in result["assistant_message"]
+    assert "public" in result["assistant_message"].lower() or "shares" in result["assistant_message"].lower()
+    assert result.get("citations")
 
 
 def test_advice_refusal_short_circuits_without_groq():
