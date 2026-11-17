@@ -191,7 +191,12 @@ def test_snapshot_exposes_expanded_columns():
         "debt_to_equity",
         "profit_growth_3y",
         "promoter_holding",
+        "sma_50",
         "sma_200",
+        "price_above_sma_200",
+        "rel_volume_20",
+        "pct_from_52w_high",
+        "bb_percent_b",
         "roa",
     ):
         assert column in SNAPSHOT_COLUMNS
