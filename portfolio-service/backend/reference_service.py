@@ -1610,32 +1610,6 @@ def _last_ohlc_date(symbol: str) -> date | None:
         return None
 
 
-def _technicals_from_ohlc_frame(frame: pd.DataFrame, indicator: str = "") -> pd.DataFrame:
-    """Compute latest-day indicators from an OHLC frame (no DB write)."""
-    from datetime import datetime, timezone
-
-    from backend.market_data.sync import DEFAULT_INDICATORS, _latest_indicator_rows
-    from backend_api.app.technical_indicators import calculate_indicators
-
-    if frame.empty:
-        return _empty_technicals()
-    try:
-        _trading_date, latest_rows = _latest_indicator_rows(frame)
-    except RuntimeError:
-        calculated = calculate_indicators(frame, DEFAULT_INDICATORS).dropna(subset=["value"])
-        if calculated.empty:
-            return _empty_technicals()
-        latest_rows = calculated
-    if indicator:
-        latest_rows = latest_rows[latest_rows["indicator_code"] == indicator.upper()]
-    if latest_rows.empty:
-        return _empty_technicals()
-    out = latest_rows.rename(columns={"value": "indicator_value"}).copy()
-    out["calculation_status"] = "CURRENT"
-    out["calculated_at"] = datetime.now(timezone.utc)
-    return out[_TECHNICAL_COLUMNS].reset_index(drop=True)
-
-
 def _opaque_technical_refresh_error(exc: BaseException) -> str:
     text = str(exc).strip()
     if not text or "://" in text:

@@ -198,5 +198,19 @@ def test_snapshot_exposes_expanded_columns():
         "pct_from_52w_high",
         "bb_percent_b",
         "roa",
+        "roce",
+        "sma50_above_sma200",
+        "price_above_sma_50",
     ):
         assert column in SNAPSHOT_COLUMNS
+
+
+def test_technicals_panel_honesty_copy():
+    technicals = (
+        ROOT / "frontend-react" / "src" / "pages" / "stocks" / "panels" / "TechnicalsPanel.tsx"
+    ).read_text(encoding="utf-8")
+    assert "research metrics" in technicals.lower()
+    assert "not advice" in technicals.lower()
+    assert "ephemeral" in technicals.lower()
+    assert "No stored technical indicators yet" in technicals
+    assert "Stochastic" in technicals
