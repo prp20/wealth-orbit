@@ -77,7 +77,7 @@ def test_stock_technical_indicators_view_surfaces_failed_sync_job():
         payload = reference_service.stock_technical_indicators_view("HDFCBANK")
     assert payload["records"] == []
     assert payload["sync_error"] == "yahoo_empty_info"
-    sync_mock.assert_not_called()
+    sync_mock.assert_called_once_with("HDFCBANK")
 
 
 def test_sync_technical_indicators_persists_latest_day(monkeypatch):
@@ -209,7 +209,7 @@ def test_load_stored_technicals_selects_migration_017_calculation_version():
     assert "calculation_version" in migration.read_text(encoding="utf-8")
 
 
-def test_resolve_stored_skips_sync_when_stale_but_rows_exist():
+def test_resolve_stored_syncs_when_stale_and_keeps_rows_if_still_behind():
     stored = pd.DataFrame(
         [
             {
@@ -233,7 +233,37 @@ def test_resolve_stored_skips_sync_when_stale_but_rows_exist():
         frame, err = reference_service._resolve_stored_technical_indicators("HDFCBANK")
     assert err == "technicals_stale_run_sync"
     assert len(frame) == 1
-    sync_mock.assert_not_called()
+    sync_mock.assert_called_once_with("HDFCBANK")
+
+
+def test_resolve_stored_surfaces_refresh_error_with_stale_rows():
+    stored = pd.DataFrame(
+        [
+            {
+                "date": date(2024, 5, 1),
+                "indicator_code": "RSI",
+                "indicator_period": 14,
+                "parameters": "{}",
+                "component": "",
+                "indicator_value": 55.0,
+                "calculation_status": "CURRENT",
+                "calculated_at": date(2024, 5, 1),
+            }
+        ]
+    )
+    with (
+        patch.object(reference_service, "_load_stored_technicals", return_value=(stored, date(2024, 5, 1))),
+        patch.object(reference_service, "_last_ohlc_date", return_value=date(2024, 6, 15)),
+        patch.object(
+            stock_sync,
+            "sync_technical_indicators",
+            MagicMock(side_effect=RuntimeError("provider_unavailable")),
+        ) as sync_mock,
+    ):
+        frame, err = reference_service._resolve_stored_technical_indicators("HDFCBANK")
+    assert len(frame) == 1
+    assert err == "provider_unavailable"
+    sync_mock.assert_called_once_with("HDFCBANK")
 
 
 def test_stock_technical_indicators_view_surfaces_stale_hint_when_rows_exist():
@@ -255,6 +285,7 @@ def test_stock_technical_indicators_view_surfaces_stale_hint_when_rows_exist():
         patch.object(reference_service, "_load_stored_technicals", return_value=(stored, date(2024, 5, 1))),
         patch.object(reference_service, "_last_ohlc_date", return_value=date(2024, 6, 15)),
         patch.object(reference_service, "_latest_technical_sync_job_error", return_value=None),
+        patch.object(stock_sync, "sync_technical_indicators", MagicMock()),
     ):
         payload = reference_service.stock_technical_indicators_view("HDFCBANK")
     assert len(payload["records"]) == 1
@@ -281,6 +312,7 @@ def test_stock_technical_indicators_view_prefers_failed_job_error_when_stale():
         patch.object(reference_service, "_load_stored_technicals", return_value=(stored, date(2024, 5, 1))),
         patch.object(reference_service, "_last_ohlc_date", return_value=date(2024, 6, 15)),
         patch.object(reference_service, "_latest_technical_sync_job_error", return_value="yahoo_empty_info"),
+        patch.object(stock_sync, "sync_technical_indicators", MagicMock()),
     ):
         payload = reference_service.stock_technical_indicators_view("HDFCBANK")
     assert payload["sync_error"] == "yahoo_empty_info"

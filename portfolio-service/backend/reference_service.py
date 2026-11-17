@@ -1611,6 +1611,18 @@ def _last_ohlc_date(symbol: str) -> date | None:
         return None
 
 
+def _opaque_technical_refresh_error(exc: BaseException) -> str:
+    try:
+        from backend_api.app.sync_queue import opaque_sync_error
+
+        return opaque_sync_error(exc)
+    except Exception:
+        text = str(exc).strip()
+        if not text or "://" in text:
+            return "technical_sync_failed"
+        return text[:120]
+
+
 def _latest_technical_sync_job_error(symbol: str) -> str | None:
     try:
         from backend_api.app.sync_queue import latest_job
@@ -1637,13 +1649,35 @@ def _technical_snapshot_stale_hint(symbol: str, snap: date | None, last_ohlc: da
 def _resolve_stored_technical_indicators(
     symbol: str, indicator: str = ""
 ) -> tuple[pd.DataFrame, str | None]:
-    """Load persisted latest-day technicals only; never sync, prune, or compute on read."""
+    """Load persisted latest-day technicals; sync when empty/stale; never invent ephemeral OHLC rows.
+
+    Unauthenticated GET may refresh the latest snapshot (including prune). If refresh fails,
+    return any existing stored rows with a sync_error so the UI can show a stale banner.
+    """
     indicator = indicator.upper() if indicator else ""
     stored, snap = _load_stored_technicals(symbol, indicator)
     last_ohlc = _last_ohlc_date(symbol)
+    if not stored.empty and snap is not None and last_ohlc is not None and snap >= last_ohlc:
+        return stored.reset_index(drop=True), None
+
+    refresh_error: str | None = None
+    if last_ohlc is not None:
+        try:
+            from backend.market_data.sync import sync_technical_indicators
+
+            sync_technical_indicators(symbol)
+            stored, snap = _load_stored_technicals(symbol, indicator)
+            if not stored.empty and (snap is None or last_ohlc is None or snap >= last_ohlc):
+                return stored.reset_index(drop=True), None
+        except Exception as exc:
+            refresh_error = _opaque_technical_refresh_error(exc)
+            stored, snap = _load_stored_technicals(symbol, indicator)
+
     if not stored.empty:
-        stale_hint = _technical_snapshot_stale_hint(symbol, snap, last_ohlc)
+        stale_hint = refresh_error or _technical_snapshot_stale_hint(symbol, snap, last_ohlc)
         return stored.reset_index(drop=True), stale_hint
+    if refresh_error:
+        return _empty_technicals(), refresh_error
     if last_ohlc is None:
         return _empty_technicals(), "sync_prices_before_technicals"
     job_error = _latest_technical_sync_job_error(symbol)
@@ -1653,7 +1687,7 @@ def _resolve_stored_technical_indicators(
 
 
 def stock_technical_indicators(symbol: str, indicator: str = "", from_date=None, to_date=None) -> pd.DataFrame:
-    """Return stored latest-day technicals only (no ephemeral OHLC compute on read).
+    """Return latest-day technicals from storage (may sync on read; no ephemeral OHLC compute).
 
     ``from_date`` / ``to_date`` are retained for API compatibility but ignored.
     """
@@ -1663,7 +1697,7 @@ def stock_technical_indicators(symbol: str, indicator: str = "", from_date=None,
 
 
 def stock_technical_indicators_view(symbol: str, indicator: str = "", from_date=None, to_date=None) -> dict:
-    """API payload: stored rows plus an opaque sync hint when the snapshot is missing."""
+    """API payload: stored rows (refresh-on-read when stale/empty) plus sync_error when needed."""
     _ = from_date, to_date
     frame, sync_error = _resolve_stored_technical_indicators(symbol, indicator)
     records = frame.to_dict(orient="records") if not frame.empty else []
