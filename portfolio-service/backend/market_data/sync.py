@@ -15,7 +15,7 @@ from backend_api.app.technical_indicators import calculate_indicators
 
 from psycopg2.extras import Json
 
-from .daily_metrics import yahoo_daily_metric_fields
+from .daily_metrics import merge_yahoo_daily_fields, yahoo_daily_metric_fields
 from .latest_snapshot import prune_non_latest_metric_dates, prune_non_latest_technical_dates
 from .sources import ensure_data_source
 
@@ -360,29 +360,43 @@ def sync_daily_metrics(symbol: str, force: bool = False) -> dict:
                     raise RuntimeError(f"Daily metrics sync failed for {symbol}: prices_missing")
                 metric_date = frame.iloc[-1]["date"]
                 source_id = _source_id(cur, "yfinance")
-                # Carry forward statement-derived ratio bag when the Yahoo as-of date moves.
+                # Carry forward provider metrics and statement bag when the Yahoo as-of date moves.
                 cur.execute(
                     """
-                    SELECT fundamental_ratios
+                    SELECT market_cap, stock_pe, price_to_book, dividend_yield, book_value,
+                           roce, roe, fundamental_ratios
                     FROM market_data.stock_daily_metrics
-                    WHERE stock_id=%s AND fundamental_ratios IS NOT NULL
+                    WHERE stock_id=%s
                     ORDER BY metric_date DESC
                     LIMIT 1
                     """,
                     (stock_id,),
                 )
-                bag_row = cur.fetchone()
-                carried_bag = bag_row[0] if bag_row else None
+                prior_row = cur.fetchone()
+                prior_metrics: dict[str, float | None] = {}
+                carried_bag = None
+                if prior_row:
+                    prior_metrics = {
+                        "market_cap": prior_row[0],
+                        "stock_pe": prior_row[1],
+                        "price_to_book": prior_row[2],
+                        "dividend_yield": prior_row[3],
+                        "book_value": prior_row[4],
+                        "roce": prior_row[5],
+                        "roe": prior_row[6],
+                    }
+                    carried_bag = prior_row[7]
+                merged_fields = merge_yahoo_daily_fields(fields, prior_metrics)
                 values = (
                     stock_id,
                     metric_date,
-                    fields["market_cap"],
-                    fields["stock_pe"],
-                    fields["price_to_book"],
-                    fields["dividend_yield"],
-                    fields["book_value"],
-                    fields["roce"],
-                    fields["roe"],
+                    merged_fields["market_cap"],
+                    merged_fields["stock_pe"],
+                    merged_fields["price_to_book"],
+                    merged_fields["dividend_yield"],
+                    merged_fields["book_value"],
+                    merged_fields["roce"],
+                    merged_fields["roe"],
                     fields["enterprise_value"],
                     fields["ebitda_ttm"],
                     fields["ev_ebitda"],
@@ -398,9 +412,15 @@ def sync_daily_metrics(symbol: str, force: bool = False) -> dict:
                          enterprise_value,ebitda_ttm,ev_ebitda,ev_sales,net_debt,fcf_yield,peg,calculation_method,source_id,
                          fundamental_ratios)
                         VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL,'PROVIDER',%s,%s)
-                        ON CONFLICT(stock_id,metric_date) DO UPDATE SET market_cap=EXCLUDED.market_cap,stock_pe=EXCLUDED.stock_pe,
-                        price_to_book=EXCLUDED.price_to_book,dividend_yield=EXCLUDED.dividend_yield,book_value=EXCLUDED.book_value,
-                        roce=EXCLUDED.roce,roe=EXCLUDED.roe,enterprise_value=EXCLUDED.enterprise_value,
+                        ON CONFLICT(stock_id,metric_date) DO UPDATE SET
+                        market_cap=COALESCE(EXCLUDED.market_cap, market_data.stock_daily_metrics.market_cap),
+                        stock_pe=COALESCE(EXCLUDED.stock_pe, market_data.stock_daily_metrics.stock_pe),
+                        price_to_book=COALESCE(EXCLUDED.price_to_book, market_data.stock_daily_metrics.price_to_book),
+                        dividend_yield=COALESCE(EXCLUDED.dividend_yield, market_data.stock_daily_metrics.dividend_yield),
+                        book_value=COALESCE(EXCLUDED.book_value, market_data.stock_daily_metrics.book_value),
+                        roce=COALESCE(EXCLUDED.roce, market_data.stock_daily_metrics.roce),
+                        roe=COALESCE(EXCLUDED.roe, market_data.stock_daily_metrics.roe),
+                        enterprise_value=EXCLUDED.enterprise_value,
                         ebitda_ttm=EXCLUDED.ebitda_ttm,ev_ebitda=EXCLUDED.ev_ebitda,ev_sales=EXCLUDED.ev_sales,
                         net_debt=EXCLUDED.net_debt,fcf_yield=EXCLUDED.fcf_yield,peg=NULL,
                         source_id=EXCLUDED.source_id,

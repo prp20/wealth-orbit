@@ -203,3 +203,26 @@ def test_upsert_skips_empty_snapshot_and_preserves_prior_bag():
     assert upsert_latest_fundamental_ratios(cur, stock_id, empty_with_as_of, "src") == "2024-03-31"
     assert len(cur.writes) == writes_before
     assert cur.bag["ratios"]["ROE"] == 40.0
+
+
+def test_upsert_latest_fundamental_ratios_preserves_provider_metric_sources():
+    cur = _SnapshotCursor()
+    stock_id = "11111111-1111-1111-1111-111111111111"
+    cur.latest = "2024-06-01"
+    cur.bag = {
+        "provider_metric_sources": {"roce": "screener", "roe": "screener"},
+        "ratios": {"ROE": 10.0},
+    }
+    snapshot = {
+        "as_of": "2024-03-31",
+        "reporting_basis": "CONSOLIDATED",
+        "reporting_period": "ANNUAL",
+        "calculation_method": CALC_VERSION,
+        "ratios": {"ROE": 42.0, "ROCE": 35.0},
+        "methods": {"ROE": CALC_VERSION, "ROCE": CALC_VERSION},
+    }
+    upsert_latest_fundamental_ratios(cur, stock_id, snapshot, "src")
+    sources = cur.bag.get("provider_metric_sources") or {}
+    assert sources["roce"] == "screener"
+    assert sources["roe"] == "screener"
+    assert cur.bag["ratios"]["ROCE"] == 35.0

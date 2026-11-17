@@ -30,6 +30,34 @@ PROVIDER_METRIC_COLUMNS = {
 
 SCREENER_PROVIDER_SOURCE = "screener"
 
+# Yahoo sync fills these; when Yahoo is NULL, keep the latest stored row (e.g. Screener).
+YAHOO_MERGE_PRESERVE_COLUMNS = (
+    "market_cap",
+    "stock_pe",
+    "price_to_book",
+    "dividend_yield",
+    "book_value",
+    "roce",
+    "roe",
+)
+
+# Screen snapshot stores profitability ratios as fractions (0.139 = 13.9%).
+_SCREENER_FRACTION_METRIC_KEYS = frozenset({"roce", "roe"})
+
+
+def merge_yahoo_daily_fields(
+    yahoo: dict[str, float | None],
+    prior: dict[str, float | None] | None,
+) -> dict[str, float | None]:
+    """Keep non-null provider metrics on the latest row when Yahoo omits them."""
+    merged = dict(yahoo)
+    if not prior:
+        return merged
+    for key in YAHOO_MERGE_PRESERVE_COLUMNS:
+        if merged.get(key) is None and prior.get(key) is not None:
+            merged[key] = prior[key]
+    return merged
+
 
 def provider_metrics_from_ratios(ratios: dict[str, str]) -> tuple[dict[str, float], list[dict[str, str]]]:
     """Map a Screener ratio panel to canonical daily-metric fields without guessing unknown fields."""
@@ -39,10 +67,12 @@ def provider_metrics_from_ratios(ratios: dict[str, str]) -> tuple[dict[str, floa
         target = PROVIDER_METRIC_LABELS.get(label)
         if target is None:
             continue
-        number = _metric_number(raw_value)
+        number = _metric_number(raw_value, label=label)
         if number is None:
             warnings.append({"kind": "invalid_provider_metric", "label": label, "value": raw_value})
         else:
+            if target in _SCREENER_FRACTION_METRIC_KEYS:
+                number = number / 100.0
             metrics[target] = number
     return metrics, warnings
 
@@ -184,10 +214,20 @@ def upsert_screener_provider_metrics(
     return str(metric_date)
 
 
-def _metric_number(value: str) -> float | None:
+def _screener_market_cap_is_crores(value: str) -> bool:
+    return bool(re.search(r"\bCr\.?", value, flags=re.IGNORECASE))
+
+
+def _metric_number(value: str, *, label: str | None = None) -> float | None:
     # Screener's market-cap display includes a unit suffix (e.g. "1,25,000 Cr.").
+    is_crores = label == "Market Cap" and _screener_market_cap_is_crores(value)
     cleaned = re.sub(r"\s*(?:Cr\.?|₹)\s*$", "", value, flags=re.IGNORECASE)
-    return normalize_number(cleaned)
+    number = normalize_number(cleaned)
+    if number is None:
+        return None
+    if is_crores:
+        number *= 10_000_000
+    return number
 
 
 def _as_float(raw) -> float | None:

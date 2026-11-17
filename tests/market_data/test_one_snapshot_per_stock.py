@@ -174,8 +174,8 @@ class _DailyMetricsCursor:
     def execute(self, sql, params=None) -> None:
         text = " ".join(sql.split())
         if (
-            "SELECT fundamental_ratios" in text
-            and "stock_daily_metrics" in text
+            "SELECT market_cap" in text
+            and "ORDER BY metric_date DESC" in text
             and params
         ):
             self._bag_fetch_stock = params[0]
@@ -188,17 +188,34 @@ class _DailyMetricsCursor:
                 bag_val = bag_param.adapted if hasattr(bag_param, "adapted") else bag_param
             key = (stock_id, metric_date)
             existing = self.store.rows.get(key)
+            row = {
+                "stock_id": stock_id,
+                "metric_date": metric_date,
+                "market_cap": params[2],
+                "stock_pe": params[3],
+                "price_to_book": params[4],
+                "dividend_yield": params[5],
+                "book_value": params[6],
+                "roce": params[7],
+                "roe": params[8],
+                "fundamental_ratios": bag_val,
+            }
             if existing:
                 if bag_val is not None:
                     existing["fundamental_ratios"] = bag_val
-                else:
-                    pass  # COALESCE keeps prior bag
+                for col in (
+                    "market_cap",
+                    "stock_pe",
+                    "price_to_book",
+                    "dividend_yield",
+                    "book_value",
+                    "roce",
+                    "roe",
+                ):
+                    if row[col] is not None:
+                        existing[col] = row[col]
             else:
-                self.store.rows[key] = {
-                    "stock_id": stock_id,
-                    "metric_date": metric_date,
-                    "fundamental_ratios": bag_val,
-                }
+                self.store.rows[key] = row
             return
         if "DELETE FROM market_data.stock_daily_metrics" in text and params:
             stock_id, keep = params
@@ -214,14 +231,23 @@ class _DailyMetricsCursor:
             stock_id = self._bag_fetch_stock
             self._bag_fetch_stock = None
             candidates = [
-                (row["metric_date"], row["fundamental_ratios"])
+                row
                 for row in self.store.rows.values()
-                if row["stock_id"] == stock_id and row.get("fundamental_ratios") is not None
+                if row["stock_id"] == stock_id
             ]
             if not candidates:
                 return None
-            candidates.sort(key=lambda item: item[0], reverse=True)
-            return (candidates[0][1],)
+            row = max(candidates, key=lambda item: item["metric_date"])
+            return (
+                row.get("market_cap"),
+                row.get("stock_pe"),
+                row.get("price_to_book"),
+                row.get("dividend_yield"),
+                row.get("book_value"),
+                row.get("roce"),
+                row.get("roe"),
+                row.get("fundamental_ratios"),
+            )
         return None
 
 

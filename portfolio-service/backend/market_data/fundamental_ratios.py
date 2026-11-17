@@ -280,6 +280,10 @@ def upsert_latest_fundamental_ratios(cur, stock_id, snapshot: dict[str, Any], so
         "methods": snapshot.get("methods") or {},
         "updated_at": date_cls.today().isoformat(),
     }
+    if isinstance(prior_bag, dict):
+        prior_sources = prior_bag.get("provider_metric_sources")
+        if isinstance(prior_sources, dict) and prior_sources:
+            payload["provider_metric_sources"] = dict(prior_sources)
     # Ensure JSON-serializable floats/None
     json.dumps(payload, allow_nan=False)
 
