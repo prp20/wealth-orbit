@@ -273,6 +273,11 @@ def _persist_latest_technicals(cur, stock_id: uuid.UUID, trading_date: date, row
                 TECHNICAL_CALCULATION_VERSION,
             )
         )
+    cur.execute(
+        """DELETE FROM market_data.stock_technical_indicators
+           WHERE stock_id=%s AND trading_date=%s""",
+        (stock_id, trading_date),
+    )
     if values:
         execute_values(
             cur,

@@ -96,12 +96,20 @@ class _PruneCursor:
 
     def execute(self, sql, params=None) -> None:
         if "stock_technical_indicators" in sql and params:
-            stock_id, keep = params
+            stock_id = params[0]
             removed = 0
-            for key, row in list(self.store.rows.items()):
-                if row["stock_id"] == stock_id and row["trading_date"] != keep:
-                    del self.store.rows[key]
-                    removed += 1
+            if "<>" in sql:
+                keep = params[1]
+                for key, row in list(self.store.rows.items()):
+                    if row["stock_id"] == stock_id and row["trading_date"] != keep:
+                        del self.store.rows[key]
+                        removed += 1
+            else:
+                trading_date = params[1]
+                for key, row in list(self.store.rows.items()):
+                    if row["stock_id"] == stock_id and row["trading_date"] == trading_date:
+                        del self.store.rows[key]
+                        removed += 1
             self.rowcount = removed
 
 
@@ -126,6 +134,46 @@ def test_two_technical_syncs_different_dates_do_not_accumulate_history():
         assert n2 == expected_keys
         assert store.count(_STOCK_ID) == expected_keys
         assert store.distinct_dates(_STOCK_ID) == {day2}
+
+
+def test_same_trading_date_resync_replaces_superseded_indicator_keys():
+    """Re-sync on the same calendar day must drop old param/family rows before upsert."""
+    store = _TechnicalSnapshotStore()
+    day = date(2024, 6, 10)
+    old_rows = _indicator_rows_for_date(day, n_macd=3)
+    old_rows = pd.concat(
+        [
+            old_rows,
+            pd.DataFrame(
+                [
+                    {
+                        "date": day,
+                        "indicator_code": "STOCH",
+                        "indicator_period": 14,
+                        "component": "K",
+                        "parameters": '{"period": 14, "smooth_k": 3}',
+                        "value": 80.0,
+                    }
+                ]
+            ),
+        ],
+        ignore_index=True,
+    )
+    new_rows = _indicator_rows_for_date(day, n_macd=2)
+    new_rows = new_rows[new_rows["indicator_code"] != "STOCH"].reset_index(drop=True)
+
+    with patch(
+        "backend.market_data.sync.execute_values",
+        side_effect=store.upsert_execute_values,
+    ):
+        stock_sync._persist_latest_technicals(_PruneCursor(store), _STOCK_ID, day, old_rows)
+        assert store.count(_STOCK_ID) == len(old_rows)
+        stock_sync._persist_latest_technicals(_PruneCursor(store), _STOCK_ID, day, new_rows)
+
+    assert store.count(_STOCK_ID) == len(new_rows)
+    assert not any(r["indicator_code"] == "STOCH" for r in store.rows.values())
+    macd_keys = [k for k in store.rows if k[2] == "MACD"]
+    assert len(macd_keys) == 2
 
 
 def test_prune_non_latest_technical_dates_removes_only_other_dates():
