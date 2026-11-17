@@ -245,3 +245,21 @@ sqlite3 portfolio-service/portfolio.db "UPDATE users SET password_hash = NULL WH
 ```
 
 Sign-up refuses a name that is already stored. Use another name, or remove that user from the file before creating the account again.
+
+## Glossary chat (release 1.11)
+
+The **Glossary** page explains curated investing terms only. Answers come from [docs/varsity_docs/glossary_seed.json](varsity_docs/glossary_seed.json) with Zerodha Varsity chapter links—not from an LLM, live prices, or your portfolio.
+
+- **Scope:** definitions and citations; buy/sell/switch and personalized advice are refused.
+- **Varsity PDFs** under `docs/varsity_docs/` are local offline copies (gitignored) for authoring—they are not shipped or served by the API.
+- **Public endpoint** (no session): `POST /api/v1/glossary/chat` with `{"message": "What is IPO?"}` → JSON with `kind`, `definition`, and `sources` when matched.
+
+With the API running on port 8000:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/v1/glossary/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"What is IPO?"}'
+```
+
+Release exit checks: `uv run pytest tests/test_glossary_api.py tests/test_glossary_seed_matcher.py -q`

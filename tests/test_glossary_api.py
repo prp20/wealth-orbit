@@ -5,6 +5,27 @@ from fastapi.testclient import TestClient
 from backend_api.app.main import app
 
 
+def test_glossary_exit_smoke_ipo_and_advice_refusal():
+    """Release 1.11 exit: curated IPO definition; buy/sell advice refused (public, no auth)."""
+    with TestClient(app) as client:
+        ipo = client.post("/api/v1/glossary/chat", json={"message": "What is IPO?"})
+        advice = client.post(
+            "/api/v1/glossary/chat",
+            json={"message": "Should I buy HDFC Bank stock now?"},
+        )
+    assert ipo.status_code == 200
+    ipo_body = ipo.json()
+    assert ipo_body["kind"] == "match"
+    assert ipo_body["term"] == "IPO"
+    assert ipo_body["definition"]
+    assert ipo_body["sources"]
+
+    assert advice.status_code == 200
+    advice_body = advice.json()
+    assert advice_body["kind"] == "refusal"
+    assert advice_body["refusal_category"] == "advice"
+
+
 def test_glossary_chat_match_without_auth():
     with TestClient(app) as client:
         response = client.post("/api/v1/glossary/chat", json={"message": "What is IPO?"})

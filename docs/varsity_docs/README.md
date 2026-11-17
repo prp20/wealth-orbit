@@ -50,3 +50,13 @@ Prefer `Module_<N>_<slug>.pdf` for new downloads. Older files may use spaces (`M
 
 Source catalog: https://zerodha.com/varsity/modules/
 
+## Glossary chat (release 1.11)
+
+The in-app glossary is **definitions only**: short answers from `glossary_seed.json` plus Varsity chapter links. It does **not** give buy, sell, switch, or personalized advice, and it does not invent live prices or portfolio numbers.
+
+- **Varsity PDFs** in this folder stay **offline research copies** (gitignored). They are not served by the app.
+- **Public API** (no login): `POST /api/v1/glossary/chat` with body `{"message": "<question>"}`. Optional browse list: `GET /api/v1/glossary/terms`.
+- **UI:** React route `/glossary` (Glossary in the nav).
+
+Exit smoke (pytest): IPO match and advice refusal — see `tests/test_glossary_api.py::test_glossary_exit_smoke_ipo_and_advice_refusal` and `tests/test_glossary_seed_matcher.py`.
+
