@@ -1304,7 +1304,49 @@ def mutual_fund_benchmark_history(scheme_code: str) -> list[dict]:
     ).to_dict(orient="records")
 
 def benchmark_list() -> list[dict]:
-    return _query("SELECT index_id,index_code,index_name FROM market_data.index_reference ORDER BY index_name").to_dict(orient="records")
+    return _query(
+        """SELECT i.index_id, i.index_code, i.index_name, m.trading_symbol AS yf_symbol
+           FROM market_data.index_reference i
+           LEFT JOIN LATERAL (
+             SELECT trading_symbol
+             FROM market_data.index_provider_mappings
+             WHERE index_id = i.index_id AND provider = 'yfinance' AND is_active = TRUE
+             ORDER BY updated_at DESC NULLS LAST
+             LIMIT 1
+           ) m ON TRUE
+           ORDER BY i.index_name"""
+    ).to_dict(orient="records")
+
+
+def index_yf_symbol_map(codes: list[str] | None = None) -> dict[str, str | None]:
+    """Active yfinance ticker by upper(index_code)."""
+    if codes is not None and not codes:
+        return {}
+    if codes is None:
+        rows = benchmark_list()
+    else:
+        cleaned = [str(code).strip() for code in codes if str(code or "").strip()]
+        if not cleaned:
+            return {}
+        frame = _query(
+            """SELECT i.index_code, m.trading_symbol AS yf_symbol
+               FROM market_data.index_reference i
+               LEFT JOIN LATERAL (
+                 SELECT trading_symbol
+                 FROM market_data.index_provider_mappings
+                 WHERE index_id = i.index_id AND provider = 'yfinance' AND is_active = TRUE
+                 ORDER BY updated_at DESC NULLS LAST
+                 LIMIT 1
+               ) m ON TRUE
+               WHERE upper(i.index_code) = ANY(%s)""",
+            ([code.upper() for code in cleaned],),
+        )
+        rows = frame.to_dict(orient="records") if frame is not None and not frame.empty else []
+    return {
+        str(row.get("index_code") or "").upper(): row.get("yf_symbol")
+        for row in rows
+        if row.get("index_code")
+    }
 
 def benchmark_history(index_code: str) -> list[dict]:
     return _index_history_query(
@@ -1315,16 +1357,37 @@ def benchmark_history(index_code: str) -> list[dict]:
     ).to_dict(orient="records")
 
 
-def benchmark_snapshot(codes: list[str]) -> list[dict]:
-    """Last two closes per index. Unknown codes are omitted."""
-    cleaned: list[str] = []
-    seen: set[str] = set()
-    for code in codes:
-        text = (code or "").strip()
-        if not text or text.upper() in seen:
-            continue
-        seen.add(text.upper())
-        cleaned.append(text)
+def benchmark_snapshot(codes: list[str] | None = None) -> list[dict]:
+    """Last two closes per index.
+
+    Empty / None ``codes`` → every row in ``index_reference`` (placeholders when
+    history is missing). Explicit codes keep request order and omit unknowns.
+    """
+    include_missing = not codes
+    if include_missing:
+        catalog = benchmark_list()
+        cleaned = [str(row.get("index_code") or "").strip() for row in catalog if row.get("index_code")]
+        names = {
+            str(row.get("index_code") or "").strip().upper(): row.get("index_name")
+            for row in catalog
+            if row.get("index_code")
+        }
+        yf_by_code = {
+            str(row.get("index_code") or "").strip().upper(): row.get("yf_symbol")
+            for row in catalog
+            if row.get("index_code")
+        }
+    else:
+        cleaned = []
+        seen: set[str] = set()
+        names = {}
+        for code in codes or []:
+            text = (code or "").strip()
+            if not text or text.upper() in seen:
+                continue
+            seen.add(text.upper())
+            cleaned.append(text)
+        yf_by_code = index_yf_symbol_map(cleaned)
     if not cleaned:
         return []
     frame = _index_history_query(
@@ -1355,6 +1418,17 @@ def benchmark_snapshot(codes: list[str]) -> list[dict]:
     for code in cleaned:
         row = by_code.get(code.upper())
         if row is None:
+            if not include_missing:
+                continue
+            rows.append({
+                "index_code": code,
+                "index_name": names.get(code.upper()) or code,
+                "yf_symbol": yf_by_code.get(code.upper()),
+                "close": None,
+                "previous_close": None,
+                "change_pct": None,
+                "as_of": None,
+            })
             continue
         close = row.get("close")
         previous = row.get("previous_close")
@@ -1364,6 +1438,7 @@ def benchmark_snapshot(codes: list[str]) -> list[dict]:
         rows.append({
             "index_code": row.get("index_code"),
             "index_name": row.get("index_name"),
+            "yf_symbol": yf_by_code.get(str(row.get("index_code") or "").upper()),
             "close": close,
             "previous_close": previous,
             "change_pct": change,

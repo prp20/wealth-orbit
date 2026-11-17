@@ -1,19 +1,24 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../api';
+import { changeClass } from '../../../components/IndexStrip';
 
 const pct = (value: unknown) => (value == null || value === '' ? '—' : `${Number(value).toFixed(2)}%`);
 
-function signedPoints(current: unknown, previous: unknown): string {
-  if (current == null || current === '' || previous == null || previous === '') return '—';
+function deltaPoints(current: unknown, previous: unknown): number | null {
+  if (current == null || current === '' || previous == null || previous === '') return null;
   const delta = Number(current) - Number(previous);
-  if (Number.isNaN(delta)) return '—';
+  return Number.isNaN(delta) ? null : delta;
+}
+
+function signedPoints(current: unknown, previous: unknown): string {
+  const delta = deltaPoints(current, previous);
+  if (delta == null) return '—';
   return `${delta > 0 ? '+' : ''}${delta.toFixed(2)}`;
 }
 
 function signedCount(current: unknown, previous: unknown): string {
-  if (current == null || current === '' || previous == null || previous === '') return '—';
-  const delta = Number(current) - Number(previous);
-  if (Number.isNaN(delta)) return '—';
+  const delta = deltaPoints(current, previous);
+  if (delta == null) return '—';
   return `${delta > 0 ? '+' : ''}${delta}`;
 }
 
@@ -65,15 +70,24 @@ export default function ShareholdingPanel({ symbol }: { symbol: string }) {
                 return (
                   <tr key={String(row.period_end_date)}>
                     <td>{String(row.period_end_date).slice(0, 10)}</td>
-                    {HOLDERS.map((holder) => (
-                      <td key={holder.key}>
-                        {pct(row[holder.key])}
-                        <small> {signedPoints(row[holder.key], previous?.[holder.key])}</small>
-                      </td>
-                    ))}
+                    {HOLDERS.map((holder) => {
+                      const delta = deltaPoints(row[holder.key], previous?.[holder.key]);
+                      return (
+                        <td key={holder.key}>
+                          {pct(row[holder.key])}
+                          <small className={changeClass(delta)}>
+                            {' '}
+                            {signedPoints(row[holder.key], previous?.[holder.key])}
+                          </small>
+                        </td>
+                      );
+                    })}
                     <td>
                       {row.shareholder_count ?? '—'}
-                      <small> {signedCount(row.shareholder_count, previous?.shareholder_count)}</small>
+                      <small className={changeClass(deltaPoints(row.shareholder_count, previous?.shareholder_count))}>
+                        {' '}
+                        {signedCount(row.shareholder_count, previous?.shareholder_count)}
+                      </small>
                     </td>
                   </tr>
                 );

@@ -40,6 +40,19 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return response.json();
 }
 
+async function patchJson<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${base}${path}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(errorDetail(await response.json().catch(() => ({})), 'Could not update'));
+  }
+  return response.json();
+}
+
 export type SyncJob = {
   job_id: string;
   status: string;
@@ -65,26 +78,58 @@ export type SyncJobByKind = {
   progress_percent?: number | null;
 };
 
+function parseJobResult(job: SyncJob | SyncJobByKind | null | undefined): Record<string, unknown> | null {
+  if (!job || !('result' in job)) return null;
+  let result = job.result;
+  if (typeof result === 'string') {
+    try {
+      result = JSON.parse(result);
+    } catch {
+      return null;
+    }
+  }
+  if (!result || typeof result !== 'object') return null;
+  return result as Record<string, unknown>;
+}
+
 export function syncJobFailureMessage(job: SyncJob | SyncJobByKind | null | undefined): string | null {
   if (!job) return null;
   if (String(job.status || '').toUpperCase() === 'FAILED') {
     return job.last_error || 'Sync failed';
   }
-  let result = 'result' in job ? job.result : undefined;
-  if (typeof result === 'string') {
-    try {
-      result = JSON.parse(result);
-    } catch {
-      result = null;
-    }
-  }
-  if (result && typeof result === 'object') {
-    const status = String((result as any).status || '').toLowerCase();
+  const result = parseJobResult(job);
+  if (result) {
+    const status = String(result.status || '').toLowerCase();
     if (status === 'failed' || status === 'error') {
-      return String((result as any).reason || (result as any).error || 'Sync failed');
+      return String(result.reason || result.error || 'Sync failed');
     }
   }
   return null;
+}
+
+/** SUCCEEDED jobs that still report per-item failures (e.g. index sync). */
+export function syncJobPartialFailureMessage(
+  job: SyncJob | SyncJobByKind | null | undefined,
+  limit = 4,
+): string | null {
+  if (!job || String(job.status || '').toUpperCase() === 'FAILED') return null;
+  const result = parseJobResult(job);
+  const failed = result?.failed;
+  if (!Array.isArray(failed) || !failed.length) return null;
+  const parts = failed
+    .slice(0, limit)
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const row = item as { index_code?: string; reason?: string };
+      const code = String(row.index_code || '').trim();
+      const reason = String(row.reason || 'failed').trim();
+      return code ? `${code}: ${reason}` : reason;
+    })
+    .filter(Boolean) as string[];
+  if (!parts.length) return null;
+  const extra = failed.length > limit ? ` · +${failed.length - limit} more` : '';
+  const text = parts.join('; ') + extra;
+  return text.length > 220 ? `${text.slice(0, 217)}…` : text;
 }
 
 export function failedSyncSummaries(
@@ -266,12 +311,21 @@ export const api = {
     get<any[]>(
       withDates(`/market-data/mutual-funds/${encodeURIComponent(id)}/benchmark/history`, from, to),
     ),
-  benchmarkSummary: (codes: string[]) =>
-    get<any[]>(`/market-data/benchmarks/summary?codes=${encodeURIComponent(codes.join(','))}`),
-  syncBenchmarks: (codes: string[], historyPeriod = '') => {
-    const params = new URLSearchParams({ codes: codes.join(',') });
+  usdInrRate: () =>
+    get<{ base: string; quote: string; rate: number; as_of?: string | number | null; provider?: string }>(
+      '/market-data/fx/usd-inr',
+    ),
+  benchmarks: () => get<{ index_id?: string; index_code: string; index_name?: string }[]>('/market-data/benchmarks'),
+  benchmarkSummary: (codes?: string[]) => {
+    if (!codes?.length) return get<any[]>('/market-data/benchmarks/summary');
+    return get<any[]>(`/market-data/benchmarks/summary?codes=${encodeURIComponent(codes.join(','))}`);
+  },
+  syncBenchmarks: (codes?: string[], historyPeriod = '') => {
+    const params = new URLSearchParams();
+    if (codes?.length) params.set('codes', codes.join(','));
     if (historyPeriod) params.set('history_period', historyPeriod);
-    return post<SyncJob>(`/market-data/benchmarks/sync?${params}`);
+    const qs = params.toString();
+    return post<SyncJob>(`/market-data/benchmarks/sync${qs ? `?${qs}` : ''}`);
   },
   syncBenchmarkStatus: () =>
     get<{ status: string; job: SyncJob | null }>('/market-data/benchmarks/sync/status'),
@@ -321,6 +375,21 @@ export const api = {
       yf_symbol: yfSymbol || null,
     });
   },
+  updateIndexInstrument: (
+    indexCode: string,
+    yfSymbol: string,
+    enqueueHistory = true,
+    historyPeriod = '10y',
+  ) => {
+    const params = new URLSearchParams({
+      enqueue_history: enqueueHistory ? 'true' : 'false',
+      history_period: historyPeriod,
+    });
+    return patchJson<TrackInstrumentResult>(
+      `/market-data/instruments/indexes/${encodeURIComponent(indexCode)}?${params}`,
+      { yf_symbol: yfSymbol },
+    );
+  },
   sectors: () => get<string[]>('/market-data/sectors'),
   filters: (kind: string) => get<string[]>(`/market-data/filters/${kind}`),
 };
@@ -339,7 +408,7 @@ export type InstrumentPreview = {
 };
 
 export type TrackInstrumentResult = {
-  status: 'created' | 'existing';
+  status: 'created' | 'existing' | 'updated';
   already_tracked: boolean;
   master: Record<string, unknown>;
   jobs: { job_id?: string; kind?: string; duplicate?: boolean }[];

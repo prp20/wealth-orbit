@@ -3,6 +3,7 @@ import {
   failedSyncSummaries,
   formatSyncJobLabel,
   syncJobFailureMessage,
+  syncJobPartialFailureMessage,
   syncQueueQuery,
 } from '../api';
 import { freshnessDateBits, freshnessFailureLine } from './syncFailures';
@@ -21,6 +22,50 @@ describe('syncJobFailureMessage', () => {
         result: { fundamental_rows: 0, shareholding_rows: 0, status: 'completed' },
       }),
     ).toBeNull();
+  });
+});
+
+describe('syncJobPartialFailureMessage', () => {
+  it('summarizes per-index failures on SUCCEEDED jobs', () => {
+    expect(
+      syncJobPartialFailureMessage({
+        status: 'SUCCEEDED',
+        result: {
+          synced: 3,
+          failed: [
+            { index_code: 'NIFTYIT', reason: 'No Yahoo symbol mapping' },
+            { index_code: 'NIFTYBANK', reason: 'empty bars' },
+          ],
+        },
+      }),
+    ).toBe('NIFTYIT: No Yahoo symbol mapping; NIFTYBANK: empty bars');
+  });
+
+  it('returns null when failed is empty or job fully FAILED', () => {
+    expect(
+      syncJobPartialFailureMessage({
+        status: 'SUCCEEDED',
+        result: { synced: 4, failed: [] },
+      }),
+    ).toBeNull();
+    expect(
+      syncJobPartialFailureMessage({
+        status: 'FAILED',
+        last_error: 'boom',
+        result: { failed: [{ index_code: 'X', reason: 'y' }] },
+      }),
+    ).toBeNull();
+  });
+
+  it('parses stringified result JSON', () => {
+    expect(
+      syncJobPartialFailureMessage({
+        status: 'SUCCEEDED',
+        result: JSON.stringify({
+          failed: [{ index_code: 'SENSEX', reason: 'provider timeout' }],
+        }),
+      }),
+    ).toBe('SENSEX: provider timeout');
   });
 });
 

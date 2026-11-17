@@ -1,6 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../api';
+import InfoTip from '../../../components/InfoTip';
 import SyncJobButton from '../../../components/SyncJobButton';
 import { formatStatementValue } from '../../../lib/format';
 
@@ -162,8 +163,6 @@ function LatestRatiosStrip({
         {asOf ? ` · as of ${asOf}` : ''}
         {` · ${method}`}
         {snapshot?.computed_on_read ? ' · computed on read' : ' · stored snapshot'}
-        . Standalone and consolidated are never mixed. Screener #top-ratios fallback applies to the
-        stored consolidated snapshot; standalone ratios are computed on read from annual statements.
       </p>
       <div className="table-wrap statement-table-wrap">
         <table className="stock-table statement-table">
@@ -216,13 +215,25 @@ export default function FundamentalsPanel({ symbol }: { symbol: string }) {
   return (
     <section className="panel">
       <div className="panel-heading">
-        <div>
-          <h2>Fundamentals</h2>
-          <p className="panel-subtitle">
-            Annual and quarterly statements are stored separately (up to 6 columns each). Quarterly matches
-            Screener Quarterly Results; annual matches yearly Profit &amp; loss, Balance sheet, and Cash
-            flow. Consolidated includes subsidiaries; standalone is the parent only — they are never mixed.
-          </p>
+        <div className="fundamentals-heading">
+          <div className="fundamentals-title-row">
+            <h2>Fundamentals</h2>
+            <InfoTip label="About fundamentals">
+              <p>
+                Annual and quarterly statements are stored separately (up to 6 columns each). Quarterly
+                matches Screener Quarterly Results; annual matches yearly Profit &amp; loss, Balance sheet,
+                and Cash flow.
+              </p>
+              <p>
+                Consolidated includes subsidiaries; standalone is the parent only — they are never mixed.
+              </p>
+              <p>
+                Screener #top-ratios fallback applies to the stored consolidated snapshot; standalone
+                ratios are computed on read from annual statements.
+              </p>
+            </InfoTip>
+          </div>
+          <p className="panel-subtitle">Statements, ratios, and reporting basis for this stock.</p>
         </div>
         <SyncJobButton
           symbol={symbol}

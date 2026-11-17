@@ -244,6 +244,17 @@ def _run(job_id, work):
 
         # work() completed successfully — persist is never part of the work retry loop.
         try:
+            if isinstance(result, dict):
+                partial = result.get("failed")
+                if isinstance(partial, list) and partial:
+                    logger.warning(
+                        "sync completed with failures job_id=%s entity_type=%s entity_key=%s sync_type=%s failed=%s",
+                        job_id,
+                        meta.get("entity_type"),
+                        meta.get("entity_key"),
+                        meta.get("sync_type"),
+                        partial,
+                    )
             logger.info("sync succeeded job_id=%s attempt=%s", job_id, attempt)
             _mark_succeeded(job_id, result)
             return

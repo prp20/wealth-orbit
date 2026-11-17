@@ -1,6 +1,7 @@
 """Incremental Yahoo sync for the index closes shown on Home."""
 from __future__ import annotations
 
+import logging
 import os
 from datetime import date, timedelta
 
@@ -10,6 +11,8 @@ from psycopg2.extras import execute_values
 
 from .index_history import quote_identifier, resolve_index_history_columns
 from .sources import ensure_data_source
+
+logger = logging.getLogger("wealth_orbit.index_sync")
 
 
 def rows_from_yahoo_frame(frame: pd.DataFrame) -> list[tuple]:
@@ -91,6 +94,30 @@ def sync_home_indexes(codes: list[str], history_period: str | None = None) -> di
                 ([code.upper() for code in cleaned],),
             )
             mapped = {str(code).upper(): (index_id, symbol) for index_id, code, symbol in cursor.fetchall()}
+            # Home sync assumes seed masters; ensure allowlisted Yahoo mappings when DB is empty.
+            missing = [code for code in cleaned if code.upper() not in mapped]
+            if missing:
+                from .instrument_registry import InstrumentResolveError, resolve_index, upsert_index
+
+                for code in missing:
+                    try:
+                        upsert_index(resolve_index(code))
+                    except InstrumentResolveError:
+                        continue
+                cursor.execute(
+                    """SELECT DISTINCT ON (upper(i.index_code))
+                              i.index_id, i.index_code, m.trading_symbol
+                       FROM market_data.index_provider_mappings m
+                       JOIN market_data.index_reference i ON i.index_id = m.index_id
+                       WHERE m.provider = 'yfinance' AND m.is_active = TRUE
+                         AND upper(i.index_code) = ANY(%s)
+                       ORDER BY upper(i.index_code)""",
+                    ([code.upper() for code in cleaned],),
+                )
+                mapped = {
+                    str(code).upper(): (index_id, symbol)
+                    for index_id, code, symbol in cursor.fetchall()
+                }
             date_column, _close = resolve_index_history_columns(cursor)
             cursor.execute(
                 """SELECT column_name FROM information_schema.columns
@@ -118,7 +145,9 @@ def sync_home_indexes(codes: list[str], history_period: str | None = None) -> di
             for code in cleaned:
                 found = mapped.get(code.upper())
                 if not found or not found[1]:
-                    failed.append({"index_code": code, "reason": "No Yahoo symbol is mapped"})
+                    reason = "No Yahoo symbol is mapped"
+                    failed.append({"index_code": code, "reason": reason})
+                    logger.warning("index sync failed index_code=%s reason=%s", code, reason)
                     continue
                 index_id, ticker = found
                 try:
@@ -147,10 +176,14 @@ def sync_home_indexes(codes: list[str], history_period: str | None = None) -> di
                         )
                     bars = rows_from_yahoo_frame(frame)
                 except Exception as exc:
-                    failed.append({"index_code": code, "reason": str(exc)})
+                    reason = str(exc)
+                    failed.append({"index_code": code, "reason": reason})
+                    logger.warning("index sync failed index_code=%s reason=%s", code, reason)
                     continue
                 if not bars:
-                    failed.append({"index_code": code, "reason": "Yahoo returned no closes"})
+                    reason = "Yahoo returned no closes"
+                    failed.append({"index_code": code, "reason": reason})
+                    logger.warning("index sync failed index_code=%s reason=%s", code, reason)
                     continue
                 if include_volume:
                     values = [(index_id, *bar, source_id) for bar in bars]
@@ -163,6 +196,14 @@ def sync_home_indexes(codes: list[str], history_period: str | None = None) -> di
                 synced.append({"index_code": code, "rows": len(values), "as_of": as_of.isoformat()})
         connection.commit()
 
+    if failed:
+        summary = "; ".join(f"{item['index_code']}: {item['reason']}" for item in failed)
+        logger.warning(
+            "index sync summary failed_count=%s synced_count=%s failed=%s",
+            len(failed),
+            len(synced),
+            summary,
+        )
     if not synced:
         reasons = "; ".join(f"{item['index_code']}: {item['reason']}" for item in failed) or "no indexes synced"
         raise RuntimeError(reasons)
