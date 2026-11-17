@@ -67,7 +67,7 @@ def test_stock_technical_indicators_view_surfaces_failed_sync_job():
     with (
         patch.object(reference_service, "_load_stored_technicals", return_value=(reference_service._empty_technicals(), None)),
         patch.object(reference_service, "_last_ohlc_date", return_value=date(2024, 6, 1)),
-        patch.object(stock_sync, "sync_technical_indicators", side_effect=RuntimeError("db read-only")),
+        patch.object(stock_sync, "sync_technical_indicators", MagicMock()) as sync_mock,
         patch.object(
             reference_service,
             "_latest_technical_sync_job_error",
@@ -76,7 +76,8 @@ def test_stock_technical_indicators_view_surfaces_failed_sync_job():
     ):
         payload = reference_service.stock_technical_indicators_view("HDFCBANK")
     assert payload["records"] == []
-    assert payload["sync_error"] == "db read-only"
+    assert payload["sync_error"] == "yahoo_empty_info"
+    sync_mock.assert_not_called()
 
 
 def test_sync_technical_indicators_persists_latest_day(monkeypatch):
@@ -158,6 +159,32 @@ def test_resolve_stored_returns_persisted_rows_without_recompute():
     with (
         patch.object(reference_service, "_load_stored_technicals", return_value=(stored, date(2024, 6, 1))),
         patch.object(reference_service, "_last_ohlc_date", return_value=date(2024, 6, 1)),
+        patch.object(stock_sync, "sync_technical_indicators", MagicMock()) as sync_mock,
+    ):
+        frame, err = reference_service._resolve_stored_technical_indicators("HDFCBANK")
+    assert err is None
+    assert len(frame) == 1
+    sync_mock.assert_not_called()
+
+
+def test_resolve_stored_skips_sync_when_stale_but_rows_exist():
+    stored = pd.DataFrame(
+        [
+            {
+                "date": date(2024, 5, 1),
+                "indicator_code": "RSI",
+                "indicator_period": 14,
+                "parameters": "{}",
+                "component": "",
+                "indicator_value": 55.0,
+                "calculation_status": "CURRENT",
+                "calculated_at": date(2024, 5, 1),
+            }
+        ]
+    )
+    with (
+        patch.object(reference_service, "_load_stored_technicals", return_value=(stored, date(2024, 5, 1))),
+        patch.object(reference_service, "_last_ohlc_date", return_value=date(2024, 6, 15)),
         patch.object(stock_sync, "sync_technical_indicators", MagicMock()) as sync_mock,
     ):
         frame, err = reference_service._resolve_stored_technical_indicators("HDFCBANK")

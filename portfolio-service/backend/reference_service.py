@@ -1610,13 +1610,6 @@ def _last_ohlc_date(symbol: str) -> date | None:
         return None
 
 
-def _opaque_technical_refresh_error(exc: BaseException) -> str:
-    text = str(exc).strip()
-    if not text or "://" in text:
-        return "technical_sync_failed"
-    return text[:120]
-
-
 def _latest_technical_sync_job_error(symbol: str) -> str | None:
     try:
         from backend_api.app.sync_queue import latest_job
@@ -1635,30 +1628,13 @@ def _latest_technical_sync_job_error(symbol: str) -> str | None:
 def _resolve_stored_technical_indicators(
     symbol: str, indicator: str = ""
 ) -> tuple[pd.DataFrame, str | None]:
-    """Load persisted latest-day technicals; attempt sync when stale; never compute ephemeral rows."""
+    """Load persisted latest-day technicals only; never sync, prune, or compute on read."""
     indicator = indicator.upper() if indicator else ""
-    stored, snap = _load_stored_technicals(symbol, indicator)
-    last_ohlc = _last_ohlc_date(symbol)
-    if not stored.empty and snap is not None and last_ohlc is not None and snap >= last_ohlc:
-        return stored.reset_index(drop=True), None
-
-    refresh_error: str | None = None
-    if last_ohlc is not None:
-        try:
-            from backend.market_data.sync import sync_technical_indicators
-
-            sync_technical_indicators(symbol)
-            stored, _snap = _load_stored_technicals(symbol, indicator)
-            if not stored.empty:
-                return stored.reset_index(drop=True), None
-        except Exception as exc:
-            refresh_error = _opaque_technical_refresh_error(exc)
-
     stored, _snap = _load_stored_technicals(symbol, indicator)
     if not stored.empty:
         return stored.reset_index(drop=True), None
-    if refresh_error:
-        return _empty_technicals(), refresh_error
+
+    last_ohlc = _last_ohlc_date(symbol)
     if last_ohlc is None:
         return _empty_technicals(), "sync_prices_before_technicals"
     job_error = _latest_technical_sync_job_error(symbol)
