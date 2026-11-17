@@ -136,29 +136,43 @@ def test_sync_stock_fundamentals_persists_both_bases_without_clobber(monkeypatch
         def commit(self):
             return None
 
+    annual_inserts = []
+    quarterly_inserts = []
+
     def fake_execute_values(cur, sql, argslist, template=None, page_size=100, fetch=False):
         normalized = " ".join(sql.split())
         if "INSERT INTO market_data.fundamental_metric_reference" in normalized:
             for row in argslist:
                 metric_ids[row[1]] = row[0]
             return None
-        if (
-            "INSERT INTO market_data.stock_annual_fundamental_values" in normalized
-            or "INSERT INTO market_data.stock_quarterly_fundamental_values" in normalized
-        ):
-            inserts.extend(argslist)
+        if "INSERT INTO market_data.stock_annual_fundamental_values" in normalized:
+            annual_inserts.extend(argslist)
             value_sql.append(normalized)
+            inserts.extend(argslist)
+            return None
+        if "INSERT INTO market_data.stock_quarterly_fundamental_values" in normalized:
+            quarterly_inserts.extend(argslist)
+            value_sql.append(normalized)
+            inserts.extend(argslist)
             return None
         return None
 
     html_by_basis = {
         "CONSOLIDATED": """
+            <section id="quarters"><table class="data-table">
+              <thead><tr><th>Particulars</th><th>Sep 2023</th><th>Mar 2024</th></tr></thead>
+              <tbody><tr><td>Sales +</td><td>900</td><td>1,000</td></tr></tbody>
+            </table></section>
             <section id="cash-flow"><table class="data-table">
               <thead><tr><th>Particulars</th><th>Mar 2024</th></tr></thead>
               <tbody><tr><td>Cash from Operating Activity</td><td>40</td></tr></tbody>
             </table></section>
             """,
         "STANDALONE": """
+            <section id="quarters"><table class="data-table">
+              <thead><tr><th>Particulars</th><th>Sep 2023</th></tr></thead>
+              <tbody><tr><td>Sales +</td><td>850</td></tr></tbody>
+            </table></section>
             <section id="cash-flow"><table class="data-table">
               <thead><tr><th>Particulars</th><th>Mar 2024</th></tr></thead>
               <tbody><tr><td>Cash from Operating Activity</td><td>35</td></tr></tbody>
@@ -181,14 +195,14 @@ def test_sync_stock_fundamentals_persists_both_bases_without_clobber(monkeypatch
 
     result = reference_service.sync_stock_fundamentals("HDFCBANK")
     assert result["status"] == "completed"
-    assert result["fundamental_rows_consolidated"] == 1
-    assert result["fundamental_rows_standalone"] == 1
+    assert result["fundamental_rows_consolidated"] == 3  # 2 quarterly PL + 1 CF
+    assert result["fundamental_rows_standalone"] == 2  # 1 quarterly PL + 1 CF
     assert result["basis_warnings"] == []
     # row: stock_id, metric_id, period_start, period_end, reporting_basis, value, source_id
-    bases = {row[4] for row in inserts}
-    values = {row[4]: row[5] for row in inserts}
-    assert bases == {"CONSOLIDATED", "STANDALONE"}
-    assert values["CONSOLIDATED"] == 40.0
-    assert values["STANDALONE"] == 35.0
-    assert all("stock_annual_fundamental_values" in sql for sql in value_sql)
+    annual_by_basis = {row[4]: row[5] for row in annual_inserts}
+    assert annual_by_basis["CONSOLIDATED"] == 40.0
+    assert annual_by_basis["STANDALONE"] == 35.0
+    assert any("stock_annual_fundamental_values" in sql for sql in value_sql)
+    assert any("stock_quarterly_fundamental_values" in sql for sql in value_sql)
+    assert len(quarterly_inserts) == 3  # consol Sep+Mar, standalone Sep
     assert all("ON CONFLICT" in sql for sql in value_sql)

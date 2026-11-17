@@ -55,6 +55,32 @@ def test_top_ratios_fallback_fills_gaps_only():
     assert merged["DEBT_TO_EQUITY"] == 0.8
 
 
+def test_profit_var_does_not_fill_pat_margin():
+    computed = {"PAT_MARGIN": None, "OPERATING_MARGIN": None}
+    merged = merge_top_ratios_fallback(
+        computed,
+        {"Profit Var": "18%", "NPM": "12%", "OPM": "22%"},
+    )
+    assert merged["PAT_MARGIN"] == 12.0  # NPM only
+    assert merged["OPERATING_MARGIN"] == 22.0
+    # Profit Var must never map into PAT_MARGIN when NPM is absent.
+    without_npm = merge_top_ratios_fallback(
+        {"PAT_MARGIN": None},
+        {"Profit Var": "18%"},
+    )
+    assert without_npm["PAT_MARGIN"] is None
+
+
+def test_roce_requires_equity_not_borrowings_alone():
+    ratios = calc_v1_from_period(
+        {
+            "OPERATING_PROFIT": 30.0,
+            "BORROWINGS": 100.0,
+        }
+    )
+    assert ratios["ROCE"] is None
+
+
 def test_period_growth_null_safe():
     assert period_growth(None, 10) is None
     assert period_growth(10, 0) is None
@@ -95,6 +121,7 @@ def test_build_latest_snapshot_prefers_computed():
 class _SnapshotCursor:
     def __init__(self):
         self.latest = None
+        self.bag = None
         self.writes = []
         self.deletes = []
         self._phase = 0
@@ -107,6 +134,7 @@ class _SnapshotCursor:
         if "INSERT INTO market_data.stock_daily_metrics" in text:
             self.writes.append(params)
             self.latest = params[1]
+            self.bag = params[2].adapted
             return
         if "DELETE FROM market_data.stock_daily_metrics" in text:
             self.deletes.append(params)
@@ -115,7 +143,9 @@ class _SnapshotCursor:
     def fetchone(self):
         if self._phase == 1:
             self._phase = 0
-            return (self.latest,) if self.latest else None
+            if self.latest is None:
+                return None
+            return (self.latest, self.bag)
         return None
 
 
@@ -142,3 +172,34 @@ def test_upsert_latest_fundamental_ratios_is_idempotent_one_row():
     assert isinstance(raw["ratios"], dict)
     assert "history" not in raw
     json.dumps(raw)  # must be JSON-serializable
+
+
+def test_upsert_skips_empty_snapshot_and_preserves_prior_bag():
+    cur = _SnapshotCursor()
+    stock_id = "11111111-1111-1111-1111-111111111111"
+    good = {
+        "as_of": "2024-03-31",
+        "reporting_basis": "CONSOLIDATED",
+        "reporting_period": "ANNUAL",
+        "calculation_method": CALC_VERSION,
+        "ratios": {"ROE": 40.0},
+        "methods": {"ROE": CALC_VERSION},
+    }
+    assert upsert_latest_fundamental_ratios(cur, stock_id, good, "src") == "2024-03-31"
+    writes_before = len(cur.writes)
+    empty = {
+        "as_of": None,
+        "reporting_basis": "CONSOLIDATED",
+        "reporting_period": "ANNUAL",
+        "calculation_method": CALC_VERSION,
+        "ratios": {"ROE": None, "PAT_MARGIN": None},
+        "methods": {},
+    }
+    assert upsert_latest_fundamental_ratios(cur, stock_id, empty, "src") is None
+    assert len(cur.writes) == writes_before
+    # Empty ratios with as_of still must not wipe a prior non-empty bag.
+    empty_with_as_of = dict(empty)
+    empty_with_as_of["as_of"] = "2024-03-31"
+    assert upsert_latest_fundamental_ratios(cur, stock_id, empty_with_as_of, "src") == "2024-03-31"
+    assert len(cur.writes) == writes_before
+    assert cur.bag["ratios"]["ROE"] == 40.0

@@ -28,7 +28,7 @@ TOP_RATIOS_FALLBACK = {
     "ROA": "ROA",
     "NPM": "PAT_MARGIN",
     "OPM": "OPERATING_MARGIN",
-    "Profit Var": "PAT_MARGIN",
+    # Profit Var is variance %, not PAT margin — never map it to PAT_MARGIN.
 }
 
 RATIO_DEFINITIONS = {
@@ -85,9 +85,10 @@ def calc_v1_from_period(
     borrowings = period.get("BORROWINGS")
     total_assets = period.get("TOTAL_ASSETS")
     equity = _equity(period)
+    # Require equity before ROCE; do not treat missing equity as 0 when only borrowings exist.
     capital_employed = None
-    if equity is not None or borrowings is not None:
-        capital_employed = (equity or 0.0) + (_as_float(borrowings) or 0.0)
+    if equity is not None:
+        capital_employed = equity + (_as_float(borrowings) or 0.0)
 
     operating_margin = period.get("OPERATING_MARGIN")
     if operating_margin is None:
@@ -218,20 +219,33 @@ def growth_series(
     return out
 
 
-def upsert_latest_fundamental_ratios(cur, stock_id, snapshot: dict[str, Any], source_id) -> str:
+def _snapshot_has_ratios(snapshot: dict[str, Any]) -> bool:
+    ratios = snapshot.get("ratios") or {}
+    return any(value is not None and value != "" for value in ratios.values())
+
+
+def upsert_latest_fundamental_ratios(cur, stock_id, snapshot: dict[str, Any], source_id) -> str | None:
     """Persist one latest fundamental_ratios bag; delete older daily_metrics rows.
 
     Prefers the existing newest ``metric_date`` so Yahoo valuation columns stay on
     the same latest row. Falls back to statement ``as_of`` (or today) when no row exists.
+
+    Skips write when the snapshot has no ``as_of`` and no non-null ratios, so a thin
+    sync cannot wipe a prior non-empty bag.
     """
     import json
     from datetime import date as date_cls
 
     from psycopg2.extras import Json
 
+    as_of = snapshot.get("as_of")
+    has_ratios = _snapshot_has_ratios(snapshot)
+    if not as_of and not has_ratios:
+        return None
+
     cur.execute(
         """
-        SELECT metric_date
+        SELECT metric_date, fundamental_ratios
         FROM market_data.stock_daily_metrics
         WHERE stock_id=%s
         ORDER BY metric_date DESC
@@ -240,13 +254,21 @@ def upsert_latest_fundamental_ratios(cur, stock_id, snapshot: dict[str, Any], so
         (stock_id,),
     )
     row = cur.fetchone()
-    as_of = snapshot.get("as_of")
     if row:
         metric_date = row[0]
+        prior_bag = row[1] if len(row) > 1 else None
     elif as_of:
         metric_date = as_of
+        prior_bag = None
     else:
         metric_date = date_cls.today()
+        prior_bag = None
+
+    # Never replace a stored non-empty bag with an empty ratio map.
+    if not has_ratios and isinstance(prior_bag, dict):
+        prior_ratios = prior_bag.get("ratios") or {}
+        if any(value is not None and value != "" for value in prior_ratios.values()):
+            return str(metric_date)
 
     payload = {
         "as_of": snapshot.get("as_of"),

@@ -149,15 +149,21 @@ function LatestRatiosStrip({
   const asOf = snapshot?.as_of ? String(snapshot.as_of).slice(0, 10) : null;
   const basis = snapshot?.reporting_basis ? String(snapshot.reporting_basis) : null;
   const method = snapshot?.calculation_method ? String(snapshot.calculation_method) : 'calc_v1';
+  const periodLabel =
+    String(snapshot?.reporting_period || 'ANNUAL').toUpperCase() === 'QUARTERLY'
+      ? 'Quarterly latest'
+      : 'Annual latest';
   return (
     <div className="fundamentals-group">
       <h3>Latest ratios</h3>
       <p className="panel-subtitle">
-        {basis ? `${basis === 'STANDALONE' ? 'Standalone' : 'Consolidated'}` : 'Basis'}
+        {periodLabel}
+        {basis ? ` · ${basis === 'STANDALONE' ? 'Standalone' : 'Consolidated'}` : ''}
         {asOf ? ` · as of ${asOf}` : ''}
         {` · ${method}`}
         {snapshot?.computed_on_read ? ' · computed on read' : ' · stored snapshot'}
-        . Standalone and consolidated are never mixed.
+        . Standalone and consolidated are never mixed. Screener #top-ratios fallback applies to the
+        stored consolidated snapshot; standalone ratios are computed on read from annual statements.
       </p>
       <div className="table-wrap statement-table-wrap">
         <table className="stock-table statement-table">

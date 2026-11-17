@@ -120,13 +120,16 @@ def _enqueue_mf_sync(
     return {**job, "duplicate": not created}
 
 @router.get("/sync/queue")
-def sync_queue(include_history: bool = Query(False), limit: int = Query(25, ge=1, le=100)):
+def sync_queue(
+    include_history: bool = Query(False),
+    limit: int = Query(25, ge=1, le=100),
+    _user=Depends(current_user),
+):
     # Read-only: does not run stale recovery (that happens on enqueue).
-    # Auth/rate-limit for sync enqueue remains a post-1.4 hardening item.
     return {"jobs": list_jobs(include_history, limit)}
 
 @router.get("/sync/jobs/{job_id}")
-def sync_job(job_id: str):
+def sync_job(job_id: str, _user=Depends(current_user)):
     job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Sync job not found")
@@ -140,6 +143,7 @@ def sync_stock(
     from_date: date | None = None,
     to_date: date | None = None,
     history_period: str | None = Query(None),
+    _user=Depends(current_user),
 ):
     """Return a sync request acknowledgement; ingestion workers can consume this request."""
     kind = kind.lower()
@@ -161,7 +165,12 @@ def sync_stock(
     return {**job, "duplicate": not created}
 
 @router.get("/stocks/{symbol}/sync/status")
-def sync_stock_status(symbol: str, kind: str = Query("fundamentals"), force: bool = Query(False)):
+def sync_stock_status(
+    symbol: str,
+    kind: str = Query("fundamentals"),
+    force: bool = Query(False),
+    _user=Depends(current_user),
+):
     kind = kind.lower()
     if kind not in {"prices", "technical", "fundamentals", "daily_metrics", "shareholding"}:
         raise HTTPException(status_code=422, detail="invalid sync kind")
