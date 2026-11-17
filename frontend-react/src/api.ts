@@ -398,6 +398,8 @@ export const api = {
   },
   sectors: () => get<string[]>('/market-data/sectors'),
   filters: (kind: string) => get<string[]>(`/market-data/filters/${kind}`),
+  glossaryChat: (message: string) => postJson<GlossaryChatResult>('/glossary/chat', { message }),
+  glossaryTerms: () => get<GlossaryTermListItem[]>('/glossary/terms'),
 };
 
 export type InstrumentPreview = {
@@ -419,4 +421,29 @@ export type TrackInstrumentResult = {
   master: Record<string, unknown>;
   jobs: { job_id?: string; kind?: string; duplicate?: boolean }[];
   preview?: InstrumentPreview;
+};
+
+export type GlossarySource = {
+  module: number;
+  chapter: string;
+  url: string;
+};
+
+export type GlossaryChatResult =
+  | {
+      kind: 'match';
+      term: string;
+      definition: string;
+      sources: GlossarySource[];
+    }
+  | {
+      kind: 'refusal';
+      refusal_reason: string;
+      refusal_category: 'advice' | 'dump';
+    }
+  | { kind: 'unknown' };
+
+export type GlossaryTermListItem = {
+  term: string;
+  aliases: string[];
 };
