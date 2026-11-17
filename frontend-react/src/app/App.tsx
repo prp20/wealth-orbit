@@ -11,6 +11,7 @@ import FundDetailPage from '../pages/funds/FundDetailPage';
 import FundScreenerPage from '../pages/funds/FundScreenerPage';
 import FundComparePage from '../pages/funds/FundComparePage';
 import DashboardPage from '../pages/DashboardPage';
+import IndexesPage from '../pages/IndexesPage';
 import PortfolioPage from '../pages/PortfolioPage';
 import { clearRecent } from '../lib/recent';
 
@@ -99,16 +100,17 @@ function Shell() {
   return (
     <div className="shell">
       <aside>
-        <div className="brand">
+        <Link to="/" className="brand" aria-label="Wealth Orbit home">
           wealth<span>orbit</span>
           <small>Investment workspace</small>
-        </div>
+        </Link>
         <nav>
           <NavLink to="/" end>Home</NavLink>
           {signedIn && <NavLink to="/portfolio">Portfolio</NavLink>}
           {signedIn && <NavLink to="/transactions">Transactions</NavLink>}
           <NavLink to="/mutualfunds">Mutual funds</NavLink>
           <NavLink to="/stocks">Stocks</NavLink>
+          <NavLink to="/indexes">Indexes</NavLink>
         </nav>
         <div className="account-footer">
           {signedIn ? (
@@ -139,6 +141,7 @@ function Shell() {
           <Route path="/stocks" element={<StockListPage />} />
           <Route path="/stocks/screen" element={<StockScreenerPage />} />
           <Route path="/stocks/:symbol" element={<StockDetailPage />} />
+          <Route path="/indexes" element={<IndexesPage />} />
           <Route path="*" element={<Navigate replace to="/portfolio" />} />
         </Routes>
       </main>

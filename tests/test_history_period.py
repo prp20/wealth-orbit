@@ -65,6 +65,15 @@ def test_track_and_sync_routes_accept_history_period():
     )
     assert "DEFAULT_YEARS = 10" in trim
     assert "prune_fundamental_periods" in trim
+    assert "6 annual / 6 quarterly" in trim
+    assert "5 annual" not in trim
+
+
+def test_trim_market_history_script_compiles():
+    import ast
+
+    path = ROOT / "portfolio-service" / "scripts" / "seed" / "trim_market_history.py"
+    ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
 
 def test_ui_labels_history_depth_and_empty_cta_are_wired():

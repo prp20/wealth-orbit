@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 export default function PageHeader({
   title,
@@ -14,7 +15,13 @@ export default function PageHeader({
   return (
     <header className="page-header">
       <div>
-        {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
+        {eyebrow ? (
+          <p className="eyebrow">
+            <Link to="/" className="eyebrow-link">
+              {eyebrow}
+            </Link>
+          </p>
+        ) : null}
         <h1>{title}</h1>
         {subtitle ? <p className="subtitle">{subtitle}</p> : null}
       </div>

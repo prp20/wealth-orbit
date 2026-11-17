@@ -3,107 +3,26 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api';
 import AddInstrumentDialog from '../components/AddInstrumentDialog';
+import IndexStrip, { newestDate } from '../components/IndexStrip';
 import PageHeader from '../components/PageHeader';
 import RecentSyncJobs from '../components/RecentSyncJobs';
 import SyncJobButton from '../components/SyncJobButton';
 import { formatDisplayDate, formatInr, formatRatio } from '../lib/format';
+import {
+  HOME_INDEXES,
+  SECTOR_INDEXES,
+  readExtraIndexes,
+  rememberExtraIndex,
+} from '../lib/homeIndexes';
 import { formatRecentWhen, readRecent } from '../lib/recent';
-
-const HOME_INDEXES = ['NIFTY50', 'SENSEX', 'NIFTYBANK', 'NIFTYIT'];
-const SECTOR_INDEXES = ['NIFTYPHARMA', 'NIFTYAUTO', 'NIFTYFMCG', 'NIFTYMETAL'];
-const EXTRA_INDEXES_KEY = 'wealth-orbit:extra-home-indexes';
-/** Keep Home + extras under the benchmarks API 12-code cap (4 sector codes are separate). */
-const MAX_HOME_EXTRA_INDEXES = 8;
-const INDEX_CODE_RE = /^[A-Z][A-Z0-9_]{1,31}$/;
-
-function readExtraIndexes(): string[] {
-  try {
-    const raw = window.localStorage.getItem(EXTRA_INDEXES_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((item) => String(item || '').toUpperCase().replace(/[\s-]/g, ''))
-      .filter((code) => INDEX_CODE_RE.test(code))
-      .filter((code) => !HOME_INDEXES.includes(code))
-      .slice(0, MAX_HOME_EXTRA_INDEXES);
-  } catch {
-    return [];
-  }
-}
-
-function rememberExtraIndex(code: string) {
-  const normalized = String(code || '')
-    .toUpperCase()
-    .replace(/[\s-]/g, '');
-  if (!INDEX_CODE_RE.test(normalized) || HOME_INDEXES.includes(normalized)) {
-    return readExtraIndexes();
-  }
-  const next = Array.from(new Set([...readExtraIndexes(), normalized])).slice(0, MAX_HOME_EXTRA_INDEXES);
-  window.localStorage.setItem(EXTRA_INDEXES_KEY, JSON.stringify(next));
-  return next;
-}
-
-const INDEX_LABELS: Record<string, string> = {
-  NIFTY50: 'Nifty 50',
-  SENSEX: 'Sensex',
-  NIFTYBANK: 'Nifty Bank',
-  NIFTYIT: 'Nifty IT',
-  NIFTYPHARMA: 'Nifty Pharma',
-  NIFTYAUTO: 'Nifty Auto',
-  NIFTYFMCG: 'Nifty FMCG',
-  NIFTYMETAL: 'Nifty Metal',
-};
 
 const SLEEVE_LABELS: Record<string, string> = {
   MUTUAL_FUND: 'Mutual funds',
   STOCK: 'Stocks',
 };
 
-function formatChange(value: unknown) {
-  if (value == null || value === '') return '—';
-  const amount = Number(value);
-  if (Number.isNaN(amount)) return '—';
-  const text = formatRatio(Math.abs(amount));
-  if (amount > 0) return `+${text}%`;
-  if (amount < 0) return `-${text}%`;
-  return `${text}%`;
-}
-
 function sleeveLabel(assetType: string) {
   return SLEEVE_LABELS[assetType] || assetType.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function indexLabel(row: { index_code?: string; index_name?: string }) {
-  const code = String(row.index_code || '').toUpperCase();
-  return INDEX_LABELS[code] || row.index_name || row.index_code || 'Index';
-}
-
-function newestDate(rows: any[]) {
-  const dates = rows.map((row) => String(row.as_of || '')).filter(Boolean).sort();
-  return dates[dates.length - 1];
-}
-
-function IndexStrip({ rows }: { rows: any[] }) {
-  const newest = formatDisplayDate(newestDate(rows));
-  return (
-    <div className="index-strip">
-      {rows.map((row) => {
-        const asOf = formatDisplayDate(row.as_of);
-        const change = Number(row.change_pct);
-        const down = row.change_pct != null && !Number.isNaN(change) && change < 0;
-        return (
-          <article className="index-tile" key={row.index_code}>
-            <small>{indexLabel(row)}</small>
-            <strong>{formatRatio(row.close)}</strong>
-            <span className={down ? 'change-down' : undefined}>
-              {formatChange(row.change_pct)} vs previous close
-            </span>
-            {asOf !== newest && <em>As of {asOf}</em>}
-          </article>
-        );
-      })}
-    </div>
-  );
 }
 
 export default function DashboardPage() {
@@ -127,6 +46,12 @@ export default function DashboardPage() {
   const sectors = useQuery({
     queryKey: ['benchmark-summary', SECTOR_INDEXES.join(',')],
     queryFn: () => api.benchmarkSummary(SECTOR_INDEXES),
+  });
+  const usdInr = useQuery({
+    queryKey: ['fx', 'usd-inr'],
+    queryFn: api.usdInrRate,
+    staleTime: 15 * 60 * 1000,
+    retry: 1,
   });
   const portfolios = useQuery({ queryKey: ['portfolios'], queryFn: api.portfolios, enabled: signedIn });
   const portfolioRows = portfolios.data || [];
@@ -171,7 +96,8 @@ export default function DashboardPage() {
           <div>
             <h2>Market</h2>
             <p className="panel-subtitle">
-              {rows.length ? `Delayed · as of ${formatDisplayDate(newest)} · index history` : 'Delayed · index history'}
+              {rows.length ? `Delayed · as of ${formatDisplayDate(newest)}` : 'Delayed quotes'}
+              {usdInr.isError && !usdInr.isLoading ? ' · USD/INR unavailable' : ''}
             </p>
           </div>
           <div className="panel-sync">
@@ -202,8 +128,23 @@ export default function DashboardPage() {
         />
         {market.isLoading && <div className="home-note">Loading market…</div>}
         {market.error && <div className="home-note">Market data could not be loaded.</div>}
-        {!market.isLoading && !market.error && !rows.length && <div className="home-note">No index history yet.</div>}
-        {rows.length > 0 && <IndexStrip rows={rows} />}
+        {!market.isLoading && !market.error && !rows.length && !usdInr.data && (
+          <div className="home-note">No index history yet.</div>
+        )}
+        {(rows.length > 0 || usdInr.data?.rate != null || usdInr.isLoading) && (
+          <IndexStrip
+            rows={rows}
+            lead={
+              usdInr.data?.rate != null || usdInr.isLoading ? (
+                <article className="index-tile fx-tile" aria-live="polite">
+                  <small>USD / INR</small>
+                  <strong>{usdInr.isLoading ? '…' : formatInr(usdInr.data?.rate)}</strong>
+                  <span>1 US dollar</span>
+                </article>
+              ) : null
+            }
+          />
+        )}
       </section>
 
       {sectorRows.length > 0 && (

@@ -48,6 +48,10 @@ class TrackIndexBody(BaseModel):
     yf_symbol: str | None = Field(default=None, max_length=32)
 
 
+class PatchIndexBody(BaseModel):
+    yf_symbol: str = Field(min_length=1, max_length=32)
+
+
 def _instrument_http_error(exc: Exception) -> HTTPException:
     from backend.market_data.instrument_registry import InstrumentResolveError
 
@@ -120,13 +124,16 @@ def _enqueue_mf_sync(
     return {**job, "duplicate": not created}
 
 @router.get("/sync/queue")
-def sync_queue(include_history: bool = Query(False), limit: int = Query(25, ge=1, le=100)):
+def sync_queue(
+    include_history: bool = Query(False),
+    limit: int = Query(25, ge=1, le=100),
+    _user=Depends(current_user),
+):
     # Read-only: does not run stale recovery (that happens on enqueue).
-    # Auth/rate-limit for sync enqueue remains a post-1.4 hardening item.
     return {"jobs": list_jobs(include_history, limit)}
 
 @router.get("/sync/jobs/{job_id}")
-def sync_job(job_id: str):
+def sync_job(job_id: str, _user=Depends(current_user)):
     job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Sync job not found")
@@ -140,6 +147,7 @@ def sync_stock(
     from_date: date | None = None,
     to_date: date | None = None,
     history_period: str | None = Query(None),
+    _user=Depends(current_user),
 ):
     """Return a sync request acknowledgement; ingestion workers can consume this request."""
     kind = kind.lower()
@@ -161,7 +169,12 @@ def sync_stock(
     return {**job, "duplicate": not created}
 
 @router.get("/stocks/{symbol}/sync/status")
-def sync_stock_status(symbol: str, kind: str = Query("fundamentals"), force: bool = Query(False)):
+def sync_stock_status(
+    symbol: str,
+    kind: str = Query("fundamentals"),
+    force: bool = Query(False),
+    _user=Depends(current_user),
+):
     kind = kind.lower()
     if kind not in {"prices", "technical", "fundamentals", "daily_metrics", "shareholding"}:
         raise HTTPException(status_code=422, detail="invalid sync kind")
@@ -375,19 +388,31 @@ def mutual_fund_compare_route(
         raise HTTPException(status_code=422, detail="no matching mutual funds for scheme_codes")
     return rows
 
+@router.get("/fx/usd-inr")
+def usd_inr_fx_route():
+    from backend.market_data.fx_rates import usd_inr_rate
+
+    try:
+        return usd_inr_rate()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc) or "Could not load USD/INR rate") from None
+
+
 @router.get("/benchmarks")
 def benchmark_list_route():
     return benchmark_list()
 
 def _benchmark_codes(codes: str) -> list[str]:
     parts = [part.strip() for part in codes.split(",") if part.strip()]
-    if len(parts) > 12:
-        raise HTTPException(status_code=422, detail="at most 12 index codes")
+    if len(parts) > 32:
+        raise HTTPException(status_code=422, detail="at most 32 index codes")
     return parts
 
 @router.get("/benchmarks/summary")
 def benchmark_summary_route(codes: str = Query("")):
-    return benchmark_snapshot(_benchmark_codes(codes))
+    parts = _benchmark_codes(codes)
+    # No codes → every index in index_reference (Indexes page).
+    return benchmark_snapshot(parts or None)
 
 # The job table only allows STOCK and MUTUAL_FUND. Home indexes share one job row.
 HOME_INDEX_ENTITY = "HOME-INDEXES"
@@ -395,6 +420,8 @@ HOME_INDEX_ENTITY = "HOME-INDEXES"
 @router.post("/benchmarks/sync")
 def benchmark_sync_route(codes: str = Query(""), history_period: str | None = Query(None)):
     parts = _benchmark_codes(codes)
+    if not parts:
+        parts = [str(row.get("index_code") or "").strip() for row in benchmark_list() if row.get("index_code")]
     if not parts:
         raise HTTPException(status_code=422, detail="at least one index code is required")
     period = _parse_history_period(history_period, default=None) if history_period else None
@@ -565,6 +592,49 @@ def track_index_instrument(
             }
         )
     return {**result, "jobs": jobs, "history_period": period}
+
+
+@router.patch("/instruments/indexes/{index_code}")
+def patch_index_instrument(
+    index_code: str,
+    body: PatchIndexBody,
+    enqueue_history: bool = Query(True),
+    history_period: str = Query("10y"),
+    _user=Depends(current_user),
+):
+    from backend.market_data.instrument_registry import InstrumentResolveError, update_index_yf_symbol
+
+    period = _parse_history_period(history_period, default="10y")
+    try:
+        master = update_index_yf_symbol(index_code, body.yf_symbol)
+    except InstrumentResolveError as exc:
+        raise _instrument_http_error(exc) from None
+    jobs = []
+    if enqueue_history:
+        code = master["index_code"]
+        job, created = enqueue(
+            "STOCK",
+            code,
+            "PRICES",
+            False,
+            lambda: sync_home_indexes([code], history_period=period),
+        )
+        jobs.append(
+            {
+                "job_id": job.get("job_id"),
+                "kind": "index_history",
+                "entity_key": code,
+                "history_period": period,
+                "duplicate": not created,
+            }
+        )
+    return {
+        "status": "updated",
+        "already_tracked": True,
+        "master": master,
+        "jobs": jobs,
+        "history_period": period,
+    }
 
 
 @router.get("/stocks")

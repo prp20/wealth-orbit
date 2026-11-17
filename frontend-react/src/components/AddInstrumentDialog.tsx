@@ -126,6 +126,7 @@ export default function AddInstrumentDialog({
       onTracked?.(result, kind);
       await queryClient.invalidateQueries({ queryKey: ['stocks'] });
       await queryClient.invalidateQueries({ queryKey: ['funds'] });
+      await queryClient.invalidateQueries({ queryKey: ['benchmarks'] });
       await queryClient.invalidateQueries({ queryKey: ['benchmark-summary'] });
 
       if (kind === 'stock') {

@@ -88,3 +88,38 @@ def test_snapshot_omits_codes_with_no_rows(monkeypatch):
     rows = benchmark_snapshot(["MISSING", "NIFTY50"])
 
     assert [row["index_code"] for row in rows] == ["NIFTY50"]
+
+
+def test_snapshot_all_indexes_includes_placeholders(monkeypatch):
+    monkeypatch.setattr(
+        reference_service,
+        "benchmark_list",
+        lambda: [
+            {"index_code": "NIFTY50", "index_name": "Nifty 50", "yf_symbol": "^NSEI"},
+            {"index_code": "NIFTY500", "index_name": "Nifty 500", "yf_symbol": "^CRSLDX"},
+        ],
+    )
+    monkeypatch.setattr(
+        reference_service,
+        "_index_history_query",
+        lambda *_args, **_kwargs: _frame(
+            [
+                {
+                    "index_code": "NIFTY50",
+                    "index_name": "Nifty 50",
+                    "close": 110.0,
+                    "previous_close": 100.0,
+                    "as_of": "2026-11-05",
+                }
+            ]
+        ),
+    )
+
+    rows = benchmark_snapshot(None)
+
+    assert [row["index_code"] for row in rows] == ["NIFTY50", "NIFTY500"]
+    assert rows[0]["change_pct"] == 10.0
+    assert rows[0]["yf_symbol"] == "^NSEI"
+    assert rows[1]["close"] is None
+    assert rows[1]["index_name"] == "Nifty 500"
+    assert rows[1]["yf_symbol"] == "^CRSLDX"

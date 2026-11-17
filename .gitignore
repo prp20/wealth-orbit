@@ -31,3 +31,4 @@ frontend-react/dist/*
 
 # Zerodha Varsity PDFs — local research copies only (do not push)
 docs/varsity_docs/*.pdf
+.worktrees/

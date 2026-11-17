@@ -36,6 +36,13 @@ INDIA_INDEX_YF: dict[str, str] = {
     "NIFTYMETAL": "^CNXMETAL",
 }
 
+# Yahoo-style / shorthand codes → canonical index_reference codes.
+INDEX_CODE_ALIASES: dict[str, str] = {
+    "NIFTYSMLCAP250": "NIFTYSMALLCAP250",
+    "NIFTYSMALLCAP": "NIFTYSMALLCAP250",
+    "NIFTYMIDCAP": "NIFTYMIDCAP150",
+}
+
 _SYMBOL_RE = re.compile(r"^[A-Z0-9][A-Z0-9.&-]{0,31}$")
 _SCHEME_RE = re.compile(r"^\d{1,12}$")
 _INDEX_CODE_RE = re.compile(r"^[A-Z][A-Z0-9_]{1,31}$")
@@ -77,7 +84,7 @@ def normalize_index_code(raw: str) -> str:
     code = (raw or "").strip().upper().replace(" ", "").replace("-", "")
     if not code or not _INDEX_CODE_RE.match(code):
         raise InstrumentResolveError("invalid_index_code", "Enter a valid index code")
-    return code
+    return INDEX_CODE_ALIASES.get(code, code)
 
 
 def normalize_yf_symbol(raw: str | None) -> str | None:
@@ -223,6 +230,12 @@ def resolve_index(index_code: str, yf_symbol: str | None = None) -> dict:
     code = normalize_index_code(index_code)
     explicit = normalize_yf_symbol(yf_symbol)
     allowlist = _load_seed_index_map()
+    # If the Yahoo ticker already belongs to a known India index, prefer that code.
+    if explicit:
+        for known_code, known_yahoo in allowlist.items():
+            if str(known_yahoo).upper() == explicit.upper():
+                code = known_code
+                break
     mapped = allowlist.get(code)
     approved_yahoo = {value.upper() for value in allowlist.values()}
     if explicit:
@@ -475,15 +488,18 @@ def upsert_index(resolved: dict) -> tuple[dict, bool]:
                 created = True
             # Refuse stealing a Yahoo symbol already mapped to a different index.
             cur.execute(
-                """SELECT index_id, is_active FROM market_data.index_provider_mappings
-                   WHERE provider='yfinance' AND trading_symbol=%s""",
+                """SELECT m.index_id, m.is_active, i.index_code
+                   FROM market_data.index_provider_mappings m
+                   JOIN market_data.index_reference i ON i.index_id = m.index_id
+                   WHERE m.provider='yfinance' AND m.trading_symbol=%s""",
                 (yf_symbol,),
             )
             existing_map = cur.fetchone()
             if existing_map and existing_map[0] != index_id:
+                owner = existing_map[2] or "another index"
                 raise InstrumentResolveError(
                     "yf_symbol_in_use",
-                    "That Yahoo symbol is already mapped to another index",
+                    f"That Yahoo symbol is already mapped to {owner}",
                 )
 
             # Keep a single active yfinance mapping per index on re-add.
@@ -555,9 +571,119 @@ def ensure_fund(scheme_code: str) -> dict:
     }
 
 
+def find_index_by_yf_symbol(yf_symbol: str) -> dict | None:
+    """Return the index master already mapped to this Yahoo ticker, if any."""
+    symbol = normalize_yf_symbol(yf_symbol)
+    if not symbol:
+        return None
+    with _connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT i.index_id, i.index_code, i.index_name, m.trading_symbol
+                   FROM market_data.index_provider_mappings m
+                   JOIN market_data.index_reference i ON i.index_id = m.index_id
+                   WHERE m.provider='yfinance' AND upper(m.trading_symbol)=upper(%s)
+                   ORDER BY m.is_active DESC
+                   LIMIT 1""",
+                (symbol,),
+            )
+            row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        "index_id": str(row[0]),
+        "index_code": row[1],
+        "index_name": row[2],
+        "yf_symbol": row[3],
+    }
+
+
+def update_index_yf_symbol(index_code: str, yf_symbol: str) -> dict:
+    """Change the active Yahoo mapping for an existing index master."""
+    code = normalize_index_code(index_code)
+    yahoo = normalize_yf_symbol(yf_symbol)
+    if not yahoo:
+        raise InstrumentResolveError("yf_symbol_required", "Provide a Yahoo Finance symbol")
+    allowlist = _load_seed_index_map()
+    approved_yahoo = {value.upper() for value in allowlist.values()}
+    if yahoo.upper() not in approved_yahoo and not yahoo.upper().endswith(".NS"):
+        raise InstrumentResolveError(
+            "index_not_india",
+            "Only India indexes are supported; pass an allowlisted or NSE Yahoo symbol",
+        )
+    with _connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT index_id, index_code, index_name
+                   FROM market_data.index_reference WHERE upper(index_code)=%s""",
+                (code,),
+            )
+            existing = cur.fetchone()
+            if not existing:
+                raise InstrumentResolveError("index_not_found", f"Index {code} is not tracked yet")
+            index_id, stored_code, index_name = existing
+            source_id = ensure_data_source(cur, "yfinance")
+            cur.execute(
+                """SELECT index_id FROM market_data.index_provider_mappings
+                   WHERE provider='yfinance' AND trading_symbol=%s AND index_id<>%s""",
+                (yahoo, index_id),
+            )
+            conflict = cur.fetchone()
+            if conflict:
+                raise InstrumentResolveError(
+                    "yf_symbol_in_use",
+                    "That Yahoo symbol is already mapped to another index",
+                )
+            cur.execute(
+                """UPDATE market_data.index_provider_mappings
+                   SET is_active=FALSE, updated_at=NOW()
+                   WHERE provider='yfinance' AND index_id=%s AND is_active=TRUE
+                     AND trading_symbol<>%s""",
+                (index_id, yahoo),
+            )
+            cur.execute(
+                """INSERT INTO market_data.index_provider_mappings
+                   (mapping_id, index_id, provider, exchange, segment, trading_symbol, is_tri, is_active, source_id)
+                   VALUES (%s, %s, 'yfinance', 'NSE', 'CASH', %s, FALSE, TRUE, %s)
+                   ON CONFLICT (provider, trading_symbol) DO UPDATE
+                   SET index_id=EXCLUDED.index_id,
+                       is_active=TRUE,
+                       source_id=EXCLUDED.source_id,
+                       updated_at=NOW()""",
+                (str(uuid.uuid4()), index_id, yahoo, source_id),
+            )
+        conn.commit()
+    return {
+        "index_id": str(index_id),
+        "index_code": stored_code,
+        "index_name": index_name,
+        "yf_symbol": yahoo,
+    }
+
+
 def ensure_index(index_code: str, yf_symbol: str | None = None) -> dict:
     """Resolve + upsert an India index master (+ yfinance mapping)."""
     resolved = resolve_index(index_code, yf_symbol)
+    owner = find_index_by_yf_symbol(resolved["yf_symbol"])
+    if owner and str(owner["index_code"]).upper() != str(resolved["index_code"]).upper():
+        # Same Yahoo feed — reuse the existing master instead of creating a duplicate code.
+        preview = {
+            **resolved,
+            "index_code": owner["index_code"],
+            "index_name": owner.get("index_name") or resolved["index_name"],
+            "yf_symbol": owner.get("yf_symbol") or resolved["yf_symbol"],
+        }
+        return {
+            "status": "existing",
+            "already_tracked": True,
+            "master": {
+                "index_id": owner["index_id"],
+                "index_code": owner["index_code"],
+                "index_name": owner.get("index_name") or resolved["index_name"],
+                "yf_symbol": owner.get("yf_symbol") or resolved["yf_symbol"],
+            },
+            "preview": preview,
+        }
     master, created = upsert_index(resolved)
     return {
         "status": "created" if created else "existing",

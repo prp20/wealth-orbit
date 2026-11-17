@@ -1,7 +1,8 @@
 import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { api, SyncJob, syncJobFailureMessage } from '../api';
+import { api, SyncJob, syncJobFailureMessage, syncJobPartialFailureMessage } from '../api';
 import { HISTORY_PERIOD_OPTIONS, HistoryPeriod } from '../lib/addInstrument';
+import { useToast } from './Toast';
 
 const TERMINAL = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED']);
 
@@ -51,6 +52,7 @@ export default function SyncJobButton({
   startExtendJob?: (period: HistoryPeriod) => Promise<SyncJob>;
 }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const entityId = id || symbol || '';
   const custom = Boolean(startJob);
   const [busy, setBusy] = React.useState(false);
@@ -118,8 +120,11 @@ export default function SyncJobButton({
         if (failure) setError(failure);
       });
       let failure = syncJobFailureMessage(terminal);
-      if (!failure && thenKind && !custom && entity === 'fund') {
-        const follow = await api.syncFundKind(entityId, thenKind, force);
+      if (!failure && thenKind && !custom) {
+        const follow =
+          entity === 'fund'
+            ? await api.syncFundKind(entityId, thenKind, force)
+            : await api.syncStock(entityId, thenKind, force);
         setStatus(quietStatus(String(follow.status || 'QUEUED').toLowerCase(), hideSucceeded));
         terminal = await pollJob(follow.job_id, (current) => {
           const followFailure = syncJobFailureMessage(current);
@@ -132,9 +137,12 @@ export default function SyncJobButton({
       if (failure) {
         setStatus('failed');
         setError(failure);
+        toast.error(failure);
       } else {
         setStatus(quietStatus(String(terminal.status || '').toLowerCase(), hideSucceeded));
-        setError('');
+        const partial = syncJobPartialFailureMessage(terminal);
+        setError(partial || '');
+        if (partial) toast.error(partial);
       }
       await Promise.all(invalidateKeys.map((key) => queryClient.invalidateQueries({ queryKey: key })));
       if (!custom) {
@@ -145,8 +153,10 @@ export default function SyncJobButton({
         }
       }
     } catch (err: any) {
+      const message = err.message || 'Sync failed';
       setStatus('failed');
-      setError(err.message || 'Sync failed');
+      setError(message);
+      toast.error(message);
     } finally {
       setBusy(false);
     }
