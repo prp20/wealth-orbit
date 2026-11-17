@@ -10,6 +10,7 @@ import re
 from typing import Any
 
 from .daily_metrics import _as_float, _metric_number
+from .latest_snapshot import prune_non_latest_metric_dates
 
 CALC_VERSION = "calc_v1"
 CONSOLIDATED = "CONSOLIDATED"
@@ -295,11 +296,5 @@ def upsert_latest_fundamental_ratios(cur, stock_id, snapshot: dict[str, Any], so
         """,
         (stock_id, metric_date, Json(payload), "CALCULATED", source_id),
     )
-    cur.execute(
-        """
-        DELETE FROM market_data.stock_daily_metrics
-        WHERE stock_id=%s AND metric_date <> %s
-        """,
-        (stock_id, metric_date),
-    )
+    prune_non_latest_metric_dates(cur, stock_id, metric_date)
     return str(metric_date)

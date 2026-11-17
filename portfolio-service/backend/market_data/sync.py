@@ -15,6 +15,7 @@ from backend_api.app.technical_indicators import calculate_indicators
 from psycopg2.extras import Json
 
 from .daily_metrics import yahoo_daily_metric_fields
+from .latest_snapshot import prune_non_latest_metric_dates, prune_non_latest_technical_dates
 from .sources import ensure_data_source
 
 
@@ -279,11 +280,7 @@ def _persist_latest_technicals(cur, stock_id: uuid.UUID, trading_date: date, row
             template="(%s,%s,%s,%s,%s,%s::jsonb,%s,%s,NOW())",
             page_size=200,
         )
-    cur.execute(
-        """DELETE FROM market_data.stock_technical_indicators
-           WHERE stock_id=%s AND trading_date <> %s""",
-        (stock_id, trading_date),
-    )
+    prune_non_latest_technical_dates(cur, stock_id, trading_date)
     return len(values)
 
 
@@ -390,12 +387,7 @@ def sync_daily_metrics(symbol: str, force: bool = False) -> dict:
                         updated_at=NOW()""",
                     values,
                 )
-                # Latest-only policy: bag carried onto this row; drop older dates.
-                cur.execute(
-                    """DELETE FROM market_data.stock_daily_metrics
-                       WHERE stock_id=%s AND metric_date <> %s""",
-                    (stock_id, metric_date),
-                )
+                prune_non_latest_metric_dates(cur, stock_id, metric_date)
             conn.commit()
         return str(metric_date)
 
