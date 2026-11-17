@@ -1,6 +1,7 @@
 """Database writers for derived stock market-data synchronizations."""
 from __future__ import annotations
 
+import logging
 import os
 import time
 import uuid
@@ -18,6 +19,9 @@ from .daily_metrics import yahoo_daily_metric_fields
 from .latest_snapshot import prune_non_latest_metric_dates, prune_non_latest_technical_dates
 from .sources import ensure_data_source
 
+logger = logging.getLogger("wealth_orbit.stock_sync")
+
+TECHNICAL_CALCULATION_VERSION = "tech_v1"
 
 def json_bag(value):
     """Wrap a dict for jsonb, or pass through NULL."""
@@ -26,11 +30,15 @@ def json_bag(value):
 
 DEFAULT_INDICATORS = [
     {"code": "SMA", "parameters": {"period": 20}},
+    {"code": "SMA", "parameters": {"period": 50}},
+    {"code": "SMA", "parameters": {"period": 200}},
     {"code": "EMA", "parameters": {"period": 20}},
+    {"code": "EMA", "parameters": {"period": 50}},
     {"code": "RSI", "parameters": {"period": 14}},
     {"code": "MACD", "parameters": {"fast": 12, "slow": 26, "signal": 9}},
     {"code": "BB", "parameters": {"period": 20, "std_dev": 2}},
     {"code": "ATR", "parameters": {"period": 14}},
+    {"code": "STOCH", "parameters": {"k_period": 14, "d_period": 3}},
 ]
 
 _READ_ONLY_MESSAGE = (
@@ -262,6 +270,7 @@ def _persist_latest_technicals(cur, stock_id: uuid.UUID, trading_date: date, row
                 json.dumps(params or {}, sort_keys=True, separators=(",", ":")),
                 float(row.value),
                 "CURRENT",
+                TECHNICAL_CALCULATION_VERSION,
             )
         )
     if values:
@@ -269,15 +278,16 @@ def _persist_latest_technicals(cur, stock_id: uuid.UUID, trading_date: date, row
             cur,
             """INSERT INTO market_data.stock_technical_indicators
                 (stock_id, trading_date, indicator_code, indicator_period, component,
-                 parameters, indicator_value, calculation_status, calculated_at)
+                 parameters, indicator_value, calculation_status, calculation_version, calculated_at)
                VALUES %s
                ON CONFLICT (stock_id, trading_date, indicator_code, indicator_period, component, parameters)
                DO UPDATE SET indicator_value=EXCLUDED.indicator_value,
                              calculation_status=EXCLUDED.calculation_status,
+                             calculation_version=EXCLUDED.calculation_version,
                              calculated_at=NOW(),
                              updated_at=NOW()""",
             values,
-            template="(%s,%s,%s,%s,%s,%s::jsonb,%s,%s,NOW())",
+            template="(%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,NOW())",
             page_size=200,
         )
     prune_non_latest_technical_dates(cur, stock_id, trading_date)
@@ -305,6 +315,15 @@ def sync_technical_indicators(symbol: str, force: bool = False) -> dict:
         return trading_date, records
 
     trading_date, records = _run_writable(_write)
+    logger.info(
+        "technical indicators synced symbol=%s calculation_version=%s indicator_families=%s "
+        "records=%s trading_date=%s",
+        symbol,
+        TECHNICAL_CALCULATION_VERSION,
+        len(DEFAULT_INDICATORS),
+        records,
+        trading_date,
+    )
     return {
         "symbol": symbol,
         "kind": "technical",
@@ -313,6 +332,8 @@ def sync_technical_indicators(symbol: str, force: bool = False) -> dict:
         "persisted": True,
         "force": force,
         "trading_date": str(trading_date),
+        "calculation_version": TECHNICAL_CALCULATION_VERSION,
+        "indicator_requests": DEFAULT_INDICATORS,
     }
 
 

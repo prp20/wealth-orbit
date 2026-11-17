@@ -35,6 +35,18 @@ def calculate_indicators(frame: pd.DataFrame, requests: list[dict]) -> pd.DataFr
             prev_close = close.shift(1)
             tr = pd.concat([(high - low).abs(), (high - prev_close).abs(), (low - prev_close).abs()], axis=1).max(axis=1)
             series["VALUE"] = tr.ewm(alpha=1 / period, adjust=False, min_periods=period).mean()
+        elif code in ("STOCH", "STOCHASTIC"):
+            k_period = int(p.get("k_period", p.get("period", 14)))
+            d_period = int(p.get("d_period", 3))
+            lowest_low = low.rolling(k_period, min_periods=k_period).min()
+            highest_high = high.rolling(k_period, min_periods=k_period).max()
+            span = (highest_high - lowest_low).replace(0, pd.NA)
+            stoch_k = 100 * (close - lowest_low) / span
+            series = {
+                "K": stoch_k,
+                "D": stoch_k.rolling(d_period, min_periods=d_period).mean(),
+            }
+            period = k_period
         else: raise ValueError(f"Unsupported indicator: {code}")
         params = normalize_parameters(p)
         for component, values in series.items():

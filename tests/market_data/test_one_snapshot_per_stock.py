@@ -66,6 +66,7 @@ class _TechnicalSnapshotStore:
     def upsert_execute_values(self, _cur, _sql, values, **kwargs) -> None:
         for row in values:
             stock_id, trading_date, code, period, component, params, value, status = row[:8]
+            _calc_version = row[8] if len(row) > 8 else None
             key = self._key(stock_id, trading_date, code, period, component, params)
             self.rows[key] = {
                 "stock_id": stock_id,

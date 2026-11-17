@@ -101,12 +101,15 @@ def test_sync_technical_indicators_persists_latest_day(monkeypatch):
     assert result["status"] == "completed"
     assert result["persisted"] is True
     assert result["records_processed"] == captured["rows"]
+    assert result["calculation_version"] == stock_sync.TECHNICAL_CALCULATION_VERSION
+    assert result["indicator_requests"] == stock_sync.DEFAULT_INDICATORS
     assert captured["trading_date"] == frame["date"].max()
     assert captured["dates"] == {str(frame["date"].max())}
 
 
 def test_latest_indicator_rows_keeps_only_last_date():
-    frame = _ohlc_frame(50)
+    frame = _ohlc_frame(250)
     trading_date, rows = stock_sync._latest_indicator_rows(frame)
     assert trading_date == frame["date"].max()
     assert set(str(d)[:10] for d in rows["date"].tolist()) == {str(trading_date)}
+    assert "STOCH" in set(rows["indicator_code"])
