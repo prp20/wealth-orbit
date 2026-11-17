@@ -115,6 +115,7 @@ class _ScreenerMetricsCursor:
     def __init__(self) -> None:
         self.rows: dict[tuple, dict] = {}
         self._fetch = False
+        self.rowcount = 0
 
     def execute(self, sql, params=None) -> None:
         text = " ".join(sql.split())
@@ -160,6 +161,9 @@ class _ScreenerMetricsCursor:
             return
         if "DELETE FROM market_data.stock_daily_metrics" in text and params:
             stock_id, keep = params
+            self.rowcount = sum(
+                1 for key in self.rows if key[0] == stock_id and key[1] != keep
+            )
             for key in list(self.rows):
                 if key[0] == stock_id and key[1] != keep:
                     del self.rows[key]
@@ -199,6 +203,44 @@ def test_afcons_fixture_roce_lands_on_latest_metrics_row():
     assert only["roe"] == pytest.approx(0.0561)
     assert only["market_cap"] == pytest.approx(8_163 * 10_000_000)
     assert only["fundamental_ratios"]["provider_metric_sources"]["roce"] == "screener"
+
+
+def test_screener_upsert_no_fill_early_return_still_prunes_history():
+    stock_id = uuid4()
+    cur = _ScreenerMetricsCursor()
+    cur.rows[(stock_id, date(2024, 3, 1))] = {
+        "stock_id": stock_id,
+        "metric_date": date(2024, 3, 1),
+        "market_cap": 1e9,
+        "stock_pe": 20.0,
+        "price_to_book": None,
+        "dividend_yield": None,
+        "book_value": None,
+        "roce": 9.5,
+        "roe": 12.0,
+        "fundamental_ratios": None,
+    }
+    cur.rows[(stock_id, date(2024, 6, 1))] = {
+        "stock_id": stock_id,
+        "metric_date": date(2024, 6, 1),
+        "market_cap": 1e9,
+        "stock_pe": 20.0,
+        "price_to_book": 2.0,
+        "dividend_yield": None,
+        "book_value": None,
+        "roce": 9.5,
+        "roe": 12.0,
+        "fundamental_ratios": None,
+    }
+    metric_date = upsert_screener_provider_metrics(
+        cur,
+        stock_id,
+        {"ROCE": "9.5%", "ROE": "12%"},
+        "screener-src-id",
+    )
+    assert metric_date == "2024-06-01"
+    assert cur.rowcount == 1
+    assert set(cur.rows) == {(stock_id, date(2024, 6, 1))}
 
 
 def test_screener_metrics_do_not_overwrite_existing_yahoo_roce():

@@ -150,6 +150,7 @@ def upsert_screener_provider_metrics(
 
     merged, filled_columns = merge_screener_provider_fields(prior, provider_values)
     if not filled_columns and row:
+        prune_non_latest_metric_dates(cur, stock_id, metric_date)
         return str(metric_date)
 
     bag = dict(prior_bag) if isinstance(prior_bag, dict) else {}
