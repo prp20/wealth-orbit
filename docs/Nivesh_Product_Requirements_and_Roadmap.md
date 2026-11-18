@@ -1,3 +1,5 @@
+> **Archived — do not use for implementation.** Superseded by [Nivesh_Product_Requirements_and_Roadmap_v1.1.md](Nivesh_Product_Requirements_and_Roadmap_v1.1.md). Handbook: [README.md](README.md).
+
 # Nivesh --- Investment Research, Intelligence & Portfolio Platform
 
 **Product Requirements Document (PRD), MVP Scope & Implementation
