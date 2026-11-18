@@ -1,3 +1,5 @@
+> **Archived — do not use.** Superseded by the handbook ([docs/README.md](../../README.md)) and [releases catalog](../../releases/README.md). Historical MVP plan only.
+
 # Mutual Fund Performance and Enrichment Execution Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Every task is independently testable; do not skip the failing-test step.

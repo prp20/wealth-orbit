@@ -1,3 +1,5 @@
+> **Archived — do not use.** Superseded by the handbook ([docs/README.md](../../README.md)) and [releases catalog](../../releases/README.md). Historical MVP plan only.
+
 # Stock Fundamentals and Technical Analysis Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (or an equivalent implementation workflow) when executing this plan.

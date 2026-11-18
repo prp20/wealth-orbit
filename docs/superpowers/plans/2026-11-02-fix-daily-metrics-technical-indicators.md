@@ -1,3 +1,5 @@
+> **Archived — do not use.** Superseded by the handbook ([docs/README.md](../../README.md)) and [releases catalog](../../releases/README.md). Historical MVP plan only.
+
 # Daily Metrics and Technical Indicators Recovery Plan
 
 ## Findings

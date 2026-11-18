@@ -1,3 +1,5 @@
+> **Archived — do not use.** Superseded by the handbook ([docs/README.md](../../README.md)) and [releases catalog](../../releases/README.md). Historical MVP plan only.
+
 # Persistent Market Sync Queue Plan
 
 **Goal:** Separate synchronization into independently queueable daily metrics, fundamentals, shareholding history, and technical indicators jobs; persist job state in PostgreSQL; expose progress and queue position; and make force-sync controls unavailable while the matching job is queued or running.

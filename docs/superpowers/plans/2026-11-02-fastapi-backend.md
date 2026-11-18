@@ -1,3 +1,5 @@
+> **Archived — do not use.** Superseded by the handbook ([docs/README.md](../../README.md)) and [releases catalog](../../releases/README.md). Historical MVP plan only.
+
 # FastAPI Backend Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
