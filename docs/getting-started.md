@@ -55,7 +55,7 @@ Edit `.env` in the repo root. **Never commit** real secrets.
 | `EXCHANGE_RATE_API_KEY` | Home USD/INR via ExchangeRate-API ([signup](https://www.exchangerate-api.com/)). Without it, USD/INR on Home may fail when that path is used. |
 | `SESSION_SECRET` | Cookie signing (generated on first setup if left blank) |
 
-**Glossary / Groq:** There is no glossary HTTP API or Groq integration in application code on this branch. Varsity-backed glossary chat is outlined in [releases/README.md](releases/README.md) (milestone **1.11**, later **1.19** / **1.27**). When that work lands, expect optional `GROQ_API_KEY` and `GLOSSARY_LLM_MODEL` (planned default `openai/gpt-oss-120b` on Groq — see [glossary-engineering.md](glossary-engineering.md)).
+**Glossary / Groq:** There is no glossary HTTP API or Groq integration in application code on this branch. When glossary chat lands, expect optional `GROQ_API_KEY` and `GLOSSARY_LLM_MODEL` (planned default `openai/gpt-oss-120b` on Groq — see [glossary-engineering.md](glossary-engineering.md)).
 
 ### 6. Smoke test
 

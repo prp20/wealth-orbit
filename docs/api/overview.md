@@ -86,4 +86,4 @@ Domain logic: `portfolio-service/backend/` (imported via `backend_api.app.portfo
 
 ## Glossary API
 
-No `/glossary` routes are registered on this branch. Planned under release milestones **1.11+** — see [../releases/README.md](../releases/README.md).
+No `/glossary` routes are registered on this branch (planned for a later glossary chat release).

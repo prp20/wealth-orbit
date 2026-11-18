@@ -29,7 +29,7 @@ North-star storage policy (not all automation shipped):
 | **A** | Hot history for core universe | ~10y OHLC/NAV for seeded names |
 | **B** | On-demand or trimmed | `max` history, optional enrichment, old trim via `trim_market_history.py` |
 
-See [../superpowers/specs/2026-11-11-wealth-orbit-architecture-evaluation-design.md](../superpowers/specs/2026-11-11-wealth-orbit-architecture-evaluation-design.md) for full tier design.
+Full storage-tier design lives in local-only planning under `docs/superpowers/` when present.
 
 ## Natural keys (idempotent sync)
 

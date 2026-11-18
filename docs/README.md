@@ -10,7 +10,6 @@ Handbook for contributors and operators. Product name in the UI is **Wealth Orbi
 ## Architecture
 
 - [architecture.md](architecture.md) — FastAPI monolith, React `/ui/`, dual DB, in-process sync
-- [superpowers/specs/2026-11-11-wealth-orbit-architecture-evaluation-design.md](superpowers/specs/2026-11-11-wealth-orbit-architecture-evaluation-design.md) — north-star evaluation (1.20+)
 
 ## Data
 
@@ -31,10 +30,6 @@ Handbook for contributors and operators. Product name in the UI is **Wealth Orbi
 - [Nivesh_Product_Requirements_and_Roadmap_v1.1.md](Nivesh_Product_Requirements_and_Roadmap_v1.1.md) — current-scale PRD (large; use search)
 - [Nivesh_Product_Requirements_and_Roadmap.md](Nivesh_Product_Requirements_and_Roadmap.md) — **archived** v1.0 baseline
 
-## Releases
-
-- [releases/README.md](releases/README.md) — frozen milestone catalog (1.2–1.27 outlines)
-
 ## Engineering glossary
 
 - [glossary-engineering.md](glossary-engineering.md) — contributor terms (sync jobs, stances, pooler, tiers)
@@ -47,12 +42,19 @@ Local research copies and chapter index for glossary-style features (planned rel
 
 PDFs under `varsity_docs/` are gitignored; download locally if needed for authoring.
 
+## Local-only (gitignored)
+
+These folders stay on your machine for planning; they are **not** in the remote repo:
+
+- `docs/releases/` — milestone outlines
+- `docs/superpowers/` — agent plans and architecture evaluation specs
+
 ## Archive
 
 Stale snapshots — do not treat as current implementation truth:
 
 - [archive/README.md](archive/README.md)
-- Bannered: `nivesh_github_issues*.json`, Nov 2026 MVP plans under `superpowers/plans/2026-11-02-*`
+- Bannered: `nivesh_github_issues*.json` (see [nivesh_github_issues.ARCHIVE-NOTICE.md](nivesh_github_issues.ARCHIVE-NOTICE.md))
 
 ## Component READMEs
 

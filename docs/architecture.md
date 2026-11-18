@@ -1,6 +1,6 @@
 # Architecture (shipped)
 
-How Wealth Orbit runs today on a developer machine. For north-star modular-monolith design and post-1.19 roadmap, see [superpowers/specs/2026-11-11-wealth-orbit-architecture-evaluation-design.md](superpowers/specs/2026-11-11-wealth-orbit-architecture-evaluation-design.md).
+How Wealth Orbit runs today on a developer machine. Longer-term modular-monolith / stance-roadmap notes may live in local-only planning docs under `docs/superpowers/` (gitignored).
 
 ## Runtime summary
 
@@ -68,7 +68,7 @@ Local accounts in SQLite: signup/login set an HTTP-only cookie. There is no emai
 
 ## What is not shipped yet
 
-Release outlines under [releases/](releases/) describe MTM/XIRR, watchlists, stance engine, glossary chat, and strategy lab. Until those milestones land, the UI remains **cost-basis portfolio** plus **stored market research** — no buy/sell stance layer in production code.
+Future milestones (MTM/XIRR, watchlists, stance engine, glossary chat, strategy lab) are tracked in local-only `docs/releases/` when present. Until those land in the product, the UI remains **cost-basis portfolio** plus **stored market research** — no buy/sell stance layer in production code.
 
 ## Related docs
 

@@ -255,7 +255,7 @@ Sign-up refuses a name that is already stored. Use another name, or remove that 
 | Repo layout & dual DB | [README.md](README.md), [data/overview.md](data/overview.md) |
 | API surface | [api/overview.md](api/overview.md) |
 | Engineering terms | [glossary-engineering.md](glossary-engineering.md) |
-| Release intent vs shipped code | [releases/README.md](releases/README.md) |
+| Local release outlines (gitignored) | `docs/releases/` on your machine |
 | Optional Home USD/INR | Set `EXCHANGE_RATE_API_KEY` in `.env` ([ExchangeRate-API](https://www.exchangerate-api.com/)) — never commit the key |
 
 Tests: `uv run pytest` from repo root; React unit tests: `cd frontend-react && npm test`.
