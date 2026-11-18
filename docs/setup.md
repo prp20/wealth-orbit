@@ -2,6 +2,8 @@
 
 The setup script takes a fresh clone to a running app. It installs the Python tools, writes `.env`, applies the Postgres schema, creates the local portfolio file, and builds the React UI.
 
+**Handbook:** [README.md](README.md) · Quick checklist: [getting-started.md](getting-started.md) · Architecture: [architecture.md](architecture.md)
+
 ## What you need
 
 - A Postgres database that already exists. Supabase is a fine choice. The script does not create a cloud database.
@@ -245,3 +247,15 @@ sqlite3 portfolio-service/portfolio.db "UPDATE users SET password_hash = NULL WH
 ```
 
 Sign-up refuses a name that is already stored. Use another name, or remove that user from the file before creating the account again.
+
+## Contributors
+
+| Topic | Doc |
+|-------|-----|
+| Repo layout & dual DB | [README.md](README.md), [data/overview.md](data/overview.md) |
+| API surface | [api/overview.md](api/overview.md) |
+| Engineering terms | [glossary-engineering.md](glossary-engineering.md) |
+| Release intent vs shipped code | [releases/README.md](releases/README.md) |
+| Optional Home USD/INR | Set `EXCHANGE_RATE_API_KEY` in `.env` ([ExchangeRate-API](https://www.exchangerate-api.com/)) — never commit the key |
+
+Tests: `uv run pytest` from repo root; React unit tests: `cd frontend-react && npm test`.
