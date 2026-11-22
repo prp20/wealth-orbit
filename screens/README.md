@@ -2,6 +2,8 @@
 
 Drop a Python file under `screens/stock/user/` (or ship one under `built_in/`), refresh discovery, and the platform lists it if validation passes.
 
+**Docs:** [docs/setup.md](../docs/setup.md#add-a-stock-screen-plugin) · [docs/api/overview.md](../docs/api/overview.md) · tests under `tests/screen_plugins/`
+
 ## File contract
 
 ```python

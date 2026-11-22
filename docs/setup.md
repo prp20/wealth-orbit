@@ -2,6 +2,8 @@
 
 The setup script takes a fresh clone to a running app. It installs the Python tools, writes `.env`, applies the Postgres schema, creates the local portfolio file, and builds the React UI.
 
+**Handbook:** [README.md](README.md) · Quick checklist: [getting-started.md](getting-started.md) · Architecture: [architecture.md](architecture.md)
+
 ## What you need
 
 - A Postgres database that already exists. Supabase is a fine choice. The script does not create a cloud database.
@@ -279,3 +281,15 @@ Release exit checks:
 ```bash
 uv run pytest tests/test_glossary_agent.py tests/test_glossary_api.py tests/test_glossary_seed_matcher.py -q
 ```
+
+## Contributors
+
+| Topic | Doc |
+|-------|-----|
+| Repo layout & dual DB | [README.md](README.md), [data/overview.md](data/overview.md) |
+| API surface | [api/overview.md](api/overview.md) |
+| Engineering terms | [glossary-engineering.md](glossary-engineering.md) |
+| Local release outlines (gitignored) | `docs/releases/` on your machine |
+| Optional Home USD/INR | Set `EXCHANGE_RATE_API_KEY` in `.env` ([ExchangeRate-API](https://www.exchangerate-api.com/)) — never commit the key |
+
+Tests: `uv run pytest` from repo root; React unit tests: `cd frontend-react && npm test`.
