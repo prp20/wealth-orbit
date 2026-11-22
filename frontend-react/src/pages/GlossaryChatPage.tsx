@@ -14,6 +14,7 @@ function cleanProse(text: string): string {
     .replace(/【[^】]+】/g, '')
     .replace(/\[[\w:.-]{1,40}\]/g, '')
     .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*]\s+[“"'].+[”"']\s*[—–-].+$/gm, '')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -53,9 +54,7 @@ function Prose({ text }: { text: string }) {
             </ListTag>
           );
         }
-        return (
-          <p key={index}>{renderInlineEmphasis(block.replace(/\n/g, ' '))}</p>
-        );
+        return <p key={index}>{renderInlineEmphasis(block.replace(/\n/g, ' '))}</p>;
       })}
     </div>
   );
@@ -70,30 +69,39 @@ function dedupeCitations(citations: GlossaryCitation[]): GlossaryCitation[] {
     seen.add(key);
     out.push(source);
   }
-  return out.slice(0, 6);
+  return out.slice(0, 4);
+}
+
+function modeLabel(mode: GlossaryAgentChatResult['mode']): string | null {
+  if (mode === 'fallback') return 'Seed lookup';
+  if (mode === 'multi_agent') return 'Local corpus';
+  if (mode === 'agent') return 'Seed agent';
+  return null;
 }
 
 function AssistantMessage({ result }: { result: GlossaryAgentChatResult }) {
   const refusal = result.refusal;
-  const bubbleClass = refusal
-    ? 'glossary-chat-bubble glossary-chat-bubble-assistant glossary-chat-refusal'
-    : 'glossary-chat-bubble glossary-chat-bubble-assistant';
   const citations = result.citations?.length ? dedupeCitations(result.citations) : [];
+  const mode = modeLabel(result.mode);
 
   return (
-    <article className={bubbleClass}>
+    <article
+      className={
+        refusal
+          ? 'glossary-msg glossary-msg-assistant glossary-msg-refusal'
+          : 'glossary-msg glossary-msg-assistant'
+      }
+    >
+      <div className="glossary-msg-meta">
+        <span className="glossary-msg-role">{refusal ? 'Notice' : 'Assistant'}</span>
+        {mode && !refusal ? <span className="glossary-msg-mode">{mode}</span> : null}
+      </div>
       {refusal ? (
         <p className="glossary-refusal-label">
           {refusal.category === 'advice' ? 'No investment advice' : 'Definitions only'}
         </p>
       ) : null}
       <Prose text={result.assistant_message} />
-      {result.mode === 'fallback' ? (
-        <p className="glossary-chat-mode-note">AI chat is offline — using seed lookup.</p>
-      ) : null}
-      {result.mode === 'multi_agent' ? (
-        <p className="glossary-chat-mode-note">Answered with local corpus RAG (POC).</p>
-      ) : null}
       {citations.length ? <EvidencePanel citations={citations} /> : null}
     </article>
   );
@@ -102,22 +110,25 @@ function AssistantMessage({ result }: { result: GlossaryAgentChatResult }) {
 function EvidencePanel({ citations }: { citations: GlossaryCitation[] }) {
   return (
     <details className="glossary-evidence">
-      <summary>Evidence ({citations.length})</summary>
+      <summary>
+        <span>Sources</span>
+        <span className="glossary-evidence-count">{citations.length}</span>
+      </summary>
       <ul className="glossary-evidence-list">
         {citations.map((source) => (
           <li key={`${source.module}-${source.chapter}-${source.url}-${source.chunk_id ?? source.term ?? ''}`}>
-            <div className="glossary-evidence-meta">
-              {source.term ? <strong>{source.term}</strong> : null}
-              {source.term ? ' · ' : null}
-              Module {source.module}
-              {source.chapter ? ` · ${source.chapter}` : ''}
+            <div className="glossary-evidence-row">
+              <div className="glossary-evidence-meta">
+                {source.term ? <span className="glossary-evidence-term">{source.term}</span> : null}
+                <span>
+                  Module {source.module}
+                  {source.chapter ? ` · ${source.chapter}` : ''}
+                </span>
+              </div>
               {source.url ? (
-                <>
-                  {' · '}
-                  <a href={source.url} target="_blank" rel="noreferrer">
-                    Varsity
-                  </a>
-                </>
+                <a className="glossary-evidence-link" href={source.url} target="_blank" rel="noreferrer">
+                  Varsity
+                </a>
               ) : null}
             </div>
             {source.excerpt ? <p className="glossary-evidence-excerpt">{source.excerpt}</p> : null}
@@ -125,6 +136,24 @@ function EvidencePanel({ citations }: { citations: GlossaryCitation[] }) {
         ))}
       </ul>
     </details>
+  );
+}
+
+function SuggestionRow({
+  busy,
+  onPick,
+}: {
+  busy: boolean;
+  onPick: (prompt: string) => void;
+}) {
+  return (
+    <div className="glossary-suggestions" aria-label="Suggested questions">
+      {SUGGESTION_PROMPTS.map((prompt) => (
+        <button key={prompt} type="button" onClick={() => onPick(prompt)} disabled={busy}>
+          {prompt}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -180,35 +209,34 @@ export default function GlossaryChatPage() {
   };
 
   return (
-    <>
+    <div className="glossary-page">
       <PageHeader
         title="Glossary"
-        subtitle="Multi-turn chat for investing terminology. Prose answers with optional local corpus evidence."
+        subtitle="Ask investing terms in plain language. Answers stay educational — not advice."
       />
 
-      <section className="panel glossary-chat-panel">
-        <div className="glossary-chat-banner" role="note">
-          POC educational assistant — not advice; corpus stays local. Explains terms only (no buy/sell/switch
-          picks). Varsity © Zerodha.
+      <section className="glossary-shell">
+        <div className="glossary-banner" role="note">
+          <span className="glossary-banner-kicker">Educational POC</span>
+          <span>
+            Definitions only. Corpus stays on your machine. Varsity materials © Zerodha.
+          </span>
         </div>
 
         <div className="glossary-chat-log" ref={logRef} aria-live="polite">
           {!entries.length ? (
             <div className="glossary-chat-empty">
-              <p>Ask about a term or compare concepts in plain language.</p>
-              <div className="glossary-suggestion-chips">
-                <span>Suggestions:</span>
-                {SUGGESTION_PROMPTS.map((prompt) => (
-                  <button key={prompt} type="button" onClick={() => send(prompt)} disabled={busy}>
-                    {prompt}
-                  </button>
-                ))}
-              </div>
+              <h2>Start with a term</h2>
+              <p>Compare ideas, ask for a plain-English definition, or explore how concepts relate.</p>
+              <SuggestionRow busy={busy} onPick={(prompt) => void send(prompt)} />
             </div>
           ) : (
             entries.map((entry) =>
               entry.role === 'user' ? (
-                <article key={entry.id} className="glossary-chat-bubble glossary-chat-bubble-user">
+                <article key={entry.id} className="glossary-msg glossary-msg-user">
+                  <div className="glossary-msg-meta">
+                    <span className="glossary-msg-role">You</span>
+                  </div>
                   <p>{entry.text}</p>
                 </article>
               ) : (
@@ -216,46 +244,45 @@ export default function GlossaryChatPage() {
               ),
             )
           )}
-          {busy ? <p className="glossary-chat-pending">Thinking…</p> : null}
+          {busy ? (
+            <div className="glossary-pending" aria-live="polite">
+              <span className="glossary-pending-dots" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              Looking that up…
+            </div>
+          ) : null}
         </div>
 
         {error ? <p className="glossary-chat-error">{error}</p> : null}
 
-        {entries.length ? (
-          <div className="glossary-suggestion-chips glossary-suggestion-chips-inline">
-            {SUGGESTION_PROMPTS.map((prompt) => (
-              <button key={prompt} type="button" onClick={() => send(prompt)} disabled={busy}>
-                {prompt}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        <form className="glossary-chat-form" onSubmit={onSubmit}>
-          <label className="glossary-chat-field">
-            <span className="visually-hidden">Your question</span>
-            <input
-              type="text"
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              placeholder="Ask about an investing term…"
-              disabled={busy}
-              autoComplete="off"
-            />
-          </label>
-          <button type="submit" className="primary-button" disabled={busy || !draft.trim()}>
-            Send
-          </button>
-        </form>
+        <div className="glossary-composer">
+          {entries.length ? <SuggestionRow busy={busy} onPick={(prompt) => void send(prompt)} /> : null}
+          <form className="glossary-chat-form" onSubmit={onSubmit}>
+            <label className="glossary-chat-field">
+              <span className="visually-hidden">Your question</span>
+              <input
+                type="text"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                placeholder="Ask about an investing term…"
+                disabled={busy}
+                autoComplete="off"
+              />
+            </label>
+            <button type="submit" className="glossary-send" disabled={busy || !draft.trim()}>
+              Send
+            </button>
+          </form>
+          {terms.data?.length ? (
+            <p className="glossary-chat-footnote">
+              {terms.data.length} curated seed terms · deeper reading opens on Varsity
+            </p>
+          ) : null}
+        </div>
       </section>
-
-      {terms.data?.length ? (
-        <p className="panel-subtitle glossary-chat-footnote">
-          {terms.data.length} curated terms in the seed. Full Varsity chapters open on zerodha.com.
-        </p>
-      ) : terms.isLoading ? (
-        <p className="panel-subtitle glossary-chat-footnote">Loading term list…</p>
-      ) : null}
-    </>
+    </div>
   );
 }
