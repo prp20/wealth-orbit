@@ -34,14 +34,14 @@ Handbook for contributors and operators. Product name in the UI is **Wealth Orbi
 
 - [glossary-engineering.md](glossary-engineering.md) — contributor terms (sync jobs, stances, pooler, tiers)
 
-## Authoring (Varsity)
+## Glossary & Varsity authoring
 
-Local research copies and chapter index for the **1.11** glossary chat (seed + Varsity links):
-
+- Product UI: `/ui/glossary` (multi-session educational chat) — [setup.md](setup.md#glossary-chat-release-111)
+- [varsity_docs/README.md](varsity_docs/README.md) — copyright, inventory, ingest
 - [varsity_docs/chapter_index.json](varsity_docs/chapter_index.json)
 - [varsity_docs/glossary_seed.json](varsity_docs/glossary_seed.json)
 
-PDFs under `varsity_docs/` are gitignored (local authoring / future RAG ingest only).
+PDFs, `extracted/`, and `.rag_index/` under `varsity_docs/` are gitignored (local RAG only).
 
 ## Local-only (gitignored)
 

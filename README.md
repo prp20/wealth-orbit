@@ -64,6 +64,24 @@ Empty top-level folders are aspirational names only — not separate deployables
 
 Then open [http://127.0.0.1:8000/ui/](http://127.0.0.1:8000/ui/) and **Create an account**. Details: [docs/getting-started.md](docs/getting-started.md).
 
+## Glossary chat (release 1.11)
+
+Open [http://127.0.0.1:8000/ui/glossary](http://127.0.0.1:8000/ui/glossary) for a full-height, multi-session educational chat (definitions only — not advice).
+
+| Mode | When |
+|------|------|
+| `multi_agent` | Local Varsity RAG index built **and** an LLM key is set |
+| `agent` | LLM key set, no RAG index — seed tool agent |
+| `fallback` | No LLM key — deterministic seed matcher |
+
+Optional ingest (PDFs stay local/gitignored):
+
+```bash
+uv run python portfolio-service/scripts/glossary/ingest_varsity_corpus.py
+```
+
+Setup, env switching, and API notes: [docs/setup.md](docs/setup.md#glossary-chat-release-111). Learning disclaimer / Zerodha credit: above and [`docs/varsity_docs/README.md`](docs/varsity_docs/README.md).
+
 ## Portfolio model (summary)
 
 `users` own one `portfolio`. Portfolios contain immutable `transactions` tied to local `assets`. `holdings` are the current aggregate per `(portfolio_id, asset_id)` and can be rebuilt from transactions (weighted-average cost). Mutual-fund identity and NAV live in Postgres and sync into asset records where needed.

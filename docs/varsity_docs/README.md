@@ -1,6 +1,6 @@
 # Zerodha Varsity local corpus
 
-Offline research copies and structured indexes for Nivesh glossary authoring (**release 1.11**).
+Offline research copies and structured indexes for Wealth Orbit glossary authoring (**release 1.11**).
 
 ## Copyright & credit
 
@@ -9,7 +9,7 @@ Wealth Orbit is a **learning project**. If you use Zerodha Varsity documents (or
 - **All credit for Varsity educational content belongs to Zerodha.** Varsity materials are © Zerodha.
 - Reproduction or redistribution of Varsity PDFs, full chapter text, or images is **not** permitted by Varsity and is **not** authorized by this project.
 - PDFs and RAG extracts under this folder are **local research copies only** (gitignored). Do **not** ship or publish them with the app.
-- The in-app glossary uses **our** short curated definitions plus citations (module/chapter title + URL) via `glossary_seed.json` — not wholesale Varsity text.
+- The in-app glossary uses **our** short curated definitions plus citations (module/chapter title + URL) via `glossary_seed.json` — not wholesale Varsity text. Optional local RAG deepens answers without redistributing PDFs.
 
 ## Files
 
@@ -18,6 +18,8 @@ Wealth Orbit is a **learning project**. If you use Zerodha Varsity documents (or
 | `*.pdf` | Official module PDFs where available (gitignored) |
 | `chapter_index.json` | All 17 modules: titles, URLs, chapter lists (blurbs are public teasers) |
 | `glossary_seed.json` | Curated terms with original definitions + Varsity citations |
+| `extracted/` | PDF→markdown extract (gitignored; created by ingest CLI) |
+| `.rag_index/` | Local Chroma index (gitignored; created by ingest CLI) |
 
 ## Naming
 
@@ -55,12 +57,11 @@ Source catalog: https://zerodha.com/varsity/modules/
 
 ## Glossary chat (release 1.11)
 
-The in-app glossary is **definitions only**: short answers from `glossary_seed.json` plus Varsity chapter links. It does **not** give buy, sell, switch, or personalized advice, and it does not invent live prices or portfolio numbers.
+In-app route: **`/ui/glossary`** — full-height multi-session chat (browser-local sessions). Definitions only; not investment advice.
 
 - **Varsity PDFs** in this folder stay **offline research copies** (gitignored). They are not served by the app.
-- **Public API** (no login): `POST /api/v1/glossary/chat` (single message) and `POST /api/v1/glossary/agent/chat` (multi-turn agent with seed fallback when `GROQ_API_KEY` is unset). Browse: `GET /api/v1/glossary/terms`.
-- **UI:** React route `/glossary` (Glossary in the nav).
-- **Env:** `GROQ_API_KEY` and optional `GLOSSARY_LLM_MODEL` — see [setup.md](../setup.md#glossary-chat-release-111).
+- **Ingest (optional RAG):** `uv run python portfolio-service/scripts/glossary/ingest_varsity_corpus.py`
+- **Public API** (no login): `POST /api/v1/glossary/chat`, `POST /api/v1/glossary/agent/chat`, `GET /api/v1/glossary/terms`
+- **Env / modes:** see [setup.md](../setup.md#glossary-chat-release-111)
 
-Exit smoke (pytest): IPO match, advice/dump refusal, and agent guards — `tests/test_glossary_api.py`, `tests/test_glossary_agent.py`, `tests/test_glossary_seed_matcher.py`.
-
+Exit smoke: `uv run pytest tests/test_glossary_*.py -q`

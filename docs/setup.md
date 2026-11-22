@@ -250,13 +250,14 @@ Sign-up refuses a name that is already stored. Use another name, or remove that 
 
 ## Glossary chat (release 1.11)
 
-The **Glossary** page explains curated investing terms only. Facts come from [docs/varsity_docs/glossary_seed.json](varsity_docs/glossary_seed.json) with Zerodha Varsity chapter links—not live prices, portfolio data, or full chapter/PDF text.
+The **Glossary** page (`/ui/glossary`) is a full-height, multi-session educational chat. Facts come from [docs/varsity_docs/glossary_seed.json](varsity_docs/glossary_seed.json) and, when ingested, a local Varsity corpus — not live prices, portfolio data, or redistributed PDF text.
 
 - **Scope:** definitions and citations; buy/sell/switch advice and Varsity dump/redistribute requests are refused.
+- **UI:** ChatGPT-style workspace — session sidebar (New chat / switch / delete), scrollable thread, docked composer. Sessions persist in the browser (`localStorage`); they are not stored on the server.
 - **Varsity PDFs** under `docs/varsity_docs/` are local offline copies (gitignored). Extracted markdown + RAG index (`extracted/`, `.rag_index/`) are also gitignored — Varsity © Zerodha; do not redistribute.
 - **Modes** (multi-turn `POST /glossary/agent/chat`):
   1. `multi_agent` — LangGraph Router→Retriever→Answerer→Critic when a local RAG index exists **and** an LLM provider key is set.
-  2. `agent` — PR 86 Groq seed tool-calling agent when the index is missing but `GROQ_API_KEY` is set.
+  2. `agent` — Groq/OpenAI seed tool-calling agent when the index is missing but a provider key is set.
   3. `fallback` — deterministic seed matcher when no LLM key is available (or on agent errors).
 - The single-turn `POST /glossary/chat` endpoint always uses the seed matcher.
 
@@ -268,7 +269,7 @@ After placing Varsity PDFs under `docs/varsity_docs/` (see `chapter_index.json` 
 uv run python portfolio-service/scripts/glossary/ingest_varsity_corpus.py
 ```
 
-Rebuild when PDFs change. UI shows a POC notice; answers include an evidence accordion (module/chapter/URL/excerpt).
+Rebuild when PDFs change. Answers show a **Sources** accordion (module/chapter/URL/excerpt) when citations are present.
 
 ### Model switching
 
