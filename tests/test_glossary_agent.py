@@ -253,4 +253,8 @@ def test_glossary_agent_modules_avoid_market_imports():
         "search_glossary",
         "get_glossary_term",
         "refuse_out_of_scope",
+        "search_corpus",
+        "read_chunk",
+        "lookup_chapter",
+        "done_retrieving",
     }

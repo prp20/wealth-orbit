@@ -8,13 +8,24 @@ from .guards import REFUSAL_MESSAGES
 from .matcher import GlossaryMatcher, normalize_phrase
 from .models import GlossaryTerm, RefusalCategory
 
-ALLOWED_TOOL_NAMES: frozenset[str] = frozenset(
+SEED_TOOL_NAMES: frozenset[str] = frozenset(
     {
         "search_glossary",
         "get_glossary_term",
         "refuse_out_of_scope",
     }
 )
+
+CORPUS_TOOL_NAMES: frozenset[str] = frozenset(
+    {
+        "search_corpus",
+        "read_chunk",
+        "lookup_chapter",
+        "done_retrieving",
+    }
+)
+
+ALLOWED_TOOL_NAMES: frozenset[str] = SEED_TOOL_NAMES | CORPUS_TOOL_NAMES
 
 GLOSSARY_TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
@@ -82,6 +93,82 @@ GLOSSARY_TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_corpus",
+            "description": (
+                "Hybrid search over the local Varsity PDF-derived corpus. "
+                "Returns chunk ids, scores, module/chapter/url, and short excerpts."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search query."},
+                    "k": {
+                        "type": "integer",
+                        "description": "Max hits (default 5, max 12).",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_chunk",
+            "description": "Read one corpus chunk by id (capped length).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "chunk_id": {"type": "string", "description": "Chunk id from search_corpus."},
+                },
+                "required": ["chunk_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "lookup_chapter",
+            "description": "Lookup Varsity chapter metadata from chapter_index.json.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "module": {"type": "integer", "description": "Varsity module number."},
+                    "chapter_title": {
+                        "type": "string",
+                        "description": "Optional chapter title substring.",
+                    },
+                },
+                "required": ["module"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "done_retrieving",
+            "description": "Signal that enough evidence was gathered for answering.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "summary": {
+                        "type": "string",
+                        "description": "Brief note on what evidence was collected.",
+                    },
+                },
+                "required": ["summary"],
+            },
+        },
+    },
+]
+
+SEED_TOOL_SCHEMAS: list[dict[str, Any]] = [
+    schema
+    for schema in GLOSSARY_TOOL_SCHEMAS
+    if schema.get("function", {}).get("name") in SEED_TOOL_NAMES
 ]
 
 
@@ -186,6 +273,94 @@ def refuse_out_of_scope(reason: str, *, category: str = "out_of_scope") -> dict[
     }
 
 
+def search_corpus(query: str, *, k: int = 5) -> dict[str, Any]:
+    from .rag.retrieve import hybrid_search, index_ready
+
+    if not index_ready():
+        return {
+            "query": query,
+            "hits": [],
+            "error": "corpus_not_built",
+            "detail": "Run the Varsity ingest CLI to build the local RAG index.",
+        }
+    hits = hybrid_search(query, k=k)
+    slim = [
+        {
+            "chunk_id": h["chunk_id"],
+            "score": h["score"],
+            "module": h.get("module"),
+            "chapter": h.get("chapter"),
+            "url": h.get("url"),
+            "excerpt": h.get("excerpt"),
+            "kind": h.get("kind"),
+            "term": h.get("term"),
+        }
+        for h in hits
+    ]
+    return {"query": query, "hits": slim}
+
+
+def read_chunk_tool(chunk_id: str) -> dict[str, Any]:
+    from .rag.retrieve import read_chunk
+
+    hit = read_chunk(chunk_id)
+    if hit is None:
+        return {"found": False, "chunk_id": chunk_id}
+    return {
+        "found": True,
+        "chunk_id": chunk_id,
+        "module": hit.get("module"),
+        "chapter": hit.get("chapter"),
+        "url": hit.get("url"),
+        "text": hit.get("text"),
+        "kind": hit.get("kind"),
+        "term": hit.get("term"),
+    }
+
+
+def lookup_chapter(module: int, chapter_title: str | None = None) -> dict[str, Any]:
+    import json
+
+    from .paths import chapter_index_path
+
+    path = chapter_index_path()
+    if not path.exists():
+        return {"found": False, "detail": "chapter_index.json missing"}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    modules = data.get("modules") or []
+    match_mod = next((m for m in modules if int(m.get("module") or -1) == int(module)), None)
+    if match_mod is None:
+        return {"found": False, "module": module}
+    chapters = match_mod.get("chapters") or []
+    if chapter_title:
+        needle = chapter_title.strip().lower()
+        for chapter in chapters:
+            title = str(chapter.get("title") or "")
+            if needle in title.lower():
+                return {
+                    "found": True,
+                    "module": module,
+                    "module_title": match_mod.get("title"),
+                    "chapter": title,
+                    "url": chapter.get("url"),
+                    "blurb": chapter.get("blurb"),
+                }
+    return {
+        "found": True,
+        "module": module,
+        "module_title": match_mod.get("title"),
+        "module_url": match_mod.get("url"),
+        "chapters": [
+            {"title": c.get("title"), "url": c.get("url"), "blurb": c.get("blurb")}
+            for c in chapters[:12]
+        ],
+    }
+
+
+def done_retrieving(summary: str) -> dict[str, Any]:
+    return {"done": True, "summary": summary.strip()}
+
+
 def execute_glossary_tool(
     name: str,
     arguments: dict[str, Any],
@@ -207,6 +382,24 @@ def execute_glossary_tool(
             str(arguments.get("reason", "")),
             category=str(arguments.get("category", "out_of_scope")),
         )
+    if name == "search_corpus":
+        k_raw = arguments.get("k", 5)
+        try:
+            k = int(k_raw)
+        except (TypeError, ValueError):
+            k = 5
+        return search_corpus(str(arguments.get("query", "")), k=k)
+    if name == "read_chunk":
+        return read_chunk_tool(str(arguments.get("chunk_id", "")))
+    if name == "lookup_chapter":
+        try:
+            module = int(arguments.get("module", 0))
+        except (TypeError, ValueError):
+            module = 0
+        title = arguments.get("chapter_title")
+        return lookup_chapter(module, str(title) if title else None)
+    if name == "done_retrieving":
+        return done_retrieving(str(arguments.get("summary", "")))
     return {"error": "unhandled_tool"}
 
 

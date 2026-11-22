@@ -31,4 +31,12 @@ frontend-react/dist/*
 
 # Zerodha Varsity PDFs — local research copies only (do not push)
 docs/varsity_docs/*.pdf
+# Local RAG POC artifacts (extracted Varsity text + embeddings — never redistribute)
+docs/varsity_docs/extracted/
+docs/varsity_docs/.rag_index/
+
+# Release outlines and agent plans/specs — local planning only (do not push)
+docs/releases/
+docs/superpowers/
+
 .worktrees/
