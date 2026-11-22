@@ -271,6 +271,12 @@ button.text-link:disabled{opacity:.55;cursor:wait}
 .glossary-citation-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .glossary-citation-chip{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid #dbe5e1;background:#fff;color:#2f6b52;font-size:12px;font-weight:600;text-decoration:none}
 .glossary-citation-chip:hover{border-color:#9bcdb7;background:#f3faf6}
+.glossary-evidence{margin-top:12px;border:1px solid #dbe5e1;border-radius:10px;padding:8px 12px;background:#f8fbf9}
+.glossary-evidence summary{cursor:pointer;font-size:13px;font-weight:600;color:#2f6b52}
+.glossary-evidence-list{margin:10px 0 4px;padding-left:18px}
+.glossary-evidence-list li{margin-bottom:10px}
+.glossary-evidence-meta{font-size:12px;color:#3d5a4e}
+.glossary-evidence-excerpt{margin:4px 0 0;font-size:12px;color:#4a5c54;line-height:1.45}
 .glossary-suggestion-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
 .glossary-suggestion-chips>span{font-size:12px;color:#718089;font-weight:600}
 .glossary-suggestion-chips button,.glossary-suggestion-chips-inline button{border:1px solid #dbe5e1;background:#fff;border-radius:999px;padding:6px 12px;color:#2f6b52;font-size:12px;font-weight:600;cursor:pointer}

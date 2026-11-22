@@ -57,7 +57,7 @@ Edit `.env` in the repo root. **Never commit** real secrets.
 | `GROQ_API_KEY` | Optional — glossary multi-turn agent over seed (empty → deterministic matcher) |
 | `GLOSSARY_LLM_MODEL` | Groq chat model (default `openai/gpt-oss-120b`) |
 
-**Glossary:** See [setup.md](setup.md#glossary-chat-release-111) for endpoints and scope.
+**Glossary:** See [setup.md](setup.md#glossary-chat-release-111) for endpoints, model switching, and optional local Varsity ingest (`uv run python portfolio-service/scripts/glossary/ingest_varsity_corpus.py`).
 
 ### 6. Smoke test
 

@@ -36,26 +36,40 @@ function AssistantMessage({ result }: { result: GlossaryAgentChatResult }) {
       {result.mode === 'fallback' ? (
         <p className="glossary-chat-mode-note">AI chat is offline — using seed lookup.</p>
       ) : null}
-      {result.citations?.length ? <CitationChips citations={result.citations} /> : null}
+      {result.mode === 'multi_agent' ? (
+        <p className="glossary-chat-mode-note">Answered with local corpus RAG (POC).</p>
+      ) : null}
+      {result.citations?.length ? <EvidencePanel citations={result.citations} /> : null}
     </article>
   );
 }
 
-function CitationChips({ citations }: { citations: NonNullable<GlossaryAgentChatResult['citations']> }) {
+function EvidencePanel({ citations }: { citations: NonNullable<GlossaryAgentChatResult['citations']> }) {
   return (
-    <div className="glossary-citation-chips" aria-label="Further reading">
-      {citations.map((source) => (
-        <a
-          key={`${source.module}-${source.chapter}-${source.url}-${source.term ?? ''}`}
-          className="glossary-citation-chip"
-          href={source.url}
-          target="_blank"
-          rel="noreferrer"
-        >
-          {source.term ? `${source.term} · ` : ''}Module {source.module} · {source.chapter}
-        </a>
-      ))}
-    </div>
+    <details className="glossary-evidence">
+      <summary>Evidence ({citations.length})</summary>
+      <ul className="glossary-evidence-list">
+        {citations.map((source) => (
+          <li key={`${source.module}-${source.chapter}-${source.url}-${source.chunk_id ?? source.term ?? ''}`}>
+            <div className="glossary-evidence-meta">
+              {source.term ? <strong>{source.term}</strong> : null}
+              {source.term ? ' · ' : null}
+              Module {source.module}
+              {source.chapter ? ` · ${source.chapter}` : ''}
+              {source.url ? (
+                <>
+                  {' · '}
+                  <a href={source.url} target="_blank" rel="noreferrer">
+                    Varsity
+                  </a>
+                </>
+              ) : null}
+            </div>
+            {source.excerpt ? <p className="glossary-evidence-excerpt">{source.excerpt}</p> : null}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
@@ -114,13 +128,13 @@ export default function GlossaryChatPage() {
     <>
       <PageHeader
         title="Glossary"
-        subtitle="Multi-turn chat for investing terminology. Answers use the curated seed and optional Varsity chapter links."
+        subtitle="Multi-turn chat for investing terminology. Prose answers with optional local corpus evidence."
       />
 
       <section className="panel glossary-chat-panel">
         <div className="glossary-chat-banner" role="note">
-          Definitions only — not investment advice. This assistant explains terms; it does not recommend buys,
-          sells, or switches.
+          POC educational assistant — not advice; corpus stays local. Explains terms only (no buy/sell/switch
+          picks). Varsity © Zerodha.
         </div>
 
         <div className="glossary-chat-log" ref={logRef} aria-live="polite">

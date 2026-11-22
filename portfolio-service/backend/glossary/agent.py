@@ -13,7 +13,7 @@ from .guards import REFUSAL_MESSAGES, detect_refusal
 from .matcher import GlossaryMatcher
 from .models import GlossaryResult, GlossaryResultKind, RefusalCategory
 from .tools import (
-    GLOSSARY_TOOL_SCHEMAS,
+    SEED_TOOL_SCHEMAS,
     execute_glossary_tool,
     parse_tool_arguments,
 )
@@ -326,7 +326,7 @@ def _run_agent_loop(
         completion = client.chat.completions.create(
             model=model,
             messages=chat_messages,
-            tools=GLOSSARY_TOOL_SCHEMAS,
+            tools=SEED_TOOL_SCHEMAS,
             tool_choice="auto",
             timeout=timeout,
         )
@@ -417,6 +417,18 @@ def run_glossary_agent(
         precheck = detect_refusal(user_text)
         if precheck is not None:
             return _precheck_refusal(user_text, precheck)
+
+    # Prefer LangGraph multi-agent RAG when local index + LLM are configured.
+    if client is None:
+        try:
+            from .agents.graph import multi_agent_available, run_multi_agent_glossary
+
+            if multi_agent_available():
+                return run_multi_agent_glossary(messages)
+        except Exception:
+            logger.exception(
+                "Glossary multi-agent path failed; falling back to seed agent/matcher"
+            )
 
     api_key = os.environ.get("GROQ_API_KEY")
     if client is None and not api_key:

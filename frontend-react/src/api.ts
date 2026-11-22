@@ -457,12 +457,15 @@ export type GlossaryAgentChatMessage = {
 
 export type GlossaryCitation = GlossarySource & {
   term?: string | null;
+  excerpt?: string | null;
+  chunk_id?: string | null;
 };
 
 export type GlossaryAgentChatResult = {
   assistant_message: string;
-  mode: 'agent' | 'fallback';
+  mode: 'agent' | 'fallback' | 'multi_agent';
   citations?: GlossaryCitation[];
+  agent_trace?: Array<Record<string, unknown>>;
   refusal?: {
     category?: string | null;
     reason?: string | null;
