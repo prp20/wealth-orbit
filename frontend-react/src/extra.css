@@ -267,7 +267,12 @@ button.text-link:disabled{opacity:.55;cursor:wait}
 .panel-sync{flex-wrap:wrap}
 .glossary-chat-banner{margin:0;padding:10px 12px;border-radius:10px;background:#f3faf6;border:1px solid #c6e4d5;color:#2f5c48;font-size:13px;line-height:1.45}
 .glossary-chat-mode-note{margin:10px 0 0;font-size:12px;color:#718089;font-style:italic}
-.glossary-agent-prose{margin:0;white-space:pre-wrap}
+.glossary-agent-prose{margin:0}
+.glossary-agent-prose p{margin:0 0 10px}
+.glossary-agent-prose p:last-child{margin-bottom:0}
+.glossary-agent-list{margin:0 0 10px;padding-left:1.25rem}
+.glossary-agent-list li{margin:0 0 6px}
+.glossary-agent-list li:last-child{margin-bottom:0}
 .glossary-citation-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .glossary-citation-chip{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid #dbe5e1;background:#fff;color:#2f6b52;font-size:12px;font-weight:600;text-decoration:none}
 .glossary-citation-chip:hover{border-color:#9bcdb7;background:#f3faf6}
@@ -284,7 +289,7 @@ button.text-link:disabled{opacity:.55;cursor:wait}
 .glossary-suggestion-chips button:disabled,.glossary-suggestion-chips-inline button:disabled{opacity:.5;cursor:wait}
 .glossary-suggestion-chips-inline{display:flex;flex-wrap:wrap;gap:8px}
 .glossary-chat-panel{display:flex;flex-direction:column;gap:14px;min-height:min(70vh,640px)}
-.glossary-chat-log{flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:4px 2px 8px;min-height:280px;max-height:min(58vh,520px)}
+.glossary-chat-log{flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:4px 2px 8px;min-height:320px;max-height:min(70vh,680px)}
 .glossary-chat-empty{color:#55706b;font-size:14px;line-height:1.5;padding:12px 4px}
 .glossary-sample-terms{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
 .glossary-sample-terms>span{font-size:12px;color:#718089;font-weight:600}

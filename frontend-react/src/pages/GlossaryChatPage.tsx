@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api, GlossaryAgentChatMessage, GlossaryAgentChatResult } from '../api';
+import { api, GlossaryAgentChatMessage, GlossaryAgentChatResult, GlossaryCitation } from '../api';
 import PageHeader from '../components/PageHeader';
 
 const SUGGESTION_PROMPTS = ['What is an IPO?', 'ROE vs ROCE', 'What is NAV?'] as const;
@@ -9,14 +9,68 @@ type ChatEntry =
   | { id: string; role: 'user'; text: string }
   | { id: string; role: 'assistant'; result: GlossaryAgentChatResult };
 
+function cleanProse(text: string): string {
+  return text
+    .replace(/【[^】]+】/g, '')
+    .replace(/\[[\w:.-]{1,40}\]/g, '')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function renderInlineEmphasis(text: string): React.ReactNode[] {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
   return parts.map((part, index) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
       return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2 && !part.startsWith('**')) {
+      return <em key={index}>{part.slice(1, -1)}</em>;
     }
     return <React.Fragment key={index}>{part}</React.Fragment>;
   });
+}
+
+function Prose({ text }: { text: string }) {
+  const cleaned = cleanProse(text);
+  const blocks = cleaned.split(/\n{2,}/).filter(Boolean);
+  return (
+    <div className="glossary-agent-prose">
+      {blocks.map((block, index) => {
+        const lines = block.split('\n');
+        const isList = lines.every((line) => /^\s*\d+\.\s+/.test(line) || /^\s*[-*]\s+/.test(line));
+        if (isList) {
+          const ordered = lines.every((line) => /^\s*\d+\.\s+/.test(line));
+          const ListTag = ordered ? 'ol' : 'ul';
+          return (
+            <ListTag key={index} className="glossary-agent-list">
+              {lines.map((line, lineIndex) => (
+                <li key={lineIndex}>
+                  {renderInlineEmphasis(line.replace(/^\s*(?:\d+\.|[-*])\s+/, ''))}
+                </li>
+              ))}
+            </ListTag>
+          );
+        }
+        return (
+          <p key={index}>{renderInlineEmphasis(block.replace(/\n/g, ' '))}</p>
+        );
+      })}
+    </div>
+  );
+}
+
+function dedupeCitations(citations: GlossaryCitation[]): GlossaryCitation[] {
+  const seen = new Set<string>();
+  const out: GlossaryCitation[] = [];
+  for (const source of citations) {
+    const key = `${source.module}|${source.chapter}|${source.url}|${source.term ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(source);
+  }
+  return out.slice(0, 6);
 }
 
 function AssistantMessage({ result }: { result: GlossaryAgentChatResult }) {
@@ -24,6 +78,7 @@ function AssistantMessage({ result }: { result: GlossaryAgentChatResult }) {
   const bubbleClass = refusal
     ? 'glossary-chat-bubble glossary-chat-bubble-assistant glossary-chat-refusal'
     : 'glossary-chat-bubble glossary-chat-bubble-assistant';
+  const citations = result.citations?.length ? dedupeCitations(result.citations) : [];
 
   return (
     <article className={bubbleClass}>
@@ -32,19 +87,19 @@ function AssistantMessage({ result }: { result: GlossaryAgentChatResult }) {
           {refusal.category === 'advice' ? 'No investment advice' : 'Definitions only'}
         </p>
       ) : null}
-      <p className="glossary-agent-prose">{renderInlineEmphasis(result.assistant_message)}</p>
+      <Prose text={result.assistant_message} />
       {result.mode === 'fallback' ? (
         <p className="glossary-chat-mode-note">AI chat is offline — using seed lookup.</p>
       ) : null}
       {result.mode === 'multi_agent' ? (
         <p className="glossary-chat-mode-note">Answered with local corpus RAG (POC).</p>
       ) : null}
-      {result.citations?.length ? <EvidencePanel citations={result.citations} /> : null}
+      {citations.length ? <EvidencePanel citations={citations} /> : null}
     </article>
   );
 }
 
-function EvidencePanel({ citations }: { citations: NonNullable<GlossaryAgentChatResult['citations']> }) {
+function EvidencePanel({ citations }: { citations: GlossaryCitation[] }) {
   return (
     <details className="glossary-evidence">
       <summary>Evidence ({citations.length})</summary>

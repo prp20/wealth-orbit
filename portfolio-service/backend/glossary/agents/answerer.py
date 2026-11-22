@@ -2,12 +2,20 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from .state import GlossaryGraphState
+
+# Model sometimes pastes retrieval ids like 【seed:IPO】 or [m1-c25] into prose.
+_CITATION_MARKERS = re.compile(
+    r"(?:【[^】]+】|\[[\w:.-]{1,40}\]|(?:\s*source\s*ids?\s*:.*$))",
+    re.IGNORECASE | re.MULTILINE,
+)
+_MD_HEADING = re.compile(r"^#{1,6}\s+", re.MULTILINE)
 
 
 def answer_node(state: GlossaryGraphState, *, model: BaseChatModel) -> dict[str, Any]:
@@ -37,7 +45,12 @@ def answer_node(state: GlossaryGraphState, *, model: BaseChatModel) -> dict[str,
                     "Write a clear learner-friendly explanation using ONLY the evidence pack. "
                     "Do not invent facts. Do not give buy/sell advice. "
                     "Do not tell the user to go read a chapter instead of explaining. "
-                    "Keep quotes short. Mention module/chapter naturally when helpful."
+                    "Keep quotes short. You may name a Varsity chapter in plain words. "
+                    "Format: short paragraphs; optional numbered steps. "
+                    "Use **bold** for key terms only. "
+                    "Do NOT use markdown headings (#). "
+                    "Do NOT insert citation markers, chunk ids, brackets like 【…】 or [m1-c25], "
+                    "or a 'Sources:' block — evidence is shown separately in the UI."
                     f"{notes}"
                 )
             ),
@@ -46,7 +59,7 @@ def answer_node(state: GlossaryGraphState, *, model: BaseChatModel) -> dict[str,
             ),
         ]
     )
-    draft = (getattr(result, "content", None) or "").strip()
+    draft = _clean_answer_prose(getattr(result, "content", None) or "")
     if not draft:
         # Fallback: stitch seed excerpts
         parts = []
@@ -68,31 +81,59 @@ def answer_node(state: GlossaryGraphState, *, model: BaseChatModel) -> dict[str,
     }
 
 
+def _clean_answer_prose(text: str) -> str:
+    cleaned = _CITATION_MARKERS.sub("", text or "")
+    cleaned = _MD_HEADING.sub("", cleaned)
+    cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
 def _citations_from_evidence(evidence: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Dedupe by module+chapter+url; prefer seed rows; cap for a clean evidence panel."""
     seen: set[tuple[Any, ...]] = set()
     citations: list[dict[str, Any]] = []
-    for item in evidence:
+
+    def add(item: dict[str, Any]) -> None:
         excerpt = str(item.get("excerpt") or "")
         words = excerpt.split()
         if len(words) > 40:
             excerpt = " ".join(words[:40]) + "…"
-        key = (
-            item.get("module"),
-            item.get("chapter"),
-            item.get("url"),
-            item.get("chunk_id"),
-        )
+        chapter = str(item.get("chapter") or "")
+        url = str(item.get("url") or "")
+        module = item.get("module") or 0
+        # Collapse many chunks from the same chapter into one evidence row.
+        key = (module, chapter.lower() or url)
+        if not chapter and not url and not item.get("term"):
+            return
         if key in seen:
-            continue
+            return
         seen.add(key)
         citations.append(
             {
-                "module": item.get("module") or 0,
-                "chapter": item.get("chapter") or "",
-                "url": item.get("url") or "",
+                "module": module,
+                "chapter": chapter,
+                "url": url,
                 "excerpt": excerpt,
                 "chunk_id": item.get("chunk_id"),
                 "term": item.get("term"),
             }
         )
-    return citations
+
+    def _looks_noisy(excerpt: str) -> bool:
+        # Mid-PDF accounting dumps make a poor evidence UI.
+        if re.search(r"\d{3,}[,\d]*", excerpt or ""):
+            digit_ratio = sum(ch.isdigit() for ch in excerpt) / max(len(excerpt), 1)
+            if digit_ratio > 0.12:
+                return True
+        return False
+
+    # Seed definitions first, then unique chapters from corpus hits.
+    for item in evidence:
+        if item.get("kind") == "seed" or str(item.get("chunk_id") or "").startswith("seed:"):
+            add(item)
+    for item in evidence:
+        if _looks_noisy(str(item.get("excerpt") or "")):
+            continue
+        add(item)
+    return citations[:3]
