@@ -126,7 +126,7 @@ function Shell() {
           )}
         </div>
       </aside>
-      <main>
+      <main className={location.pathname.startsWith('/glossary') ? 'main-flush' : undefined}>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/login" element={<LoginPage />} />
