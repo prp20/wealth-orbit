@@ -31,4 +31,9 @@ frontend-react/dist/*
 
 # Zerodha Varsity PDFs — local research copies only (do not push)
 docs/varsity_docs/*.pdf
+
+# Release outlines and agent plans/specs — local planning only (do not push)
+docs/releases/
+docs/superpowers/
+
 .worktrees/
