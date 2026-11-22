@@ -36,11 +36,12 @@ Handbook for contributors and operators. Product name in the UI is **Wealth Orbi
 
 ## Authoring (Varsity)
 
-Local research copies and chapter index for glossary-style features (planned release **1.11** — not shipped in app code on this branch):
+Local research copies and chapter index for the **1.11** glossary chat (seed + Varsity links):
 
 - [varsity_docs/chapter_index.json](varsity_docs/chapter_index.json)
+- [varsity_docs/glossary_seed.json](varsity_docs/glossary_seed.json)
 
-PDFs under `varsity_docs/` are gitignored; download locally if needed for authoring.
+PDFs under `varsity_docs/` are gitignored (local authoring / future RAG ingest only).
 
 ## Local-only (gitignored)
 
