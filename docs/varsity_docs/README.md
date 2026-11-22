@@ -2,11 +2,14 @@
 
 Offline research copies and structured indexes for Nivesh glossary authoring (**release 1.11**).
 
-## Copyright
+## Copyright & credit
 
-- Varsity content is © Zerodha. Reproduction of materials, text, and images is not permitted by Varsity.
-- PDFs here are **local research copies only** (gitignored). Do **not** ship them in the app or redistribute them.
-- The product uses **our** short definitions plus citations (module/chapter title + URL), via `glossary_seed.json`.
+Wealth Orbit is a **learning project**. If you use Zerodha Varsity documents (or extracts derived from them) while exploring this repo:
+
+- **All credit for Varsity educational content belongs to Zerodha.** Varsity materials are © Zerodha.
+- Reproduction or redistribution of Varsity PDFs, full chapter text, or images is **not** permitted by Varsity and is **not** authorized by this project.
+- PDFs and RAG extracts under this folder are **local research copies only** (gitignored). Do **not** ship or publish them with the app.
+- The in-app glossary uses **our** short curated definitions plus citations (module/chapter title + URL) via `glossary_seed.json` — not wholesale Varsity text.
 
 ## Files
 

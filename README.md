@@ -4,6 +4,14 @@ Multi-user portfolio research for India mutual funds and listed equities: local 
 
 **Naming:** The product UI and API are **Wealth Orbit**. **Nivesh** is the historical PRD / codename in older documents ([`docs/Nivesh_Product_Requirements_and_Roadmap_v1.1.md`](docs/Nivesh_Product_Requirements_and_Roadmap_v1.1.md)).
 
+## License & learning disclaimer
+
+This repository is a **personal learning / portfolio project**, not a commercial product or official Zerodha offering.
+
+Any Zerodha Varsity materials used for local study (PDFs, chapter indexes, RAG extracts, or similar) remain **© Zerodha**. Credit for that educational content belongs entirely to **Zerodha**. Do not redistribute Varsity documents or treat them as part of this project's license. Local copies stay gitignored for offline research only — see [`docs/varsity_docs/README.md`](docs/varsity_docs/README.md).
+
+Wealth Orbit's own code and curated glossary seed definitions are separate from Varsity's copyrighted materials.
+
 ## Documentation
 
 | Start here | Purpose |
