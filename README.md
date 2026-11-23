@@ -4,6 +4,14 @@ Multi-user portfolio research for India mutual funds and listed equities: local 
 
 **Naming:** The product UI and API are **Wealth Orbit**. **Nivesh** is the historical PRD / codename in older documents ([`docs/Nivesh_Product_Requirements_and_Roadmap_v1.1.md`](docs/Nivesh_Product_Requirements_and_Roadmap_v1.1.md)).
 
+## License & learning disclaimer
+
+This repository is a **personal learning / portfolio project**, not a commercial product or official Zerodha offering.
+
+Any Zerodha Varsity materials used for local study (PDFs, chapter indexes, RAG extracts, or similar) remain **© Zerodha**. Credit for that educational content belongs entirely to **Zerodha**. Do not redistribute Varsity documents or treat them as part of this project's license. Local copies stay gitignored for offline research only — see [`docs/varsity_docs/README.md`](docs/varsity_docs/README.md).
+
+Wealth Orbit's own code and curated glossary seed definitions are separate from Varsity's copyrighted materials.
+
 ## Documentation
 
 | Start here | Purpose |
@@ -55,6 +63,24 @@ Empty top-level folders are aspirational names only — not separate deployables
 ```
 
 Then open [http://127.0.0.1:8000/ui/](http://127.0.0.1:8000/ui/) and **Create an account**. Details: [docs/getting-started.md](docs/getting-started.md).
+
+## Glossary chat (release 1.11)
+
+Open [http://127.0.0.1:8000/ui/glossary](http://127.0.0.1:8000/ui/glossary) for a full-height, multi-session educational chat (definitions only — not advice).
+
+| Mode | When |
+|------|------|
+| `multi_agent` | Local Varsity RAG index built **and** an LLM key is set |
+| `agent` | LLM key set, no RAG index — seed tool agent |
+| `fallback` | No LLM key — deterministic seed matcher |
+
+Optional ingest (PDFs stay local/gitignored):
+
+```bash
+uv run python portfolio-service/scripts/glossary/ingest_varsity_corpus.py
+```
+
+Setup, env switching, and API notes: [docs/setup.md](docs/setup.md#glossary-chat-release-111). Learning disclaimer / Zerodha credit: above and [`docs/varsity_docs/README.md`](docs/varsity_docs/README.md).
 
 ## Portfolio model (summary)
 

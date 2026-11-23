@@ -24,6 +24,17 @@ dependencies = [
     "pyotp>=2.9.0",
     "growwapi>=1.5.0",
     "cryptography>=44.0.0",
+    "groq>=1.7.0",
+    "langgraph>=1.2.24",
+    "langchain-core>=1.7.2",
+    "langchain-groq>=1.2.0",
+    "langchain-openai>=1.7.3",
+    "pymupdf>=2.1",
+    "pypdf>=7.1.1",
+    "chromadb>=1.5.9",
+    "fastembed>=0.9.1",
+    "rank-bm25>=0.2.2",
+    "tiktoken>=0.14.0",
 ]
 
 [dependency-groups]

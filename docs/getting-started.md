@@ -54,16 +54,20 @@ Edit `.env` in the repo root. **Never commit** real secrets.
 |----------|---------|
 | `EXCHANGE_RATE_API_KEY` | Home USD/INR via ExchangeRate-API ([signup](https://www.exchangerate-api.com/)). Without it, USD/INR on Home may fail when that path is used. |
 | `SESSION_SECRET` | Cookie signing (generated on first setup if left blank) |
+| `GROQ_API_KEY` | Optional — glossary multi-turn agent / RAG (empty → deterministic matcher) |
+| `GLOSSARY_LLM_PROVIDER` | Optional — `groq` (default), `openai`, or `openai_compatible` |
+| `GLOSSARY_LLM_MODEL` | Optional chat model id (default `openai/gpt-oss-120b` on Groq) |
 
-**Glossary / Groq:** There is no glossary HTTP API or Groq integration in application code on this branch. When glossary chat lands, expect optional `GROQ_API_KEY` and `GLOSSARY_LLM_MODEL` (planned default `openai/gpt-oss-120b` on Groq — see [glossary-engineering.md](glossary-engineering.md)).
+**Glossary:** Full-height multi-session UI at [http://127.0.0.1:8000/ui/glossary](http://127.0.0.1:8000/ui/glossary). Endpoints, model switching, and optional Varsity ingest: [setup.md](setup.md#glossary-chat-release-111).
 
 ### 6. Smoke test
 
 1. Sign in after account creation.
 2. Open **Home** — index strip loads when index seed ran.
 3. Open **Stocks** or **Mutual funds** — list pages read Postgres masters.
-4. Open API docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) — try `GET /api/v1/health`.
-5. (Optional) Run tests: `uv run pytest` from repo root.
+4. Open **Glossary** — ask “What is an IPO?”; use **New chat** for a second session.
+5. Open API docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) — try `GET /api/v1/health`.
+6. (Optional) Run tests: `uv run pytest tests/test_glossary_*.py -q` from repo root.
 
 ### 7. Next reading
 

@@ -86,4 +86,10 @@ Domain logic: `portfolio-service/backend/` (imported via `backend_api.app.portfo
 
 ## Glossary API
 
-No `/glossary` routes are registered on this branch (planned for a later glossary chat release).
+Public (no login cookie required) under `/api/v1/glossary` — see [../setup.md](../setup.md#glossary-chat-release-111). Product UI: `/ui/glossary` (multi-session browser chat).
+
+| Method | Path | Notes |
+|--------|------|--------|
+| `POST` | `/chat` | Single-turn seed matcher |
+| `POST` | `/agent/chat` | Multi-turn: `multi_agent` \| `agent` \| `fallback` (+ optional `citations`) |
+| `GET` | `/terms` | Browse curated seed terms |

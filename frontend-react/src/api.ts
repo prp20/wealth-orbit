@@ -27,7 +27,7 @@ async function post<T>(path: string): Promise<T> {
   return response.json();
 }
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
+async function postJson<T>(path: string, body: unknown, fallback = 'Could not sign in'): Promise<T> {
   const response = await fetch(`${base}${path}`, {
     method: 'POST',
     credentials: 'include',
@@ -35,7 +35,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(errorDetail(await response.json().catch(() => ({})), 'Could not sign in'));
+    throw new Error(errorDetail(await response.json().catch(() => ({})), fallback));
   }
   return response.json();
 }
@@ -402,6 +402,15 @@ export const api = {
   vaultPullSummary: () => get<VaultSummary>('/vault/pull-summary'),
   vaultPushFromSqlite: () => postJson<VaultPushResult>('/vault/push-from-sqlite', {}),
   vaultReset: (confirm: string) => postJson<VaultResetResult>('/vault/reset', { confirm }),
+  glossaryChat: (message: string) =>
+    postJson<GlossaryChatResult>('/glossary/chat', { message }, 'Could not reach the glossary service'),
+  glossaryAgentChat: (messages: GlossaryAgentChatMessage[]) =>
+    postJson<GlossaryAgentChatResult>(
+      '/glossary/agent/chat',
+      { messages },
+      'Could not reach the glossary service',
+    ),
+  glossaryTerms: () => get<GlossaryTermListItem[]>('/glossary/terms'),
 };
 
 export type VaultMeta = {
@@ -456,4 +465,50 @@ export type TrackInstrumentResult = {
   master: Record<string, unknown>;
   jobs: { job_id?: string; kind?: string; duplicate?: boolean }[];
   preview?: InstrumentPreview;
+};
+
+export type GlossarySource = {
+  module: number;
+  chapter: string;
+  url: string;
+};
+
+export type GlossaryChatResult =
+  | {
+      kind: 'match';
+      term: string;
+      definition: string;
+      sources: GlossarySource[];
+    }
+  | {
+      kind: 'refusal';
+      refusal_reason: string;
+      refusal_category: 'advice' | 'dump';
+    }
+  | { kind: 'unknown' };
+
+export type GlossaryTermListItem = {
+  term: string;
+  aliases: string[];
+};
+
+export type GlossaryAgentChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+export type GlossaryCitation = GlossarySource & {
+  term?: string | null;
+  excerpt?: string | null;
+  chunk_id?: string | null;
+};
+
+export type GlossaryAgentChatResult = {
+  assistant_message: string;
+  mode: 'agent' | 'fallback' | 'multi_agent';
+  citations?: GlossaryCitation[];
+  refusal?: {
+    category?: string | null;
+    reason?: string | null;
+  };
 };

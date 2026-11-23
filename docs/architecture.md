@@ -83,9 +83,13 @@ Local accounts in SQLite: signup/login set an HTTP-only cookie. There is no emai
 
 Multi-client vault ownership is keyed by `VAULT_USER_ID` (same UUID on PC `.env` and Android setup). Email Auth is optional/not required for the pooler path.
 
+## Glossary (shipped, educational)
+
+`/ui/glossary` is a full-height multi-session chat over curated seed terms, with an optional local Varsity RAG path (`multi_agent`). It refuses investment advice and PDF dumps. Details: [setup.md](setup.md#glossary-chat-release-111).
+
 ## What is not shipped yet
 
-Future milestones (MTM/XIRR, watchlists, stance engine, glossary chat, strategy lab, full SQLite→vault cutover as default) are tracked in local-only `docs/releases/` when present. Until those land in the product, the UI remains **cost-basis portfolio** plus **stored market research** — no buy/sell stance layer in production code.
+Future milestones (MTM/XIRR, watchlists, stance engine, strategy lab, full SQLite→vault cutover as default) are tracked in local-only `docs/releases/` when present. The core UI remains **cost-basis portfolio** plus **stored market research** — no buy/sell stance layer in production code.
 
 ## Related docs
 
