@@ -8,6 +8,7 @@ from backend_api.app.auth_routes import router as auth_router
 from backend_api.app.logging_config import configure_logging
 from backend_api.app.market_data_routes import router as market_data_router
 from backend_api.app.portfolio_routes import router as portfolio_router
+from backend_api.app.vault_routes import router as vault_router
 
 app = FastAPI(title="Wealth Orbit API", version="1.0.0")
 configure_logging()
@@ -41,6 +42,7 @@ def legacy_ui_redirect(request: Request):
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(portfolio_router, prefix="/api/v1")
 app.include_router(market_data_router, prefix="/api/v1")
+app.include_router(vault_router, prefix="/api/v1")
 
 UI_DIST = Path(__file__).resolve().parents[2] / "frontend-react" / "dist"
 
