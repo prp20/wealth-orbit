@@ -49,4 +49,6 @@ Details: [market.md](market.md).
 
 ## UI read path
 
-React calls FastAPI `/api/v1/market-data/*` → `portfolio-service/backend/reference_service.py` and related modules → Postgres. Portfolio pages call `/api/v1/portfolios/*` → SQLite.
+React calls FastAPI `/api/v1/market-data/*` → `portfolio-service/backend/reference_service.py` and related modules → Postgres. Portfolio pages call `/api/v1/portfolios/*` → SQLite. Vault pages/API use `/api/v1/vault*` → encrypt/decrypt with `PORTFOLIO_ENCRYPTION_SECRET` → `public.portfolio_vault`.
+
+Android uses a **restricted session pooler** URI (see [../../supabase/android_readonly_role.sql](../../supabase/android_readonly_role.sql)): SELECT on `market_data`, vault as granted. GitHub Actions uses [../../supabase/gha_market_writer.sql](../../supabase/gha_market_writer.sql) (`MARKET_DATABASE_URL`) with **no** vault privileges.

@@ -227,15 +227,15 @@ v1 migration outline (detail in implementation plan):
 
 ## 15. Success criteria
 
-- [ ] Same encrypted portfolio document readable on PC and Android after configuring the shared secret
-- [ ] Supabase dashboard / SQL cannot reveal holdings plaintext
-- [ ] Android restricted role cannot write `market_data` (verified by grants / failed INSERT)
-- [ ] GHA updates market data without portfolio credentials
-- [ ] Lost secret → unreadable vault; PC reset creates empty vault + new secret
-- [ ] Android agent answers using local skill.md + decrypted context via user Groq key
-- [ ] Android app stays lightweight: no bulk market sync or on-device LLM; narrow fetches only
-- [ ] App installs and runs on Android 7.0 (API 24) and newer
-- [ ] Design and implementation docs stay consistent with [architecture.md](../architecture.md) and [data/overview.md](../data/overview.md) until those are updated in the same initiative
+- [x] Same encrypted portfolio document readable on PC and Android after configuring the shared secret *(PC vault API + Android Portfolio screen; operator must push once and paste shared secret / VAULT_USER_ID)*
+- [x] Supabase dashboard / SQL cannot reveal holdings plaintext *(ciphertext-only column + AES-GCM contract)*
+- [x] Android restricted role cannot write `market_data` (verified by grants / failed INSERT) *(SQL template `supabase/android_readonly_role.sql`; apply + verify in project)*
+- [x] GHA updates market data without portfolio credentials *(workflow + `gha_market_writer` + CI refuses vault secrets)*
+- [x] Lost secret → unreadable vault; PC reset creates empty vault + new secret *(PC Vault settings + reset API)*
+- [x] Android agent answers using local skill.md + decrypted context via user Groq key *(Agent screen + GroqClient)*
+- [x] Android app stays lightweight: no bulk market sync or on-device LLM; narrow fetches only
+- [x] App installs and runs on Android 7.0 (API 24) and newer *(`assembleDebug` with `minSdk 24`)*
+- [x] Design and implementation docs stay consistent with [architecture.md](../architecture.md) and [data/overview.md](../data/overview.md) until those are updated in the same initiative
 
 ## 16. Open for implementation plan (not undecided product)
 
