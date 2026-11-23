@@ -112,6 +112,24 @@ Or use **Vault** in the UI (`/ui/vault`) after sign-in: push, pull summary, PC-o
 
 Details: [design/2026-11-23-multi-client-e2e-portfolio-design.md](design/2026-11-23-multi-client-e2e-portfolio-design.md), [supabase/README.md](../supabase/README.md).
 
+### GitHub Actions market refresh (optional)
+
+Scheduled incremental updates for `market_data` (indexes, seeded stock prices/metrics/technicals, seeded fund NAV). Workflow: [`.github/workflows/market-data-refresh.yml`](../.github/workflows/market-data-refresh.yml).
+
+1. Run [supabase/gha_market_writer.sql](../supabase/gha_market_writer.sql) (set a strong password). Confirm that role **cannot** `SELECT` `public.portfolio_vault`.
+2. Build a **Session** pooler URI for role `gha_market_writer`.
+3. In the GitHub repo: **Settings → Secrets and variables → Actions** → create secret `MARKET_DATABASE_URL` with that URI.
+4. Do **not** add `PORTFOLIO_ENCRYPTION_SECRET`, `VAULT_USER_ID`, or `SUPABASE_SERVICE_ROLE_KEY` to Actions secrets for this workflow.
+5. Trigger **market-data-refresh** via **Actions → Run workflow**, or wait for the weekday schedule (`17 12 * * 1-5` UTC ≈ 17:47 IST).
+
+Local dry-run (uses your PC `DATABASE_URL`):
+
+```bash
+uv run python portfolio-service/scripts/ci/refresh_market_incremental.py --dry-run
+```
+
+Optional repo Variables: `MARKET_REFRESH_STOCK_LIMIT`, `MARKET_REFRESH_FUND_LIMIT` (defaults 50 / 30).
+
 **Persist (facts):** masters, OHLC / NAV / index history (default **10y**), fundamentals (5 annual + 6 quarterly periods), shareholding, latest Yahoo daily metrics, latest-day technical indicators, sync jobs.
 
 **Derived snapshots:** technical indicators (SMA/EMA/RSI/MACD/BB/ATR) are computed from OHLC and stored for the **latest trading day only**. Screener `sma_200` is computed in SQL from prices.

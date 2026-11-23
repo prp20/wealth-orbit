@@ -1,0 +1,32 @@
+name: market-data-refresh
+
+on:
+  schedule:
+    # ~17:47 IST weekdays (12:17 UTC). Off-peak minute avoids :00 pileups.
+    - cron: "17 12 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Sync Python deps
+        run: uv sync
+
+      - name: Incremental market refresh
+        run: uv run python portfolio-service/scripts/ci/refresh_market_incremental.py
+        env:
+          # Market-writer session pooler only. Never set PORTFOLIO_ENCRYPTION_SECRET,
+          # SUPABASE_SERVICE_ROLE_KEY, or VAULT_USER_ID on this job.
+          DATABASE_URL: ${{ secrets.MARKET_DATABASE_URL }}
+          CI: "true"
+          # Optional overrides (repo Variables). Script defaults: stocks=50, funds=30.
+          MARKET_REFRESH_STOCK_LIMIT: ${{ vars.MARKET_REFRESH_STOCK_LIMIT }}
+          MARKET_REFRESH_FUND_LIMIT: ${{ vars.MARKET_REFRESH_FUND_LIMIT }}
