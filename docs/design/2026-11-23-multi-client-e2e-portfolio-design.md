@@ -1,0 +1,249 @@
+# Multi-client E2E portfolio design
+
+**Status:** Approved for implementation planning  
+**Date:** 2026-11-23  
+**Branch:** `docs/multi-client-e2e-portfolio-design`  
+**Implementation plan:** [2026-11-23-multi-client-e2e-portfolio-plan.md](./2026-11-23-multi-client-e2e-portfolio-plan.md)  
+**Crypto/JSON contract:** [portfolio-vault-crypto.md](./portfolio-vault-crypto.md)
+
+## 1. Problem
+
+Wealth Orbit today is a single-machine product: React + FastAPI, portfolio/auth in local SQLite, shared market research in Supabase Postgres. There is no mobile client, no reliable daily market refresh without a running PC, and no way for a phone and PC to share the same portfolio ledger.
+
+We want dual clients (PC + Android) with a cloud source of truth, privacy for holdings against the database host, free-tier-friendly market updates, and an optional on-device agent.
+
+## 2. Goals (v1)
+
+1. PC and Android both read/write the **same** portfolio via a remote store.
+2. Portfolio plaintext never exists on Supabase; only ciphertext is stored and returned.
+3. Shared market research stays plaintext in Supabase `market_data`.
+4. GitHub Actions performs scheduled market data updates.
+5. Android is **read-only** for market data; may write **portfolio ciphertext only**.
+6. Android can run a Groq-backed agent with a local `skill.md` after decrypting portfolio on device.
+7. Lost encryption secret makes old portfolio unrecoverable; vault reset is **PC-only**.
+8. Android client is **Kotlin + Jetpack Compose** and stays **lightweight** (no heavy local compute or bulk market sync).
+9. Android **minSdk = 24** (Android 7.0 Nougat and newer).
+
+## 3. Non-goals (v1)
+
+- Phone background cron as the platform notification / digest backbone
+- Server-side portfolio analytics, digests, or Edge Functions that decrypt holdings
+- Append-only encrypted transaction log at the DB layer
+- OS keyring for PC secret storage (env file only)
+- Proxied / server-held Groq API keys
+- PocketServer as source of truth
+- Always-on free PaaS hosting of FastAPI + SQLite
+- iOS client
+- Migrating every existing FastAPI feature onto mobile in one release
+- Heavy on-device ML, large offline market mirrors, or bulk OHLC sync on the phone
+
+## 4. Trust boundaries
+
+| Party | May see portfolio plaintext? | Role |
+|-------|------------------------------|------|
+| Supabase | **No** | Store/return ciphertext; plaintext market data |
+| PC client / PC server | **Yes** | Encrypt/decrypt; admin vault reset; full UI |
+| Android app | **Yes** | Encrypt/decrypt; UI; Groq agent |
+| GitHub Actions | **No** | Incremental `market_data` writes only |
+| Groq | **Yes, if prompted** | Receives whatever context the Android agent sends |
+
+**Product honesty:** Encryption protects data at rest in Supabase. It does **not** protect holdings once the user asks the Groq agent about their portfolio.
+
+## 5. Architecture
+
+```mermaid
+flowchart TB
+  subgraph trusted [Trusted for portfolio plaintext]
+    PC[PC app / server]
+    And[Android app]
+    Secret[Shared encryption secret]
+  end
+  subgraph cloud [Supabase via session pooler]
+    Mkt[(market_data plaintext)]
+    Port[(portfolio ciphertext document)]
+    GHA[GitHub Actions]
+    Groq[Groq API]
+  end
+  Secret --> PC
+  Secret --> And
+  GHA -->|"market writer role"| Mkt
+  PC -->|"DATABASE_URL pooler"| Mkt
+  PC -->|"encrypt then upsert"| Port
+  And -->|"setup restricted pooler URL"| Mkt
+  And -->|"vault read or limited write"| Port
+  And -->|"skill.md + decrypted context + user Groq key"| Groq
+```
+
+### Components
+
+| Component | Responsibility |
+|-----------|----------------|
+| Session pooler (`DATABASE_URL`) | PC/server Postgres access to `market_data` + `portfolio_vault` (already in `.env`) |
+| Restricted Android pooler URL | Pasted at **Android app setup**; dedicated DB role — market **SELECT-only**; vault as granted. Never the full `postgres` superuser URL |
+| `market_data` schema | Existing shared research (masters, OHLC/NAV, etc.) |
+| Portfolio vault table | One encrypted document per configured vault user id |
+| PC Wealth Orbit | Decrypt/encrypt with env secret; portfolio + research UI; vault reset via pooler |
+| Android app | **Kotlin + Jetpack Compose**; setup stores pooler URL + encryption secret; research read; vault sync; local agent |
+| GitHub Actions | Scheduled market refresh using market-scoped credentials |
+| Groq | Optional Q&A; user-supplied API key on device |
+
+PocketServer remains out of the critical path (optional offline cache later).
+
+### 5.1 Android stack and lightness (locked)
+
+- **Language / UI:** Kotlin + Jetpack Compose.
+- **Minimum OS:** **Android 7.0+** (`minSdk = 24`). Aligns with broad device coverage (including older phones) and with PocketServer’s Android 7+ target; use AndroidX / desugaring as needed so Compose and crypto APIs stay compatible.
+- **Goal:** a **lightweight** client — small APK surface, low RAM/CPU when idle, no background bulk sync.
+- **Do on device:** decrypt single portfolio document; show focused research views (e.g. indexes, watchlist, latest metrics); simple derived numbers; Groq calls over the network.
+- **Do not on device:** full-universe OHLC history sync; large local market DB; on-device LLM; continuous WorkManager polling; embedding the PC FastAPI stack.
+- **Setup:** first-run screen collects (1) **restricted session pooler URL**, (2) `PORTFOLIO_ENCRYPTION_SECRET`, (3) vault `user_id` UUID (same id PC uses), (4) optional Groq key. Store in EncryptedSharedPreferences / Keystore — not in source.
+- **Data habit:** JDBC/Postgres over the pooler URL; narrow SELECTs; cache only what the current screens need; prefer network-on-open over always-on sync. No Supabase Email Auth required for v1 Android.
+- **Agent:** one-shot / chat requests to Groq over HTTPS; no local model weights. Groq’s official SDKs are Python/TypeScript, but the API is OpenAI-compatible REST ([API reference](https://console.groq.com/docs/api-reference), [overview](https://console.groq.com/docs/overview)) — call `POST https://api.groq.com/openai/v1/chat/completions` from Kotlin (OkHttp/Ktor). Flutter or React Native is **not** required for Groq.
+- **APK posture:** prefer small libraries (Postgres driver or thin HTTP if using a proxy, Android Keystore, cryptography). Avoid shipping unused Google/ML SDKs. Verify dependency `minSdk` does not force above 24.
+
+## 6. Data model
+
+### 6.1 Portfolio ciphertext document
+
+One row per user:
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `user_id` | UUID | Vault owner id (shared config on PC + Android; not necessarily Supabase Auth uid) |
+| `vault_generation` | int | Bumped on PC vault reset |
+| `version` | int | Monotonic; conflict detection |
+| `ciphertext` | bytea / text | AES-256-GCM payload (nonce + tag + ciphertext as documented) |
+| `updated_at` | timestamptz | Audit |
+
+**Plaintext (before encrypt):** single JSON snapshot of the portfolio (holdings and transactions as needed for v1 parity with current ledger semantics). Exact JSON schema is defined in the implementation plan and shared by PC and Android.
+
+**Conflict rule:** read → merge locally → encrypt → write with `version = previous + 1`. Reject or retry if remote `version` changed (last successful writer wins after retry).
+
+### 6.2 Market data
+
+Unchanged intent: plaintext Postgres `market_data` as today. Android and PC **SELECT** only from clients. Writers: GitHub Actions (and optionally PC tools with elevated role during migration)—never the Android app.
+
+### 6.3 Connection vs secrets
+
+| Item | Purpose | Storage |
+|------|---------|---------|
+| Session pooler `DATABASE_URL` | PC/server connects to Supabase Postgres (full app role) | `.env` |
+| Android restricted pooler URL | App setup input; **market SELECT-only**; vault SELECT (and optional INSERT/UPDATE on `portfolio_vault` only if you enable phone edits) | Android EncryptedSharedPreferences |
+| `VAULT_USER_ID` | Which `portfolio_vault.user_id` row to read/write | PC `.env` + Android setup |
+| `PORTFOLIO_ENCRYPTION_SECRET` | Encrypt/decrypt portfolio document | PC: `.env`. Android: secure storage |
+| Groq API key | Agent calls | Android app settings only (user-supplied) |
+
+**Android DB role (create in Supabase once):** e.g. `wealth_orbit_android` — `SELECT` on `market_data.*`; **no** market writes; **no** DDL; **no** vault DELETE / reset. Prefer a URL that is not the `postgres` superuser. Treat the device as extractable: ciphertext still protects holdings plaintext even if the URL leaks.
+
+Supabase Email Auth / anon key / RLS are **optional** (not required for this v1 path).
+
+## 7. Cryptography (v1)
+
+- Algorithm: **AES-256-GCM**
+- Key material: shared high-entropy secret (API-key style), identical on PC and Android
+- Interoperability: documented binary layout (nonce length, AAD if any, encoding) so PC (Python/TS) and Android produce compatible ciphertext
+- Supabase never receives the secret
+- GitHub Actions never receives the secret
+
+## 8. Key lifecycle
+
+### 8.1 Initial setup
+
+1. PC already has Supabase **session pooler** `DATABASE_URL` in `.env`.
+2. Set `PORTFOLIO_ENCRYPTION_SECRET` and `VAULT_USER_ID` in PC `.env`.
+3. Create restricted Postgres role + session pooler URI for Android (market read-only).
+4. On Android **setup screen**: paste restricted pooler URL, encryption secret, vault user id; optional Groq key + local `skill.md`.
+
+### 8.2 Lost secret
+
+- Existing ciphertext is permanently unreadable.
+- No server recovery path.
+
+### 8.3 Vault reset (PC only)
+
+1. Authenticated user on PC chooses **Reset portfolio vault**.
+2. Strong confirmation (re-auth / typed phrase).
+3. Delete or replace portfolio row(s); increment `vault_generation`.
+4. Set new `PORTFOLIO_ENCRYPTION_SECRET` in PC `.env`.
+5. User re-enters or re-imports portfolio under the new secret.
+6. User pastes new secret on Android (Android has **no** reset action).
+
+## 9. Android write policy (mandatory)
+
+| Capability | Allowed |
+|------------|---------|
+| Read `market_data` | Yes (via restricted pooler role) |
+| Write `market_data` / enqueue full sync | **No** |
+| Read portfolio ciphertext | Yes |
+| Write portfolio ciphertext | Optional grant on Android role only (`INSERT`/`UPDATE` on `portfolio_vault`); default product still allows phone edits if granted |
+| Vault reset / DELETE vault | **No** (PC only) |
+| Full `postgres` / market writer URL | **Never** paste into Android |
+
+Enforce with Postgres grants on the Android role, not UI alone.
+
+## 10. GitHub Actions market updates
+
+- Workflow `on.schedule` (and `workflow_dispatch`) runs incremental stock/index/NAV-style updates into `market_data`.
+- Credentials in GitHub Secrets: market-scoped DB role only (no portfolio table privileges, no encryption secret, no Groq key).
+- Prefer off-peak cron minutes; treat schedule timing as best-effort.
+- Respect Supabase Free quotas (storage, egress) with incremental jobs, not full-history reloads every run.
+- Optional later: market-only notifications (“index moved”); not portfolio digests.
+
+## 11. Groq agent (Android)
+
+1. Load Android-local `skill.md` (not synced in the encrypted cloud document).
+2. Fetch market rows + portfolio ciphertext; decrypt with shared secret.
+3. Build grounded prompt; call Groq with **user-supplied** API key.
+4. Agent is read-mostly: no silent portfolio mutations; no market writes.
+5. UX must disclose that portfolio context is sent to Groq.
+6. Align with Wealth Orbit’s no-investment-advice posture where applicable.
+
+## 12. Notifications (v1 stance)
+
+- Do **not** use phone cron as scheduler of record.
+- Portfolio-aware digests require local decrypt after unlock (or are deferred).
+- Market-only alerts may come from CI later.
+- Local/OS notifications after unlock are acceptable enhancements.
+
+## 13. Migration from today
+
+Current state: portfolio and local auth in SQLite; market data already on Supabase.
+
+v1 migration outline (detail in implementation plan):
+
+1. Portfolio vault table (done: Alembic 018); optional restricted Android DB role SQL.
+2. Shared plaintext JSON snapshot schema mapping from existing SQLite models (Wave A done).
+3. PC path: export/encrypt/upload existing ledger via session pooler; dual-run or cutover from SQLite.
+4. Point PC UI at decrypt-render-encrypt cycle for portfolio.
+5. Ship Android client: setup with restricted pooler URL + secret; research read + vault sync + agent.
+6. Add GHA market refresh; retire reliance on “PC must be on” for daily market updates.
+7. PC-only vault reset; document lost-key behavior.
+
+## 14. Free-tier notes
+
+- Supabase Free: 500 MB, inactivity pause after ~1 week, 2 active projects—keep market history trimmed.
+- GitHub Actions: suitable free scheduler for market jobs.
+- Free PaaS web services (Render/Railway sleep + ephemeral disk) are **not** used to host SQLite portfolio.
+
+## 15. Success criteria
+
+- [x] Same encrypted portfolio document readable on PC and Android after configuring the shared secret *(PC vault API + Android Portfolio screen; operator must push once and paste shared secret / VAULT_USER_ID)*
+- [x] Supabase dashboard / SQL cannot reveal holdings plaintext *(ciphertext-only column + AES-GCM contract)*
+- [x] Android restricted role cannot write `market_data` (verified by grants / failed INSERT) *(SQL template `supabase/android_readonly_role.sql`; apply + verify in project)*
+- [x] GHA updates market data without portfolio credentials *(workflow + `gha_market_writer` + CI refuses vault secrets)*
+- [x] Lost secret → unreadable vault; PC reset creates empty vault + new secret *(PC Vault settings + reset API)*
+- [x] Android agent answers using local skill.md + decrypted context via user Groq key *(Agent screen + GroqClient)*
+- [x] Android app stays lightweight: no bulk market sync or on-device LLM; narrow fetches only
+- [x] App installs and runs on Android 7.0 (API 24) and newer *(`assembleDebug` with `minSdk 24`)*
+- [x] Design and implementation docs stay consistent with [architecture.md](../architecture.md) and [data/overview.md](../data/overview.md) until those are updated in the same initiative
+
+## 16. Open for implementation plan (not undecided product)
+
+These are engineering choices to specify in `docs/superpowers/plans/` or follow-on plan tasks—not open product debates:
+
+- Exact ciphertext binary framing and AAD contents
+- Exact portfolio JSON schema fields
+- ~~Android stack~~ — **locked: Kotlin + Jetpack Compose, lightweight client**
+- Whether PC encrypt/decrypt lives in FastAPI process or a small shared library called from the API
+- Cutover strategy details (dual-write period vs hard cut)
+- RLS policy SQL and market-writer DB role DDL

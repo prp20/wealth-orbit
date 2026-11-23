@@ -398,6 +398,10 @@ export const api = {
   },
   sectors: () => get<string[]>('/market-data/sectors'),
   filters: (kind: string) => get<string[]>(`/market-data/filters/${kind}`),
+  vaultGet: () => get<VaultMeta>('/vault'),
+  vaultPullSummary: () => get<VaultSummary>('/vault/pull-summary'),
+  vaultPushFromSqlite: () => postJson<VaultPushResult>('/vault/push-from-sqlite', {}),
+  vaultReset: (confirm: string) => postJson<VaultResetResult>('/vault/reset', { confirm }),
   glossaryChat: (message: string) =>
     postJson<GlossaryChatResult>('/glossary/chat', { message }, 'Could not reach the glossary service'),
   glossaryAgentChat: (messages: GlossaryAgentChatMessage[]) =>
@@ -407,6 +411,39 @@ export const api = {
       'Could not reach the glossary service',
     ),
   glossaryTerms: () => get<GlossaryTermListItem[]>('/glossary/terms'),
+};
+
+export type VaultMeta = {
+  user_id: string;
+  vault_generation: number;
+  version: number;
+  ciphertext: string;
+  updated_at: string | null;
+};
+
+export type VaultSummary = {
+  vault_generation: number;
+  version: number;
+  schema_version?: number;
+  portfolio_id?: string;
+  assets_count: number;
+  holdings_count: number;
+  transactions_count: number;
+  exported_at?: string;
+};
+
+export type VaultPushResult = {
+  ok: boolean;
+  vault: VaultMeta;
+  holdings_count: number;
+  transactions_count: number;
+};
+
+export type VaultResetResult = {
+  ok: boolean;
+  vault_generation: number;
+  version: number;
+  message: string;
 };
 
 export type InstrumentPreview = {

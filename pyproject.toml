@@ -23,6 +23,7 @@ dependencies = [
     "requests>=2.31.0",
     "pyotp>=2.9.0",
     "growwapi>=1.5.0",
+    "cryptography>=44.0.0",
     "groq>=1.7.0",
     "langgraph>=1.2.24",
     "langchain-core>=1.7.2",

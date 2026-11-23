@@ -14,6 +14,7 @@ import DashboardPage from '../pages/DashboardPage';
 import IndexesPage from '../pages/IndexesPage';
 import GlossaryChatPage from '../pages/GlossaryChatPage';
 import PortfolioPage from '../pages/PortfolioPage';
+import VaultSettingsPage from '../pages/VaultSettingsPage';
 import { clearRecent } from '../lib/recent';
 
 function Page({ title, subtitle, children }: { title: string; subtitle: string; children?: React.ReactNode }) {
@@ -109,6 +110,7 @@ function Shell() {
           <NavLink to="/" end>Home</NavLink>
           {signedIn && <NavLink to="/portfolio">Portfolio</NavLink>}
           {signedIn && <NavLink to="/transactions">Transactions</NavLink>}
+          {signedIn && <NavLink to="/vault">Vault</NavLink>}
           <NavLink to="/mutualfunds">Mutual funds</NavLink>
           <NavLink to="/stocks">Stocks</NavLink>
           <NavLink to="/indexes">Indexes</NavLink>
@@ -132,6 +134,7 @@ function Shell() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/portfolio" element={<RequireAuth><PortfolioPage /></RequireAuth>} />
           <Route path="/transactions" element={<RequireAuth><TransactionsPage /></RequireAuth>} />
+          <Route path="/vault" element={<RequireAuth><VaultSettingsPage /></RequireAuth>} />
           <Route path="/mutualfunds" element={<FundListPage />} />
           <Route path="/mutualfunds/screen" element={<FundScreenerPage />} />
           <Route path="/mutualfunds/compare" element={<FundComparePage />} />

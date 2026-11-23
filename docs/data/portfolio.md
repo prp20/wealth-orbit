@@ -1,6 +1,8 @@
-# Portfolio ledger (SQLite)
+# Portfolio ledger (SQLite + encrypted vault)
 
 Private per-installation ledger. File path comes from `PORTFOLIO_SQLITE_URL` (default beside `portfolio-service/portfolio.db`).
+
+**Multi-client path:** export the ledger to a JSON snapshot, AES-256-GCM encrypt it, and store only ciphertext in `public.portfolio_vault` (see [../design/portfolio-vault-crypto.md](../design/portfolio-vault-crypto.md)). PC helpers: `POST /api/v1/vault/push-from-sqlite`, CLI `portfolio-service/scripts/vault_migrate_push.py`, UI `/ui/vault`. Android decrypts the same row on device. Vault **reset is PC-only**.
 
 ## Core entities
 

@@ -84,8 +84,51 @@ Wealth Orbit uses **two databases on purpose**:
 
 | Store | Env | Holds |
 |-------|-----|--------|
-| Supabase Postgres | `DATABASE_URL` | Shared market research (`market_data`) |
-| Local SQLite | `PORTFOLIO_SQLITE_URL` | Private portfolio ledger (users, holdings, transactions) |
+| Supabase Postgres | `DATABASE_URL` | Shared market research (`market_data`); optional `public.portfolio_vault` ciphertext |
+| Local SQLite | `PORTFOLIO_SQLITE_URL` | Private portfolio ledger (users, holdings, transactions) until vault cutover |
+
+### Multi-client vault (optional; Waves B+)
+
+**PC / server connection to Supabase is the session pooler URL you already use** — `DATABASE_URL` / `ALEMBIC_DATABASE_URL` in `.env` (port **5432** on `*.pooler.supabase.com`). Alembic, market sync, and PC vault read/write all use that Postgres URL. You do **not** need Email Auth.
+
+After `alembic upgrade head` includes `018_portfolio_vault`, add vault env vars on the PC:
+
+```bash
+# Same session-pooler DATABASE_URL as market data (already required above).
+PORTFOLIO_ENCRYPTION_SECRET=generate-a-long-random-string
+VAULT_USER_ID=generate-or-pick-a-uuid   # same id pasted into Android setup
+```
+
+**Android** does **not** use the PC superuser URL. Create a restricted role ([supabase/android_readonly_role.sql](../supabase/android_readonly_role.sql)), build a **session pooler** URI for that role, and paste it into the Android **setup** screen with the encryption secret and `VAULT_USER_ID`.
+
+Push local SQLite → encrypted vault (CLI):
+
+```bash
+uv run python portfolio-service/scripts/vault_migrate_push.py --dry-run
+uv run python portfolio-service/scripts/vault_migrate_push.py
+```
+
+Or use **Vault** in the UI (`/ui/vault`) after sign-in: push, pull summary, PC-only reset.
+
+Details: [design/2026-11-23-multi-client-e2e-portfolio-design.md](design/2026-11-23-multi-client-e2e-portfolio-design.md), [supabase/README.md](../supabase/README.md).
+
+### GitHub Actions market refresh (optional)
+
+Scheduled incremental updates for `market_data` (indexes, seeded stock prices/metrics/technicals, seeded fund NAV). Workflow: [`.github/workflows/market-data-refresh.yml`](../.github/workflows/market-data-refresh.yml).
+
+1. Run [supabase/gha_market_writer.sql](../supabase/gha_market_writer.sql) (set a strong password). Confirm that role **cannot** `SELECT` `public.portfolio_vault`.
+2. Build a **Session** pooler URI for role `gha_market_writer`.
+3. In the GitHub repo: **Settings → Secrets and variables → Actions** → create secret `MARKET_DATABASE_URL` with that URI.
+4. Do **not** add `PORTFOLIO_ENCRYPTION_SECRET`, `VAULT_USER_ID`, or `SUPABASE_SERVICE_ROLE_KEY` to Actions secrets for this workflow.
+5. Trigger **market-data-refresh** via **Actions → Run workflow**, or wait for the weekday schedule (`17 12 * * 1-5` UTC ≈ 17:47 IST).
+
+Local dry-run (uses your PC `DATABASE_URL`):
+
+```bash
+uv run python portfolio-service/scripts/ci/refresh_market_incremental.py --dry-run
+```
+
+Optional repo Variables: `MARKET_REFRESH_STOCK_LIMIT`, `MARKET_REFRESH_FUND_LIMIT` (defaults 50 / 30).
 
 **Persist (facts):** masters, OHLC / NAV / index history (default **10y**), fundamentals (5 annual + 6 quarterly periods), shareholding, latest Yahoo daily metrics, latest-day technical indicators, sync jobs.
 
