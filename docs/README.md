@@ -12,6 +12,7 @@ Handbook for contributors and operators. Product name in the UI is **Wealth Orbi
 - [architecture.md](architecture.md) — FastAPI monolith, React `/ui/`, dual DB, in-process sync
 - [design/2026-11-23-multi-client-e2e-portfolio-design.md](design/2026-11-23-multi-client-e2e-portfolio-design.md) — approved design: dual client, E2E portfolio ciphertext, GHA market sync, Android agent
 - [design/2026-11-23-multi-client-e2e-portfolio-plan.md](design/2026-11-23-multi-client-e2e-portfolio-plan.md) — implementation plan (Waves A–E, task checklists)
+- [design/portfolio-vault-crypto.md](design/portfolio-vault-crypto.md) — vault ciphertext + JSON contract
 
 ## Data
 

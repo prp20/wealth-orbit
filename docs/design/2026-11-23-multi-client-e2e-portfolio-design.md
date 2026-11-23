@@ -3,7 +3,8 @@
 **Status:** Approved for implementation planning  
 **Date:** 2026-11-23  
 **Branch:** `docs/multi-client-e2e-portfolio-design`  
-**Implementation plan:** [2026-11-23-multi-client-e2e-portfolio-plan.md](./2026-11-23-multi-client-e2e-portfolio-plan.md)
+**Implementation plan:** [2026-11-23-multi-client-e2e-portfolio-plan.md](./2026-11-23-multi-client-e2e-portfolio-plan.md)  
+**Crypto/JSON contract:** [portfolio-vault-crypto.md](./portfolio-vault-crypto.md)
 
 ## 1. Problem
 
