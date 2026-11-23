@@ -17,15 +17,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.wealthorbit.android.db.AppConfig
+import com.wealthorbit.android.db.PoolerConfigStore
 
 @Composable
 fun SetupScreen(onConfigured: () -> Unit) {
-    var poolerUrl by remember { mutableStateOf("") }
-    var secret by remember { mutableStateOf("") }
-    var vaultUserId by remember { mutableStateOf("") }
-    var groqKey by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val store = remember { PoolerConfigStore(context) }
+    val existing = remember { store.load() }
+    var poolerUrl by remember { mutableStateOf(existing.poolerUrl) }
+    var secret by remember { mutableStateOf(existing.encryptionSecret) }
+    var vaultUserId by remember { mutableStateOf(existing.vaultUserId) }
+    var groqKey by remember { mutableStateOf(existing.groqApiKey) }
     var error by remember { mutableStateOf<String?>(null) }
 
     Column(
@@ -83,13 +89,24 @@ fun SetupScreen(onConfigured: () -> Unit) {
                     else -> null
                 }
                 if (error == null) {
-                    // Persistence wired in Task 12 (EncryptedSharedPreferences).
-                    onConfigured()
+                    try {
+                        store.save(
+                            AppConfig(
+                                poolerUrl = poolerUrl,
+                                encryptionSecret = secret,
+                                vaultUserId = vaultUserId,
+                                groqApiKey = groqKey,
+                            ),
+                        )
+                        onConfigured()
+                    } catch (e: Exception) {
+                        error = e.message ?: "Could not save setup"
+                    }
                 }
             },
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Continue")
+            Text("Save & continue")
         }
     }
 }

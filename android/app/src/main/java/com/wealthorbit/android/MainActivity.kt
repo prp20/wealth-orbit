@@ -26,6 +26,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.wealthorbit.android.db.PoolerConfigStore
 import com.wealthorbit.android.ui.agent.AgentScreen
 import com.wealthorbit.android.ui.home.HomeScreen
 import com.wealthorbit.android.ui.portfolio.PortfolioScreen
@@ -37,9 +38,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val start = if (PoolerConfigStore(this).isConfigured()) Dest.Home.route else "setup"
         setContent {
             WealthOrbitTheme {
-                WealthOrbitApp()
+                WealthOrbitApp(startDestination = start)
             }
         }
     }
@@ -57,7 +59,7 @@ private enum class Dest(
 }
 
 @Composable
-fun WealthOrbitApp() {
+fun WealthOrbitApp(startDestination: String = "setup") {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val current = backStack?.destination
@@ -92,7 +94,7 @@ fun WealthOrbitApp() {
     ) { padding ->
         NavHost(
             navController = navController,
-            startDestination = "setup",
+            startDestination = startDestination,
             modifier = Modifier.padding(padding),
         ) {
             composable("setup") {

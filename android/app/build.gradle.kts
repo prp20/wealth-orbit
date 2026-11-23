@@ -68,8 +68,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
-    // Task 12+: pooler IO via OkHttp/PostgREST or an API-24-safe Postgres path.
-    // Do not add org.postgresql:postgresql here — current jars require minSdk 26+.
+    // 42.2.x dexes on minSdk 24; 42.7+ needs API 26 (MethodHandle).
+    implementation("org.postgresql:postgresql:42.2.27")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
 

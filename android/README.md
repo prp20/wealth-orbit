@@ -37,4 +37,4 @@ Store only in EncryptedSharedPreferences after setup — never commit pooler pas
 
 ## Note on Postgres drivers
 
-`org.postgresql:postgresql` (current) fails D8 for `minSdk 24` (MethodHandle needs API 26). Vault/market IO will use an API-24-safe path (OkHttp to a narrow gateway or a compatible driver), not the desktop JDBC jar.
+Use `org.postgresql:postgresql:42.2.27` (dexes on `minSdk 24`). Newer 42.7+ jars need API 26.
