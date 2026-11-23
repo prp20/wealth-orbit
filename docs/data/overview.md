@@ -2,14 +2,17 @@
 
 Wealth Orbit deliberately splits **private portfolio state** from **shared market research**.
 
-## Two stores
+## Two stores (today) + vault (multi-client path)
 
 | Store | Connection | Schema / file | Typical size |
 |-------|------------|---------------|--------------|
 | Postgres | `DATABASE_URL` | `market_data` (Alembic under `migrations/`) | Cloud quota-bound (e.g. Supabase) |
 | SQLite | `PORTFOLIO_SQLITE_URL` | Local `portfolio-service/portfolio.db` | Stays on your machine |
+| Postgres vault (multi-client) | same `DATABASE_URL` / Supabase | `public.portfolio_vault` — **ciphertext only** | Small (one row per user) |
 
 Never copy full OHLC/NAV history into SQLite. Portfolio endpoints only need asset identity links and ledger rows.
+
+**Multi-client E2E vault:** see [../design/2026-11-23-multi-client-e2e-portfolio-design.md](../design/2026-11-23-multi-client-e2e-portfolio-design.md) and [../design/portfolio-vault-crypto.md](../design/portfolio-vault-crypto.md). Apply Alembic `018_portfolio_vault`, then [../../supabase/rls_portfolio_vault.sql](../../supabase/rls_portfolio_vault.sql). Plaintext holdings never land in Postgres.
 
 ## What Postgres holds (research)
 

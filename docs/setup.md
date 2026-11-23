@@ -84,8 +84,26 @@ Wealth Orbit uses **two databases on purpose**:
 
 | Store | Env | Holds |
 |-------|-----|--------|
-| Supabase Postgres | `DATABASE_URL` | Shared market research (`market_data`) |
-| Local SQLite | `PORTFOLIO_SQLITE_URL` | Private portfolio ledger (users, holdings, transactions) |
+| Supabase Postgres | `DATABASE_URL` | Shared market research (`market_data`); optional `public.portfolio_vault` ciphertext |
+| Local SQLite | `PORTFOLIO_SQLITE_URL` | Private portfolio ledger (users, holdings, transactions) until vault cutover |
+
+### Multi-client vault (optional; Waves B+)
+
+After `alembic upgrade head` includes `018_portfolio_vault`:
+
+1. Enable **Authentication → Email** in the Supabase dashboard.
+2. In the SQL editor, run [supabase/rls_portfolio_vault.sql](../supabase/rls_portfolio_vault.sql), then [supabase/grants_market_reader.sql](../supabase/grants_market_reader.sql).
+3. Add to `.env` (never commit real values; never put service role or encryption secret in the Android app):
+
+```bash
+SUPABASE_URL=https://PROJECT_REF.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+PORTFOLIO_ENCRYPTION_SECRET=generate-a-long-random-string
+# PC vault reset only — never ship to Android:
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+Details: [design/2026-11-23-multi-client-e2e-portfolio-design.md](design/2026-11-23-multi-client-e2e-portfolio-design.md), [supabase/README.md](../supabase/README.md).
 
 **Persist (facts):** masters, OHLC / NAV / index history (default **10y**), fundamentals (5 annual + 6 quarterly periods), shareholding, latest Yahoo daily metrics, latest-day technical indicators, sync jobs.
 
