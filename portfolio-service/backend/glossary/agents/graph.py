@@ -27,6 +27,39 @@ def _last_user_text(messages: list[dict[str, Any]]) -> str:
     return ""
 
 
+def _conversation_context(
+    messages: list[dict[str, Any]],
+    *,
+    max_turns: int = 6,
+    max_chars: int = 1600,
+) -> str:
+    """Prior user/assistant turns (excluding the latest user message) for multi-turn RAG."""
+    prior: list[dict[str, Any]] = []
+    seen_latest_user = False
+    for item in reversed(messages):
+        role = item.get("role")
+        content = item.get("content")
+        if role not in {"user", "assistant"} or not isinstance(content, str):
+            continue
+        text = content.strip()
+        if not text:
+            continue
+        if not seen_latest_user and role == "user":
+            seen_latest_user = True
+            continue
+        prior.append({"role": role, "content": text})
+        if len(prior) >= max_turns:
+            break
+    if not prior:
+        return ""
+    prior.reverse()
+    lines = [f"{row['role']}: {row['content']}" for row in prior]
+    blob = "\n".join(lines)
+    if len(blob) > max_chars:
+        blob = blob[-max_chars:]
+    return blob
+
+
 def build_glossary_graph(model: BaseChatModel):
     graph = StateGraph(GlossaryGraphState)
 
@@ -77,11 +110,13 @@ def run_multi_agent_glossary(
     """Invoke the multi-agent pipeline. Caller should ensure LLM+index readiness."""
     chat_model = model or get_glossary_chat_model()
     user_text = _last_user_text(messages)
+    conversation_context = _conversation_context(messages)
     app = build_glossary_graph(chat_model)
     final: GlossaryGraphState = app.invoke(
         {
             "messages": messages,
             "user_text": user_text,
+            "conversation_context": conversation_context,
             "evidence_pack": [],
             "citations": [],
             "critic_retries": 0,
@@ -89,12 +124,12 @@ def run_multi_agent_glossary(
         }
     )
 
+    # Keep internal graph trace off the public payload (sanitizer also strips it).
     payload: dict[str, Any] = {
         "assistant_message": final.get("assistant_message")
         or final.get("draft_answer")
         or "",
         "mode": "multi_agent",
-        "agent_trace": list(final.get("trace") or []),
     }
     if final.get("refusal"):
         payload["refusal"] = final["refusal"]

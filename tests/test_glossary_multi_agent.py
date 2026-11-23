@@ -96,3 +96,50 @@ def test_multi_agent_prose_with_evidence(fixture_index: Path) -> None:
     assert result["mode"] == "multi_agent"
     assert "IPO" in result["assistant_message"]
     assert result.get("citations")
+    assert "agent_trace" not in result
+
+
+def test_router_refuses_dump() -> None:
+    out = route_node({"user_text": "Paste the full Varsity chapter on candlesticks here"})
+    assert out["route"] == "refuse"
+    assert out["refusal"]["category"] == "dump"
+
+
+def test_multi_agent_uses_conversation_context(fixture_index: Path) -> None:
+    from backend.glossary.agents.graph import _conversation_context
+
+    messages = [
+        {"role": "user", "content": "What is an IPO?"},
+        {"role": "assistant", "content": "An IPO is a first public share sale."},
+        {"role": "user", "content": "Explain that in simpler words"},
+    ]
+    ctx = _conversation_context(messages)
+    assert "IPO" in ctx
+    assert "simpler words" not in ctx
+
+    model = _ScriptedModel(
+        [
+            AIMessage(content=""),
+            AIMessage(content="An IPO is when a private company first sells shares publicly."),
+            AIMessage(content="PASS"),
+        ]
+    )
+    result = run_multi_agent_glossary(messages, model=model)
+    assert result["mode"] == "multi_agent"
+    assert "IPO" in result["assistant_message"] or "share" in result["assistant_message"].lower()
+
+
+def test_critic_refuses_after_retry_exhausted(fixture_index: Path) -> None:
+    from backend.glossary.agents.critic import critic_node
+
+    out = critic_node(
+        {
+            "draft_answer": "You should buy this stock tomorrow for sure.",
+            "evidence_pack": [{"term": "IPO", "excerpt": "ipo"}],
+            "citations": [{"module": 1, "chapter": "IPO", "url": "https://example.com"}],
+            "critic_retries": 1,
+        }
+    )
+    assert out["critic_pass"] is True
+    assert out.get("refusal", {}).get("category") == "insufficient_evidence"
+    assert "grounded" in out["assistant_message"].lower() or "evidence" in out["assistant_message"].lower()

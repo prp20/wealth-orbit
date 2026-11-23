@@ -73,6 +73,7 @@ from backend.glossary import (  # noqa: E402
     answer_glossary_message,
     cached_glossary_terms,
     run_glossary_agent,
+    sanitize_public_agent_payload,
 )
 
 __all__ = [
@@ -96,4 +97,5 @@ __all__ = [
     "STOCK_SCREEN_SORT_COLUMNS", "stock_screen",
     "list_screens", "refresh_screens", "run_screen",
     "answer_glossary_message", "cached_glossary_terms", "run_glossary_agent",
+    "sanitize_public_agent_payload",
 ]

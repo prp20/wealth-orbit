@@ -6,6 +6,7 @@ from .engine import answer_glossary_message
 from .loader import cached_glossary_terms, load_glossary_seed
 from .matcher import GlossaryMatcher
 from .models import GlossaryResult, GlossaryResultKind, RefusalCategory
+from .public_payload import sanitize_public_agent_payload
 
 __all__ = [
     "GlossaryMatcher",
@@ -16,4 +17,5 @@ __all__ = [
     "cached_glossary_terms",
     "load_glossary_seed",
     "run_glossary_agent",
+    "sanitize_public_agent_payload",
 ]

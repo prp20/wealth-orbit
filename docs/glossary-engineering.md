@@ -42,9 +42,10 @@ Contributor-facing terms. Distinct from the **investor** Glossary UI at `/ui/glo
 | Term | Meaning |
 |------|---------|
 | **Seed matcher** | Deterministic lookup over `glossary_seed.json` (`mode: fallback` / `POST /glossary/chat`) |
-| **Seed agent** | LLM tool-calling over seed allowlist (`mode: agent`) |
+| **Seed agent** | Groq tool-calling over seed allowlist (`mode: agent`). POC limit: seed path is Groq-only; OpenAI/compatible providers are used on the multi-agent RAG path via `GLOSSARY_LLM_PROVIDER`. |
 | **Multi-agent RAG** | LangGraph Router→Retriever→Answerer→Critic over local Chroma index (`mode: multi_agent`) |
 | **Browser sessions** | Multi-chat UI state in `localStorage` — not a server chat store |
+| **Public payload** | Agent HTTP responses omit `agent_trace` / `tool_trace` and cap citation excerpts |
 
 Operator env (see [.env.example](../.env.example) and [setup.md](setup.md#glossary-chat-release-111)):
 

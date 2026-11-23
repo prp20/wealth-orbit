@@ -14,6 +14,11 @@ _ADVICE = re.compile(
     re.IGNORECASE,
 )
 
+_INSUFFICIENT_EVIDENCE = (
+    "I could not produce a sufficiently grounded glossary answer from the available evidence. "
+    "Try a more specific investing term, or rephrase the question."
+)
+
 
 def critic_node(state: GlossaryGraphState, *, model: BaseChatModel | None = None) -> dict[str, Any]:
     draft = (state.get("draft_answer") or state.get("assistant_message") or "").strip()
@@ -63,8 +68,10 @@ def critic_node(state: GlossaryGraphState, *, model: BaseChatModel | None = None
                 ]
             )
             text = (getattr(result, "content", None) or "").strip()
-            if text.upper().startswith("FAIL"):
-                notes.append(text)
+            if isinstance(text, list):
+                text = " ".join(str(part) for part in text)
+            if str(text).upper().startswith("FAIL"):
+                notes.append(str(text))
         except Exception:
             pass
 
@@ -76,11 +83,25 @@ def critic_node(state: GlossaryGraphState, *, model: BaseChatModel | None = None
             "trace": [{"agent": "critic", "pass": False, "notes": notes}],
         }
 
-    # Pass (or retries exhausted — ship draft with citations anyway)
+    if notes:
+        # Exhausted retries with remaining issues — refuse instead of forced pass.
+        return {
+            "critic_pass": True,
+            "critic_notes": "; ".join(notes),
+            "assistant_message": _INSUFFICIENT_EVIDENCE,
+            "draft_answer": _INSUFFICIENT_EVIDENCE,
+            "citations": [],
+            "refusal": {
+                "category": "insufficient_evidence",
+                "reason": _INSUFFICIENT_EVIDENCE,
+            },
+            "trace": [{"agent": "critic", "pass": False, "refused": True, "notes": notes}],
+        }
+
     return {
         "critic_pass": True,
         "critic_notes": "",
         "assistant_message": draft,
         "citations": citations,
-        "trace": [{"agent": "critic", "pass": True, "forced": bool(notes)}],
+        "trace": [{"agent": "critic", "pass": True}],
     }

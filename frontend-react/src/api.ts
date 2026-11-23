@@ -27,7 +27,7 @@ async function post<T>(path: string): Promise<T> {
   return response.json();
 }
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
+async function postJson<T>(path: string, body: unknown, fallback = 'Could not sign in'): Promise<T> {
   const response = await fetch(`${base}${path}`, {
     method: 'POST',
     credentials: 'include',
@@ -35,7 +35,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(errorDetail(await response.json().catch(() => ({})), 'Could not sign in'));
+    throw new Error(errorDetail(await response.json().catch(() => ({})), fallback));
   }
   return response.json();
 }
@@ -398,9 +398,14 @@ export const api = {
   },
   sectors: () => get<string[]>('/market-data/sectors'),
   filters: (kind: string) => get<string[]>(`/market-data/filters/${kind}`),
-  glossaryChat: (message: string) => postJson<GlossaryChatResult>('/glossary/chat', { message }),
+  glossaryChat: (message: string) =>
+    postJson<GlossaryChatResult>('/glossary/chat', { message }, 'Could not reach the glossary service'),
   glossaryAgentChat: (messages: GlossaryAgentChatMessage[]) =>
-    postJson<GlossaryAgentChatResult>('/glossary/agent/chat', { messages }),
+    postJson<GlossaryAgentChatResult>(
+      '/glossary/agent/chat',
+      { messages },
+      'Could not reach the glossary service',
+    ),
   glossaryTerms: () => get<GlossaryTermListItem[]>('/glossary/terms'),
 };
 
@@ -465,7 +470,6 @@ export type GlossaryAgentChatResult = {
   assistant_message: string;
   mode: 'agent' | 'fallback' | 'multi_agent';
   citations?: GlossaryCitation[];
-  agent_trace?: Array<Record<string, unknown>>;
   refusal?: {
     category?: string | null;
     reason?: string | null;

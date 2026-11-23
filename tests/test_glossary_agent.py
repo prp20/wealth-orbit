@@ -236,6 +236,134 @@ def test_fallback_without_groq_api_key(monkeypatch: pytest.MonkeyPatch):
     assert "IPO" in result["assistant_message"] or "public" in result["assistant_message"].lower()
 
 
+def test_ungrounded_first_round_prose_falls_back_to_matcher(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-key-unused")
+    first = _FakeCompletion(
+        [_FakeChoice(_FakeChoiceMessage(content="An IPO is whatever I invent without tools.", tool_calls=[]))]
+    )
+    client = _groq_client_with_responses([first])
+    result = run_glossary_agent(
+        [{"role": "user", "content": "What is IPO?"}],
+        client=client,
+    )
+    assert result["mode"] == "fallback"
+    assert "IPO" in result["assistant_message"] or "public" in result["assistant_message"].lower()
+
+
+def test_reasoning_field_is_not_user_facing(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-key-unused")
+
+    @dataclass
+    class _ReasoningMessage(_FakeChoiceMessage):
+        reasoning: str | None = None
+        reasoning_content: str | None = None
+
+    first = _FakeCompletion(
+        [
+            _FakeChoice(
+                _ReasoningMessage(
+                    content=None,
+                    tool_calls=[
+                        _FakeToolCall(
+                            id="call_1",
+                            type="function",
+                            function=_FakeFunction(
+                                name="get_glossary_term",
+                                arguments='{"term_or_alias": "IPO"}',
+                            ),
+                        )
+                    ],
+                    reasoning="INTERNAL SCRATCH: invent a definition",
+                )
+            )
+        ]
+    )
+    second = _FakeCompletion(
+        [
+            _FakeChoice(
+                _ReasoningMessage(
+                    content="",
+                    tool_calls=[],
+                    reasoning_content="INTERNAL SCRATCH should not ship",
+                )
+            )
+        ]
+    )
+    client = _groq_client_with_responses([first, second])
+    result = run_glossary_agent(
+        [{"role": "user", "content": "What is IPO?"}],
+        client=client,
+    )
+    assert "INTERNAL SCRATCH" not in result["assistant_message"]
+    assert "IPO" in result["assistant_message"]
+
+
+def test_refuse_tool_skips_finalize_llm(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-key-unused")
+    first = _FakeCompletion(
+        [
+            _FakeChoice(
+                _FakeChoiceMessage(
+                    content=None,
+                    tool_calls=[
+                        _FakeToolCall(
+                            id="call_1",
+                            type="function",
+                            function=_FakeFunction(
+                                name="refuse_out_of_scope",
+                                arguments='{"reason":"advice","category":"advice"}',
+                            ),
+                        )
+                    ],
+                )
+            )
+        ]
+    )
+    client = _groq_client_with_responses([first])
+    result = run_glossary_agent(
+        [{"role": "user", "content": "What is a stock split?"}],
+        client=client,
+    )
+    assert result.get("refusal")
+    assert client.chat.completions.create.call_count == 1
+
+
+def test_bad_timeout_falls_back_to_matcher(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-key-unused")
+    monkeypatch.setenv("GLOSSARY_AGENT_TIMEOUT", "not-a-float")
+    result = run_glossary_agent([{"role": "user", "content": "What is IPO?"}])
+    assert result["mode"] == "fallback"
+
+
+def test_degrade_prefers_multi_agent_when_available(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+
+    def fake_multi_agent(messages):
+        return {"assistant_message": "multi path", "mode": "multi_agent"}
+
+    monkeypatch.setattr(
+        "backend.glossary.agents.graph.multi_agent_available",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "backend.glossary.agents.graph.run_multi_agent_glossary",
+        fake_multi_agent,
+    )
+    result = run_glossary_agent([{"role": "user", "content": "What is IPO?"}])
+    assert result["mode"] == "multi_agent"
+    assert result["assistant_message"] == "multi path"
+
+
+def test_degrade_to_matcher_when_multi_agent_unavailable(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setattr(
+        "backend.glossary.agents.graph.multi_agent_available",
+        lambda: False,
+    )
+    result = run_glossary_agent([{"role": "user", "content": "What is IPO?"}])
+    assert result["mode"] == "fallback"
+
+
 def test_glossary_agent_modules_avoid_market_imports():
     glossary_dir = ROOT / "portfolio-service" / "backend" / "glossary"
     forbidden = (

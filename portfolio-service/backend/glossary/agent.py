@@ -116,14 +116,10 @@ def _tool_facts_ready(tool_trace: list[dict[str, Any]]) -> bool:
 
 
 def _message_text(choice_message: Any) -> str:
-    """Extract visible assistant text (gpt-oss may leave content empty)."""
+    """Extract user-facing assistant text. Never surface model reasoning fields."""
     content = getattr(choice_message, "content", None)
     if isinstance(content, str) and content.strip():
         return content.strip()
-    for attr in ("reasoning", "reasoning_content"):
-        value = getattr(choice_message, attr, None)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
     return ""
 
 
@@ -352,19 +348,13 @@ def _run_agent_loop(
         chat_messages.append(assistant_record)
 
         if not tool_calls:
-            if tool_trace and not text:
+            if not tool_trace:
+                # Seed-tools-only: never ship first-round free-form prose without tools.
+                user_text = _last_user_message(messages) or ""
+                return _assistant_payload_from_fallback(answer_glossary_message(user_text))
+            if not text:
                 return _synthesize_from_tool_trace(tool_trace)
-            if tool_trace:
-                return _payload_from_prose(
-                    text
-                    or "I could not generate a glossary answer. Please rephrase your question.",
-                    tool_trace,
-                )
-            return {
-                "assistant_message": text
-                or "I could not generate a glossary answer. Please rephrase your question.",
-                "mode": "agent",
-            }
+            return _payload_from_prose(text, tool_trace)
 
         for call in tool_calls:
             name = call.function.name
@@ -379,6 +369,10 @@ def _run_agent_loop(
                     "content": json.dumps(result),
                 }
             )
+
+        # Tool-triggered refusals must not be diluted by a free-form finalize pass.
+        if _refusal_from_tool_trace(tool_trace) is not None:
+            return _synthesize_from_tool_trace(tool_trace)
 
         if _tool_facts_ready(tool_trace):
             return _finalize_after_tools(
@@ -435,11 +429,10 @@ def run_glossary_agent(
         fallback = answer_glossary_message(user_text or "")
         return _assistant_payload_from_fallback(fallback)
 
-    model = os.environ.get("GLOSSARY_LLM_MODEL", DEFAULT_MODEL)
-    timeout = float(os.environ.get("GLOSSARY_AGENT_TIMEOUT", str(DEFAULT_TIMEOUT_SECONDS)))
-    groq_client = client or Groq(api_key=api_key)
-
     try:
+        model = os.environ.get("GLOSSARY_LLM_MODEL", DEFAULT_MODEL)
+        timeout = float(os.environ.get("GLOSSARY_AGENT_TIMEOUT", str(DEFAULT_TIMEOUT_SECONDS)))
+        groq_client = client or Groq(api_key=api_key)
         return _run_agent_loop(messages, client=groq_client, model=model, timeout=timeout)
     except Exception:
         logger.exception("Glossary Groq agent failed; falling back to deterministic matcher")

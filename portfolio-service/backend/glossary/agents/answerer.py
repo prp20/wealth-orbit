@@ -18,8 +18,30 @@ _CITATION_MARKERS = re.compile(
 _MD_HEADING = re.compile(r"^#{1,6}\s+", re.MULTILINE)
 
 
+def _coerce_content_text(content: Any) -> str:
+    """LangChain content may be a string or a list of content blocks."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict):
+                text = block.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
+            else:
+                text = getattr(block, "text", None)
+                if isinstance(text, str):
+                    parts.append(text)
+        return "\n".join(parts)
+    return str(content or "")
+
+
 def answer_node(state: GlossaryGraphState, *, model: BaseChatModel) -> dict[str, Any]:
     user_text = state.get("user_text") or ""
+    conversation_context = (state.get("conversation_context") or "").strip()
     evidence = state.get("evidence_pack") or []
     critic_notes = (state.get("critic_notes") or "").strip()
 
@@ -37,29 +59,38 @@ def answer_node(state: GlossaryGraphState, *, model: BaseChatModel) -> dict[str,
 
     pack_json = json.dumps(evidence, ensure_ascii=False)[:8000]
     notes = f"\nCritic notes to fix:\n{critic_notes}\n" if critic_notes else ""
-    result = model.invoke(
-        [
-            SystemMessage(
-                content=(
-                    "You are the Wealth Orbit glossary answerer. "
-                    "Write a clear learner-friendly explanation using ONLY the evidence pack. "
-                    "Do not invent facts. Do not give buy/sell advice. "
-                    "Do not tell the user to go read a chapter instead of explaining. "
-                    "Keep quotes short. You may name a Varsity chapter in plain words. "
-                    "Format: short paragraphs; optional numbered steps. "
-                    "Use **bold** for key terms only. "
-                    "Do NOT use markdown headings (#). "
-                    "Do NOT insert citation markers, chunk ids, brackets like 【…】 or [m1-c25], "
-                    "or a 'Sources:' block — evidence is shown separately in the UI."
-                    f"{notes}"
-                )
-            ),
-            HumanMessage(
-                content=f"Question:\n{user_text}\n\nEvidence pack JSON:\n{pack_json}"
-            ),
-        ]
-    )
-    draft = _clean_answer_prose(getattr(result, "content", None) or "")
+    human = f"Question:\n{user_text}\n\nEvidence pack JSON:\n{pack_json}"
+    if conversation_context:
+        human = (
+            f"Prior conversation:\n{conversation_context}\n\n"
+            f"Current question:\n{user_text}\n\n"
+            f"Evidence pack JSON:\n{pack_json}"
+        )
+    try:
+        result = model.invoke(
+            [
+                SystemMessage(
+                    content=(
+                        "You are the Wealth Orbit glossary answerer. "
+                        "Write a clear learner-friendly explanation using ONLY the evidence pack. "
+                        "Do not invent facts. Do not give buy/sell advice. "
+                        "Do not tell the user to go read a chapter instead of explaining. "
+                        "Use prior conversation only to resolve pronouns/follow-ups. "
+                        "Keep quotes short. You may name a Varsity chapter in plain words. "
+                        "Format: short paragraphs; optional numbered steps. "
+                        "Use **bold** for key terms only. "
+                        "Do NOT use markdown headings (#). "
+                        "Do NOT insert citation markers, chunk ids, brackets like 【…】 or [m1-c25], "
+                        "or a 'Sources:' block — evidence is shown separately in the UI."
+                        f"{notes}"
+                    )
+                ),
+                HumanMessage(content=human),
+            ]
+        )
+        draft = _clean_answer_prose(_coerce_content_text(getattr(result, "content", None)))
+    except Exception:
+        draft = ""
     if not draft:
         # Fallback: stitch seed excerpts
         parts = []

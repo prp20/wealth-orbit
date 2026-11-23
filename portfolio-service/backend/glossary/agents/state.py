@@ -18,6 +18,7 @@ class EvidenceItem(TypedDict, total=False):
 class GlossaryGraphState(TypedDict, total=False):
     messages: list[dict[str, Any]]
     user_text: str
+    conversation_context: str
     route: Literal["glossary", "refuse"]
     refusal: dict[str, Any] | None
     evidence_pack: list[EvidenceItem]

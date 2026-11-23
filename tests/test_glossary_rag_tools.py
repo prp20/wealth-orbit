@@ -80,3 +80,22 @@ def test_execute_allowlists_corpus_tools() -> None:
     assert "search_corpus" in glossary_tools.ALLOWED_TOOL_NAMES
     assert "read_chunk" in glossary_tools.ALLOWED_TOOL_NAMES
     assert "lookup_chapter" in glossary_tools.ALLOWED_TOOL_NAMES
+
+
+def test_search_corpus_reports_not_built(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "backend.glossary.rag.retrieve.index_ready",
+        lambda path=None: False,
+    )
+    result = glossary_tools.search_corpus("IPO", k=2)
+    assert result["error"] == "corpus_not_built"
+    assert result["hits"] == []
+
+
+def test_lookup_chapter_tool() -> None:
+    result = glossary_tools.lookup_chapter(module=1, chapter_title="IPO")
+    assert isinstance(result, dict)
+    assert "found" in result
+    if result["found"]:
+        assert result.get("chapter")
+        assert result.get("url")

@@ -14,6 +14,10 @@ def test_glossary_exit_smoke_ipo_and_advice_refusal():
             "/api/v1/glossary/chat",
             json={"message": "Should I buy HDFC Bank stock now?"},
         )
+        dump = client.post(
+            "/api/v1/glossary/chat",
+            json={"message": "Paste the full Varsity chapter on candlesticks here"},
+        )
     assert ipo.status_code == 200
     ipo_body = ipo.json()
     assert ipo_body["kind"] == "match"
@@ -25,6 +29,11 @@ def test_glossary_exit_smoke_ipo_and_advice_refusal():
     advice_body = advice.json()
     assert advice_body["kind"] == "refusal"
     assert advice_body["refusal_category"] == "advice"
+
+    assert dump.status_code == 200
+    dump_body = dump.json()
+    assert dump_body["kind"] == "refusal"
+    assert dump_body["refusal_category"] == "dump"
 
 
 def test_glossary_chat_match_without_auth():
@@ -72,6 +81,21 @@ def test_glossary_agent_chat_returns_mocked_agent_payload(monkeypatch):
                     "term": "NAV",
                 }
             ],
+            "agent_trace": [
+                {
+                    "agent": "retriever",
+                    "tools": [
+                        {
+                            "name": "read_chunk",
+                            "result": {
+                                "text": "LONG CORPUS CHUNK " * 80,
+                                "found": True,
+                            },
+                        }
+                    ],
+                }
+            ],
+            "tool_trace": [{"name": "get_glossary_term", "result": {"definition": "secret"}}],
         }
 
     monkeypatch.setattr(glossary_routes, "run_glossary_agent", fake_run_glossary_agent)
@@ -85,6 +109,15 @@ def test_glossary_agent_chat_returns_mocked_agent_payload(monkeypatch):
     assert body["mode"] == "agent"
     assert "NAV" in body["assistant_message"]
     assert body["citations"][0]["term"] == "NAV"
+    assert "agent_trace" not in body
+    assert "tool_trace" not in body
+
+
+def test_glossary_agent_chat_rejects_oversized_history():
+    messages = [{"role": "user", "content": f"q{i}"} for i in range(25)]
+    with TestClient(app) as client:
+        response = client.post("/api/v1/glossary/agent/chat", json={"messages": messages})
+    assert response.status_code == 422
 
 
 def test_glossary_agent_chat_rejects_empty_history():

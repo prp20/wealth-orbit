@@ -158,8 +158,32 @@
     },
     {
       "term": "Financial ratios",
-      "aliases": ["PE", "ROE", "Debt-to-equity"],
+      "aliases": ["PE", "Debt-to-equity", "ratio analysis"],
       "definition": "Metrics built from financial statements that help compare profitability, leverage, liquidity, or valuation across periods or peers.",
+      "sources": [
+        {
+          "module": 3,
+          "chapter": "The Financial Ratio Analysis (Part 1)",
+          "url": "https://zerodha.com/varsity/chapter/financial-ratio-analysis/"
+        }
+      ]
+    },
+    {
+      "term": "ROE",
+      "aliases": ["Return on Equity", "return on equity"],
+      "definition": "Return on Equity measures how much profit a company generates with shareholders' equity — typically net income divided by shareholders' equity (often average equity).",
+      "sources": [
+        {
+          "module": 3,
+          "chapter": "The Financial Ratio Analysis (Part 1)",
+          "url": "https://zerodha.com/varsity/chapter/financial-ratio-analysis/"
+        }
+      ]
+    },
+    {
+      "term": "ROCE",
+      "aliases": ["Return on Capital Employed", "return on capital employed"],
+      "definition": "Return on Capital Employed measures operating profit relative to the capital used in the business — typically EBIT (or similar) divided by capital employed (equity plus interest-bearing debt, definitions vary).",
       "sources": [
         {
           "module": 3,

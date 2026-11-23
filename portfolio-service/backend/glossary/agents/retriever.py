@@ -99,19 +99,28 @@ MAX_ROUNDS = 5
 
 def retrieve_node(state: GlossaryGraphState, *, model: BaseChatModel) -> dict[str, Any]:
     user_text = state.get("user_text") or ""
+    conversation_context = (state.get("conversation_context") or "").strip()
     evidence: list[EvidenceItem] = list(state.get("evidence_pack") or [])
     tool_trace: list[dict[str, Any]] = []
+    search_query = user_text
+    if conversation_context:
+        # Prefer the latest question but keep prior terms for follow-ups ("explain that").
+        search_query = f"{user_text}\n\nPrior conversation:\n{conversation_context}"
 
     bound = model.bind_tools(RETRIEVER_TOOLS)
+    human_bits = [f"Current question:\n{user_text}"]
+    if conversation_context:
+        human_bits.append(f"Prior conversation (for context only):\n{conversation_context}")
     messages: list[Any] = [
         SystemMessage(
             content=(
                 "You gather evidence for a glossary answer. "
                 "Use search_corpus and seed tools. Prefer short excerpts. "
+                "Use prior conversation only to resolve follow-ups; search for the current question. "
                 "Call done_retrieving when you have enough snippets. Max a few tool rounds."
             )
         ),
-        HumanMessage(content=user_text),
+        HumanMessage(content="\n\n".join(human_bits)),
     ]
 
     done = False
@@ -156,9 +165,13 @@ def retrieve_node(state: GlossaryGraphState, *, model: BaseChatModel) -> dict[st
                 }
             )
             _absorb_evidence(evidence, name="get_glossary_term", result=term_payload)
-        corpus = execute_glossary_tool("search_corpus", {"query": user_text, "k": 5})
+        corpus = execute_glossary_tool("search_corpus", {"query": search_query, "k": 5})
         tool_trace.append(
-            {"name": "search_corpus", "arguments": {"query": user_text, "k": 5}, "result": corpus}
+            {
+                "name": "search_corpus",
+                "arguments": {"query": search_query, "k": 5},
+                "result": corpus,
+            }
         )
         _absorb_evidence(evidence, name="search_corpus", result=corpus)
 

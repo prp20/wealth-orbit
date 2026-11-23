@@ -24,11 +24,12 @@ _DUMP_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
     for p in (
         r"\bfull\s+chapter\b",
         r"\bentire\s+chapter\b",
+        r"\bwhole\s+chapter\b",
         r"\bvarsity\s+pdf\b",
         r"\bpdf\s+text\b",
         r"\bpaste\b.+\bvarsity\b",
         r"\bfull\s+varsity\s+chapter\b",
-        r"\bdump\s+(all\s+)?(the\s+)?(definitions|glossary|terms)\b",
+        r"\bdump\s+(all\s+)?(the\s+)?(definitions|glossary|terms|chapter|module)\b",
         r"\b(all|every)\s+(glossary\s+)?definitions\b",
         r"\bwholesale\b.+\b(definitions|varsity|glossary)\b",
         r"\b(definitions|varsity|glossary)\b.+\bwholesale\b",
@@ -37,6 +38,8 @@ _DUMP_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
         r"\bvarsity\s+(full\s+)?text\b",
         r"\bdownload\s+(all\s+)?varsity\b",
         r"\bexport\s+(all\s+)?(definitions|terms)\b",
+        r"\bgive\s+me\s+(the\s+)?(entire|full|complete)\s+(module|pdf|chapter)\b",
+        r"\bverbatim\b.+\b(chapter|varsity|pdf)\b",
     )
 )
 
