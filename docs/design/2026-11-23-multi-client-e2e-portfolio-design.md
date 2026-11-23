@@ -41,7 +41,7 @@ We want dual clients (PC + Android) with a cloud source of truth, privacy for ho
 
 | Party | May see portfolio plaintext? | Role |
 |-------|------------------------------|------|
-| Supabase | **No** | Auth identity; store/return ciphertext; plaintext market data |
+| Supabase | **No** | Store/return ciphertext; plaintext market data |
 | PC client / PC server | **Yes** | Encrypt/decrypt; admin vault reset; full UI |
 | Android app | **Yes** | Encrypt/decrypt; UI; Groq agent |
 | GitHub Actions | **No** | Incremental `market_data` writes only |
@@ -58,8 +58,7 @@ flowchart TB
     And[Android app]
     Secret[Shared encryption secret]
   end
-  subgraph untrusted [Untrusted for portfolio plaintext]
-    Auth[Supabase Auth]
+  subgraph cloud [Supabase via session pooler]
     Mkt[(market_data plaintext)]
     Port[(portfolio ciphertext document)]
     GHA[GitHub Actions]
@@ -67,17 +66,12 @@ flowchart TB
   end
   Secret --> PC
   Secret --> And
-  GHA -->|"narrow DB role"| Mkt
+  GHA -->|"market writer role"| Mkt
+  PC -->|"DATABASE_URL pooler"| Mkt
   PC -->|"encrypt then upsert"| Port
-  And -->|"encrypt then upsert"| Port
-  And -.->|"RLS deny"| Mkt
-  Mkt --> PC
-  Mkt --> And
-  Port --> PC
-  Port --> And
+  And -->|"setup restricted pooler URL"| Mkt
+  And -->|"vault read or limited write"| Port
   And -->|"skill.md + decrypted context + user Groq key"| Groq
-  Auth --> PC
-  Auth --> And
 ```
 
 ### Components
@@ -85,11 +79,11 @@ flowchart TB
 | Component | Responsibility |
 |-----------|----------------|
 | Session pooler (`DATABASE_URL`) | PC/server Postgres access to `market_data` + `portfolio_vault` (already in `.env`) |
-| Supabase Auth (Android later) | Email/password → JWT for RLS (`auth.uid()`); not required for PC pooler path |
+| Restricted Android pooler URL | Pasted at **Android app setup**; dedicated DB role — market **SELECT-only**; vault as granted. Never the full `postgres` superuser URL |
 | `market_data` schema | Existing shared research (masters, OHLC/NAV, etc.) |
-| Portfolio vault table | One encrypted document per user |
+| Portfolio vault table | One encrypted document per configured vault user id |
 | PC Wealth Orbit | Decrypt/encrypt with env secret; portfolio + research UI; vault reset via pooler |
-| Android app | **Kotlin + Jetpack Compose** lightweight client; same crypto; research read; portfolio write; local agent |
+| Android app | **Kotlin + Jetpack Compose**; setup stores pooler URL + encryption secret; research read; vault sync; local agent |
 | GitHub Actions | Scheduled market refresh using market-scoped credentials |
 | Groq | Optional Q&A; user-supplied API key on device |
 
@@ -102,9 +96,10 @@ PocketServer remains out of the critical path (optional offline cache later).
 - **Goal:** a **lightweight** client — small APK surface, low RAM/CPU when idle, no background bulk sync.
 - **Do on device:** decrypt single portfolio document; show focused research views (e.g. indexes, watchlist, latest metrics); simple derived numbers; Groq calls over the network.
 - **Do not on device:** full-universe OHLC history sync; large local market DB; on-device LLM; continuous WorkManager polling; embedding the PC FastAPI stack.
-- **Data habit:** fetch narrow queries from Supabase; cache only what the current screens need; prefer network-on-open over always-on sync.
+- **Setup:** first-run screen collects (1) **restricted session pooler URL**, (2) `PORTFOLIO_ENCRYPTION_SECRET`, (3) vault `user_id` UUID (same id PC uses), (4) optional Groq key. Store in EncryptedSharedPreferences / Keystore — not in source.
+- **Data habit:** JDBC/Postgres over the pooler URL; narrow SELECTs; cache only what the current screens need; prefer network-on-open over always-on sync. No Supabase Email Auth required for v1 Android.
 - **Agent:** one-shot / chat requests to Groq over HTTPS; no local model weights. Groq’s official SDKs are Python/TypeScript, but the API is OpenAI-compatible REST ([API reference](https://console.groq.com/docs/api-reference), [overview](https://console.groq.com/docs/overview)) — call `POST https://api.groq.com/openai/v1/chat/completions` from Kotlin (OkHttp/Ktor). Flutter or React Native is **not** required for Groq.
-- **APK posture:** prefer official small libraries (Supabase Kotlin client or thin HTTP + JWT, Android Keystore, cryptography). Avoid shipping unused Google/ML SDKs. Verify dependency `minSdk` does not force above 24.
+- **APK posture:** prefer small libraries (Postgres driver or thin HTTP if using a proxy, Android Keystore, cryptography). Avoid shipping unused Google/ML SDKs. Verify dependency `minSdk` does not force above 24.
 
 ## 6. Data model
 
@@ -114,7 +109,7 @@ One row per user:
 
 | Column | Type | Notes |
 |--------|------|-------|
-| `user_id` | UUID (FK / auth uid) | RLS owner |
+| `user_id` | UUID | Vault owner id (shared config on PC + Android; not necessarily Supabase Auth uid) |
 | `vault_generation` | int | Bumped on PC vault reset |
 | `version` | int | Monotonic; conflict detection |
 | `ciphertext` | bytea / text | AES-256-GCM payload (nonce + tag + ciphertext as documented) |
@@ -132,12 +127,15 @@ Unchanged intent: plaintext Postgres `market_data` as today. Android and PC **SE
 
 | Item | Purpose | Storage |
 |------|---------|---------|
-| Session pooler `DATABASE_URL` | PC/server connects to Supabase Postgres | `.env` (already required for market data) |
-| `PORTFOLIO_ENCRYPTION_SECRET` | Encrypt/decrypt portfolio document | PC: `.env`. Android: Keystore-backed secure storage |
-| Supabase email/password | Android (Wave E) identity / RLS JWT — **not** how the PC connects | Supabase Auth |
+| Session pooler `DATABASE_URL` | PC/server connects to Supabase Postgres (full app role) | `.env` |
+| Android restricted pooler URL | App setup input; **market SELECT-only**; vault SELECT (and optional INSERT/UPDATE on `portfolio_vault` only if you enable phone edits) | Android EncryptedSharedPreferences |
+| `VAULT_USER_ID` | Which `portfolio_vault.user_id` row to read/write | PC `.env` + Android setup |
+| `PORTFOLIO_ENCRYPTION_SECRET` | Encrypt/decrypt portfolio document | PC: `.env`. Android: secure storage |
 | Groq API key | Agent calls | Android app settings only (user-supplied) |
 
-Never put the pooler password or encryption secret in the Android app.
+**Android DB role (create in Supabase once):** e.g. `wealth_orbit_android` — `SELECT` on `market_data.*`; **no** market writes; **no** DDL; **no** vault DELETE / reset. Prefer a URL that is not the `postgres` superuser. Treat the device as extractable: ciphertext still protects holdings plaintext even if the URL leaks.
+
+Supabase Email Auth / anon key / RLS are **optional** (not required for this v1 path).
 
 ## 7. Cryptography (v1)
 
@@ -152,9 +150,9 @@ Never put the pooler password or encryption secret in the Android app.
 ### 8.1 Initial setup
 
 1. PC already has Supabase **session pooler** `DATABASE_URL` in `.env`.
-2. User generates `PORTFOLIO_ENCRYPTION_SECRET` into PC `.env`.
-3. When Android ships: create Supabase Auth user (email/password), paste encryption secret into Android secure settings, use anon key + JWT (not the pooler URL).
-4. Optional: user adds Groq API key and local `skill.md` on Android.
+2. Set `PORTFOLIO_ENCRYPTION_SECRET` and `VAULT_USER_ID` in PC `.env`.
+3. Create restricted Postgres role + session pooler URI for Android (market read-only).
+4. On Android **setup screen**: paste restricted pooler URL, encryption secret, vault user id; optional Groq key + local `skill.md`.
 
 ### 8.2 Lost secret
 
@@ -174,14 +172,14 @@ Never put the pooler password or encryption secret in the Android app.
 
 | Capability | Allowed |
 |------------|---------|
-| Read `market_data` | Yes |
+| Read `market_data` | Yes (via restricted pooler role) |
 | Write `market_data` / enqueue full sync | **No** |
-| Read own portfolio ciphertext | Yes |
-| Write own portfolio ciphertext | Yes |
-| Vault reset | **No** (PC only) |
-| Service role / market writer credentials | **Never** |
+| Read portfolio ciphertext | Yes |
+| Write portfolio ciphertext | Optional grant on Android role only (`INSERT`/`UPDATE` on `portfolio_vault`); default product still allows phone edits if granted |
+| Vault reset / DELETE vault | **No** (PC only) |
+| Full `postgres` / market writer URL | **Never** paste into Android |
 
-Enforce with RLS/grants and by omitting write APIs from the Android client—not UI alone.
+Enforce with Postgres grants on the Android role, not UI alone.
 
 ## 10. GitHub Actions market updates
 
@@ -213,11 +211,11 @@ Current state: portfolio and local auth in SQLite; market data already on Supaba
 
 v1 migration outline (detail in implementation plan):
 
-1. Add Supabase Auth and portfolio vault table + RLS.
-2. Define shared plaintext JSON snapshot schema mapping from existing SQLite models.
-3. PC path: export/encrypt/upload existing ledger; dual-run or cutover from SQLite.
+1. Portfolio vault table (done: Alembic 018); optional restricted Android DB role SQL.
+2. Shared plaintext JSON snapshot schema mapping from existing SQLite models (Wave A done).
+3. PC path: export/encrypt/upload existing ledger via session pooler; dual-run or cutover from SQLite.
 4. Point PC UI at decrypt-render-encrypt cycle for portfolio.
-5. Ship Android client for research read + portfolio document sync + agent.
+5. Ship Android client: setup with restricted pooler URL + secret; research read + vault sync + agent.
 6. Add GHA market refresh; retire reliance on “PC must be on” for daily market updates.
 7. PC-only vault reset; document lost-key behavior.
 
@@ -231,7 +229,7 @@ v1 migration outline (detail in implementation plan):
 
 - [ ] Same encrypted portfolio document readable on PC and Android after configuring the shared secret
 - [ ] Supabase dashboard / SQL cannot reveal holdings plaintext
-- [ ] Android cannot write market tables under normal user JWT
+- [ ] Android restricted role cannot write `market_data` (verified by grants / failed INSERT)
 - [ ] GHA updates market data without portfolio credentials
 - [ ] Lost secret → unreadable vault; PC reset creates empty vault + new secret
 - [ ] Android agent answers using local skill.md + decrypted context via user Groq key

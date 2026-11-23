@@ -4,9 +4,9 @@
 
 **Goal:** Ship dual-client Wealth Orbit with a single AES-256-GCM encrypted portfolio document in Supabase, PC + Kotlin Android clients that share one secret, GitHub Actions for market_data refresh, and an optional Groq agent on Android.
 
-**Architecture:** Supabase holds plaintext `market_data` and opaque portfolio ciphertext. PC connects via **session pooler** `DATABASE_URL` in `.env` (same as today) and encrypts/decrypts with `PORTFOLIO_ENCRYPTION_SECRET`. Android (Kotlin) later uses Auth JWT + anon key (not the pooler password). GHA writes market data only. Android is market read-only and never performs vault reset.
+**Architecture:** Supabase holds plaintext `market_data` and opaque portfolio ciphertext. PC and Android both use **session pooler** URLs: PC via `DATABASE_URL` in `.env`; Android via a **restricted read-only (market) pooler URL** pasted at app setup, plus encryption secret and `VAULT_USER_ID`. No Email Auth required for v1. GHA writes market data only. Android never performs vault reset.
 
-**Tech Stack:** Python 3 + FastAPI + existing `portfolio-service`; Supabase Auth + Postgres; Alembic; AES-256-GCM; Kotlin + Jetpack Compose (`minSdk 24`); OkHttp/Ktor → Groq OpenAI-compatible API; GitHub Actions + existing seed/sync scripts.
+**Tech Stack:** Python 3 + FastAPI + existing `portfolio-service`; Supabase Postgres (session pooler); Alembic; AES-256-GCM; Kotlin + Jetpack Compose (`minSdk 24`) + Postgres client; OkHttp/Ktor → Groq; GitHub Actions + existing seed/sync scripts.
 
 **Spec:** [2026-11-23-multi-client-e2e-portfolio-design.md](./2026-11-23-multi-client-e2e-portfolio-design.md)
 
@@ -25,10 +25,10 @@
 | Wave | Deliverable | Can ship alone? |
 |------|-------------|-----------------|
 | **A** | Crypto contract + golden vectors (Python) | Yes (library + tests) |
-| **B** | Supabase vault table + Auth + RLS | Yes (schema + SQL policies) |
+| **B** | Supabase vault table (+ optional Android DB role SQL) | Yes |
 | **C** | PC FastAPI vault sync + migrate + reset | Yes (PC dual-client SoT) |
 | **D** | GitHub Actions market refresh | Yes (ops) |
-| **E** | Android app (auth, vault, market read, Groq) | Needs A–C |
+| **E** | Android app (setup pooler URL, vault, market read, Groq) | Needs A–C |
 
 Prefer one PR per wave. Do not start Wave E until Wave A golden vectors exist (Android must match them).
 
@@ -448,7 +448,7 @@ def test_put_rejects_stale_version(client, auth_header):
 
 - [ ] **Step 2: Implement repository using `DATABASE_URL` or Supabase REST**
 
-**Locked:** PC FastAPI vault IO uses the existing **session pooler** `DATABASE_URL` / `ALEMBIC_DATABASE_URL` (psycopg), same as market data — not PostgREST and not Email Auth. Encrypt/decrypt with `PORTFOLIO_ENCRYPTION_SECRET` from `.env`. Map vault owner via `SUPABASE_USER_ID` (or local config) until Android Auth lands in Wave E.
+**Locked:** PC FastAPI vault IO uses the existing **session pooler** `DATABASE_URL` / `ALEMBIC_DATABASE_URL` (psycopg), same as market data — not PostgREST and not Email Auth. Encrypt/decrypt with `PORTFOLIO_ENCRYPTION_SECRET` from `.env`. Map vault owner via `VAULT_USER_ID` in `.env` (same UUID pasted into Android setup).
 
 - [ ] **Step 3: Wire router in `main.py`; tests PASS**
 
@@ -477,7 +477,7 @@ uv run python portfolio-service/scripts/vault_migrate_push.py --user-access-toke
 
 - [ ] **Step 1: Script loads SQLite portfolio for mapped user, encrypts with `PORTFOLIO_ENCRYPTION_SECRET`, PUTs vault**
 
-Map local SQLite user → Supabase `auth.users` id via env `SUPABASE_USER_ID` for v1 (explicit; no magic email join yet).
+Map vault owner via env `VAULT_USER_ID` (same UUID configured on Android setup).
 
 - [ ] **Step 2: Dry-run flag prints snapshot stats without upload**
 
@@ -628,32 +628,35 @@ git commit -m "feat(android): AES-GCM vault crypto interoperable with Python"
 
 ---
 
-### Task 12: Android Auth + vault get/put + settings
+### Task 12: Android setup (restricted pooler URL) + vault get/put
 
 **Files:**
-- `android/.../auth/SupabaseAuthRepository.kt`
+- `android/.../setup/SetupScreen.kt`
+- `android/.../db/PoolerConfigStore.kt`
 - `android/.../vault/VaultRepository.kt`
 - `android/.../ui/settings/SettingsScreen.kt`
 - `android/.../ui/portfolio/PortfolioScreen.kt`
+- Create: `supabase/android_readonly_role.sql` (role grants template)
 
 **Interfaces:**
-- Settings stores: encryption secret + Groq key in EncryptedSharedPreferences
-- Portfolio screen: fetch ciphertext → decrypt → show holdings list (read-only first); edit later optional
-- Put path: bump version, encrypt, upsert; handle 409 retry
+- Setup collects: restricted session pooler URL, `PORTFOLIO_ENCRYPTION_SECRET`, `VAULT_USER_ID`, optional Groq key → EncryptedSharedPreferences
+- Connect with Postgres driver (or equivalent) using that URL; **never** embed PC `DATABASE_URL` in the APK
+- Portfolio screen: `SELECT` vault row for `VAULT_USER_ID` → decrypt → show holdings
+- Put path (if role allows): bump version, encrypt, upsert; handle 409 retry
 
-- [ ] **Step 1: Login with Supabase email/password (GoTrue REST)**
+- [ ] **Step 1: Setup screen validation (reject blank URL/secret/user id)**
 
-- [ ] **Step 2: Load vault row with user JWT; decrypt; render holdings**
+- [ ] **Step 2: Load vault row via pooler; decrypt; render holdings**
 
-- [ ] **Step 3: Save encryption secret; reject blank**
+- [ ] **Step 3: Document creating `wealth_orbit_android` role (market SELECT-only) in `supabase/android_readonly_role.sql`**
 
 - [ ] **Step 4: Manual E2E with PC-pushed vault**
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add android
-git commit -m "feat(android): auth, vault sync, and encrypted portfolio view"
+git add android supabase/android_readonly_role.sql
+git commit -m "feat(android): setup with restricted pooler URL and vault sync"
 ```
 
 ---
@@ -668,7 +671,7 @@ git commit -m "feat(android): auth, vault sync, and encrypted portfolio view"
 - SELECT-only queries: index latest levels, watchlist/latest metrics for a small symbol list
 - No sync job enqueue; no writes
 
-- [ ] **Step 1: Implement narrow PostgREST/SQL selects**
+- [ ] **Step 1: Implement narrow SQL SELECTs over the Android pooler connection**
 
 - [ ] **Step 2: UI shows 3–5 indexes + optional symbol quote**
 
@@ -736,7 +739,7 @@ git commit -m "docs: align handbook with multi-client E2E vault architecture"
 ## Guidance for implementers
 
 1. **Order matters:** never build Android crypto before Python golden vectors.
-2. **Secrets:** three different secrets (Auth password, encryption secret, Groq key). Name them differently in UI copy.
+2. **Secrets:** pooler URL (restricted), encryption secret, Groq key, vault user id. Name them differently in UI copy. Never paste the PC superuser pooler URL into Android.
 3. **Logging:** never log decrypted JSON or encryption secret. Redact ciphertext in debug logs if needed.
 4. **Concurrency:** always send `version`; on 409, re-fetch, re-apply local edit, re-encrypt.
 5. **Lightweight Android:** if a library pulls minSdk > 24 or adds ML, reject it.

@@ -1,16 +1,17 @@
 # Supabase SQL for multi-client vault
 
-## PC path (what you use now)
+## PC path
 
-The PC connects with the **session pooler** URI in `.env` (`DATABASE_URL` / `ALEMBIC_DATABASE_URL`, port 5432). That is enough for Alembic, market sync, and PC vault read/write. **Email Auth is not required for that.**
+PC connects with the **session pooler** URI in `.env` (`DATABASE_URL` / `ALEMBIC_DATABASE_URL`, port 5432). That is enough for Alembic, market sync, and PC vault IO. **Email Auth is not required.**
 
-## Android / JWT path (Wave E — later)
+## Android path (setup input)
 
-When the phone uses the anon key (never the pooler password), apply in order after `018_portfolio_vault`:
+1. Run [android_readonly_role.sql](./android_readonly_role.sql) (set a strong password).
+2. Create a **Session** pooler connection string for role `wealth_orbit_android`.
+3. On Android **setup**, paste that URI + `PORTFOLIO_ENCRYPTION_SECRET` + `VAULT_USER_ID`.
 
-1. [rls_portfolio_vault.sql](./rls_portfolio_vault.sql) — RLS on `public.portfolio_vault`
-2. [grants_market_reader.sql](./grants_market_reader.sql) — `market_data` SELECT-only for `anon` / `authenticated`
+The Android role is **market SELECT-only**. Uncomment vault `INSERT`/`UPDATE` in the SQL only if you want phone portfolio edits. Never give Android the `postgres` superuser pooler URL.
 
-Enable **Authentication → Providers → Email** only when you start the Android client.
+## Optional: Auth + RLS
 
-Do **not** put `DATABASE_URL`, the pooler password, or `PORTFOLIO_ENCRYPTION_SECRET` in the Android app.
+[rls_portfolio_vault.sql](./rls_portfolio_vault.sql) and [grants_market_reader.sql](./grants_market_reader.sql) are for a future anon-key/JWT client. Not required when Android uses a restricted pooler URL.

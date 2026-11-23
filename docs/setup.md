@@ -89,18 +89,19 @@ Wealth Orbit uses **two databases on purpose**:
 
 ### Multi-client vault (optional; Waves B+)
 
-**PC / server connection to Supabase is the session pooler URL you already use** — `DATABASE_URL` / `ALEMBIC_DATABASE_URL` in `.env` (port **5432** on `*.pooler.supabase.com`). Alembic, market sync, and PC vault read/write all use that Postgres URL. You do **not** need Email Auth to connect the PC to Supabase.
+**PC / server connection to Supabase is the session pooler URL you already use** — `DATABASE_URL` / `ALEMBIC_DATABASE_URL` in `.env` (port **5432** on `*.pooler.supabase.com`). Alembic, market sync, and PC vault read/write all use that Postgres URL. You do **not** need Email Auth.
 
-After `alembic upgrade head` includes `018_portfolio_vault`, add only the encryption secret for PC vault work:
+After `alembic upgrade head` includes `018_portfolio_vault`, add vault env vars on the PC:
 
 ```bash
 # Same session-pooler DATABASE_URL as market data (already required above).
 PORTFOLIO_ENCRYPTION_SECRET=generate-a-long-random-string
+VAULT_USER_ID=generate-or-pick-a-uuid   # same id pasted into Android setup
 ```
 
-**Email Auth + `SUPABASE_URL` / `SUPABASE_ANON_KEY`** are for the **Android (or browser) client** later: they get a user JWT so RLS can scope `portfolio_vault` without embedding the pooler password in the app. Skip those until Wave E. Optional SQL: [supabase/README.md](../supabase/README.md).
+**Android** does **not** use the PC superuser URL. Create a restricted role ([supabase/android_readonly_role.sql](../supabase/android_readonly_role.sql)), build a **session pooler** URI for that role, and paste it into the Android **setup** screen with the encryption secret and `VAULT_USER_ID`.
 
-Details: [design/2026-11-23-multi-client-e2e-portfolio-design.md](design/2026-11-23-multi-client-e2e-portfolio-design.md).
+Details: [design/2026-11-23-multi-client-e2e-portfolio-design.md](design/2026-11-23-multi-client-e2e-portfolio-design.md), [supabase/README.md](../supabase/README.md).
 
 **Persist (facts):** masters, OHLC / NAV / index history (default **10y**), fundamentals (5 annual + 6 quarterly periods), shareholding, latest Yahoo daily metrics, latest-day technical indicators, sync jobs.
 
