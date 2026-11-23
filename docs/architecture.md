@@ -66,9 +66,13 @@ flowchart LR
 
 Local accounts in SQLite: signup/login set an HTTP-only cookie. There is no email reset flow; see [setup.md](setup.md#forgotten-password).
 
+## Glossary (shipped, educational)
+
+`/ui/glossary` is a full-height multi-session chat over curated seed terms, with an optional local Varsity RAG path (`multi_agent`). It refuses investment advice and PDF dumps. Details: [setup.md](setup.md#glossary-chat-release-111).
+
 ## What is not shipped yet
 
-Future milestones (MTM/XIRR, watchlists, stance engine, glossary chat, strategy lab) are tracked in local-only `docs/releases/` when present. Until those land in the product, the UI remains **cost-basis portfolio** plus **stored market research** — no buy/sell stance layer in production code.
+Future milestones (MTM/XIRR, watchlists, stance engine, strategy lab) are tracked in local-only `docs/releases/` when present. The core UI remains **cost-basis portfolio** plus **stored market research** — no buy/sell stance layer in production code.
 
 ## Related docs
 

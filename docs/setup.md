@@ -248,6 +248,80 @@ sqlite3 portfolio-service/portfolio.db "UPDATE users SET password_hash = NULL WH
 
 Sign-up refuses a name that is already stored. Use another name, or remove that user from the file before creating the account again.
 
+## Glossary chat (release 1.11)
+
+The **Glossary** page (`/ui/glossary`) is a full-height, multi-session educational chat. Facts come from [docs/varsity_docs/glossary_seed.json](varsity_docs/glossary_seed.json) and, when ingested, a local Varsity corpus — not live prices, portfolio data, or redistributed PDF text.
+
+- **Scope:** definitions and citations; buy/sell/switch advice and Varsity dump/redistribute requests are refused.
+- **UI:** ChatGPT-style workspace — session sidebar (New chat / switch / delete), scrollable thread, docked composer. Sessions persist in the browser (`localStorage`); they are not stored on the server.
+- **Varsity PDFs** under `docs/varsity_docs/` are local offline copies (gitignored). Extracted markdown + RAG index (`extracted/`, `.rag_index/`) are also gitignored — Varsity © Zerodha; do not redistribute.
+- **Modes** (multi-turn `POST /glossary/agent/chat`):
+  1. `multi_agent` — LangGraph Router→Retriever→Answerer→Critic when a local RAG index exists **and** an LLM provider key is set.
+  2. `agent` — Groq/OpenAI seed tool-calling agent when the index is missing but a provider key is set.
+  3. `fallback` — deterministic seed matcher when no LLM key is available (or on agent errors).
+- The single-turn `POST /glossary/chat` endpoint always uses the seed matcher.
+
+### Local corpus ingest (POC)
+
+After placing Varsity PDFs under `docs/varsity_docs/` (see `chapter_index.json` `pdf_local` names):
+
+```bash
+uv run python portfolio-service/scripts/glossary/ingest_varsity_corpus.py
+```
+
+Rebuild when PDFs change. Answers show a **Sources** accordion (module/chapter/URL/excerpt) when citations are present.
+
+### Model switching
+
+Chat models are selected via env (no code edits). See [.env.example](../.env.example):
+
+| Variable | Purpose |
+|----------|---------|
+| `GLOSSARY_LLM_PROVIDER` | `groq` (default) \| `openai` \| `openai_compatible` |
+| `GLOSSARY_LLM_MODEL` | Provider model id (default `openai/gpt-oss-120b` on Groq) |
+| `GLOSSARY_LLM_BASE_URL` | Required for `openai_compatible` gateways |
+| `GROQ_API_KEY` | When provider=`groq` |
+| `OPENAI_API_KEY` | When provider=`openai` or `openai_compatible` |
+
+Examples:
+
+```bash
+# Groq (default)
+GLOSSARY_LLM_PROVIDER=groq
+GLOSSARY_LLM_MODEL=openai/gpt-oss-120b
+GROQ_API_KEY=...
+
+# OpenAI
+GLOSSARY_LLM_PROVIDER=openai
+GLOSSARY_LLM_MODEL=gpt-4o-mini
+OPENAI_API_KEY=...
+
+# Compatible endpoint (Together / Fireworks / local vLLM)
+GLOSSARY_LLM_PROVIDER=openai_compatible
+GLOSSARY_LLM_BASE_URL=https://api.together.xyz/v1
+GLOSSARY_LLM_MODEL=...
+OPENAI_API_KEY=...
+```
+
+- **Public endpoints** (no session):
+  - `POST /api/v1/glossary/chat` — one message: `{"message": "What is IPO?"}` → `kind`, `definition`, `sources`.
+  - `POST /api/v1/glossary/agent/chat` — multi-turn: `{"messages": [{"role":"user","content":"What is NAV?"}]}` → `assistant_message`, `mode`, optional `citations` / `agent_trace`.
+  - `GET /api/v1/glossary/terms` — browse curated terms.
+
+With the API running on port 8000:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/v1/glossary/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"What is IPO?"}'
+```
+
+Release exit checks:
+
+```bash
+uv run pytest tests/test_glossary_*.py -q
+```
+
 ## Contributors
 
 | Topic | Doc |
