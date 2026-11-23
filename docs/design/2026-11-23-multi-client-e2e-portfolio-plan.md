@@ -4,7 +4,7 @@
 
 **Goal:** Ship dual-client Wealth Orbit with a single AES-256-GCM encrypted portfolio document in Supabase, PC + Kotlin Android clients that share one secret, GitHub Actions for market_data refresh, and an optional Groq agent on Android.
 
-**Architecture:** Supabase holds plaintext `market_data` and opaque portfolio ciphertext. PC (Python crypto in FastAPI) and Android (Kotlin) encrypt/decrypt locally with `PORTFOLIO_ENCRYPTION_SECRET`. Auth is Supabase email/password (separate from the encryption secret). GHA writes market data only. Android is market read-only and never performs vault reset.
+**Architecture:** Supabase holds plaintext `market_data` and opaque portfolio ciphertext. PC connects via **session pooler** `DATABASE_URL` in `.env` (same as today) and encrypts/decrypts with `PORTFOLIO_ENCRYPTION_SECRET`. Android (Kotlin) later uses Auth JWT + anon key (not the pooler password). GHA writes market data only. Android is market read-only and never performs vault reset.
 
 **Tech Stack:** Python 3 + FastAPI + existing `portfolio-service`; Supabase Auth + Postgres; Alembic; AES-256-GCM; Kotlin + Jetpack Compose (`minSdk 24`); OkHttp/Ktor → Groq OpenAI-compatible API; GitHub Actions + existing seed/sync scripts.
 
@@ -448,9 +448,7 @@ def test_put_rejects_stale_version(client, auth_header):
 
 - [ ] **Step 2: Implement repository using `DATABASE_URL` or Supabase REST**
 
-Prefer direct Postgres with user JWT via `request.headers.Authorization` set as `SET LOCAL ROLE` only if using Supabase; simpler v1: PC uses **service role only for reset**, and **user access token** for get/put through Supabase PostgREST or psycopg with RLS. Document chosen approach in route module docstring; lock to:
-
-**Locked:** PC FastAPI uses Supabase PostgREST (`SUPABASE_URL` + user access token) for get/put; service role for reset only.
+**Locked:** PC FastAPI vault IO uses the existing **session pooler** `DATABASE_URL` / `ALEMBIC_DATABASE_URL` (psycopg), same as market data — not PostgREST and not Email Auth. Encrypt/decrypt with `PORTFOLIO_ENCRYPTION_SECRET` from `.env`. Map vault owner via `SUPABASE_USER_ID` (or local config) until Android Auth lands in Wave E.
 
 - [ ] **Step 3: Wire router in `main.py`; tests PASS**
 

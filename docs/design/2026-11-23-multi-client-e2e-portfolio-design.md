@@ -84,10 +84,11 @@ flowchart TB
 
 | Component | Responsibility |
 |-----------|----------------|
-| Supabase Auth | Email/password identity; JWT for RLS (`auth.uid()`) |
+| Session pooler (`DATABASE_URL`) | PC/server Postgres access to `market_data` + `portfolio_vault` (already in `.env`) |
+| Supabase Auth (Android later) | Email/password → JWT for RLS (`auth.uid()`); not required for PC pooler path |
 | `market_data` schema | Existing shared research (masters, OHLC/NAV, etc.) |
 | Portfolio vault table | One encrypted document per user |
-| PC Wealth Orbit | Decrypt/encrypt with env secret; portfolio + research UI; vault reset |
+| PC Wealth Orbit | Decrypt/encrypt with env secret; portfolio + research UI; vault reset via pooler |
 | Android app | **Kotlin + Jetpack Compose** lightweight client; same crypto; research read; portfolio write; local agent |
 | GitHub Actions | Scheduled market refresh using market-scoped credentials |
 | Groq | Optional Q&A; user-supplied API key on device |
@@ -127,15 +128,16 @@ One row per user:
 
 Unchanged intent: plaintext Postgres `market_data` as today. Android and PC **SELECT** only from clients. Writers: GitHub Actions (and optionally PC tools with elevated role during migration)—never the Android app.
 
-### 6.3 Auth vs encryption secret
+### 6.3 Connection vs secrets
 
-| Secret | Purpose | Storage |
-|--------|---------|---------|
-| Supabase email/password | Identity / RLS | Supabase Auth |
-| `PORTFOLIO_ENCRYPTION_SECRET` | Encrypt/decrypt portfolio document | PC: `.env` (gitignored). Android: Keystore-backed secure storage |
+| Item | Purpose | Storage |
+|------|---------|---------|
+| Session pooler `DATABASE_URL` | PC/server connects to Supabase Postgres | `.env` (already required for market data) |
+| `PORTFOLIO_ENCRYPTION_SECRET` | Encrypt/decrypt portfolio document | PC: `.env`. Android: Keystore-backed secure storage |
+| Supabase email/password | Android (Wave E) identity / RLS JWT — **not** how the PC connects | Supabase Auth |
 | Groq API key | Agent calls | Android app settings only (user-supplied) |
 
-These three must never be conflated.
+Never put the pooler password or encryption secret in the Android app.
 
 ## 7. Cryptography (v1)
 
@@ -149,9 +151,9 @@ These three must never be conflated.
 
 ### 8.1 Initial setup
 
-1. User creates Supabase Auth account (email/password).
-2. User (or PC setup) generates `PORTFOLIO_ENCRYPTION_SECRET` into PC `.env`.
-3. User pastes the same secret into Android secure settings.
+1. PC already has Supabase **session pooler** `DATABASE_URL` in `.env`.
+2. User generates `PORTFOLIO_ENCRYPTION_SECRET` into PC `.env`.
+3. When Android ships: create Supabase Auth user (email/password), paste encryption secret into Android secure settings, use anon key + JWT (not the pooler URL).
 4. Optional: user adds Groq API key and local `skill.md` on Android.
 
 ### 8.2 Lost secret

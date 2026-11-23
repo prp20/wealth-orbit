@@ -89,21 +89,18 @@ Wealth Orbit uses **two databases on purpose**:
 
 ### Multi-client vault (optional; Waves B+)
 
-After `alembic upgrade head` includes `018_portfolio_vault`:
+**PC / server connection to Supabase is the session pooler URL you already use** — `DATABASE_URL` / `ALEMBIC_DATABASE_URL` in `.env` (port **5432** on `*.pooler.supabase.com`). Alembic, market sync, and PC vault read/write all use that Postgres URL. You do **not** need Email Auth to connect the PC to Supabase.
 
-1. Enable **Authentication → Email** in the Supabase dashboard.
-2. In the SQL editor, run [supabase/rls_portfolio_vault.sql](../supabase/rls_portfolio_vault.sql), then [supabase/grants_market_reader.sql](../supabase/grants_market_reader.sql).
-3. Add to `.env` (never commit real values; never put service role or encryption secret in the Android app):
+After `alembic upgrade head` includes `018_portfolio_vault`, add only the encryption secret for PC vault work:
 
 ```bash
-SUPABASE_URL=https://PROJECT_REF.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
+# Same session-pooler DATABASE_URL as market data (already required above).
 PORTFOLIO_ENCRYPTION_SECRET=generate-a-long-random-string
-# PC vault reset only — never ship to Android:
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-Details: [design/2026-11-23-multi-client-e2e-portfolio-design.md](design/2026-11-23-multi-client-e2e-portfolio-design.md), [supabase/README.md](../supabase/README.md).
+**Email Auth + `SUPABASE_URL` / `SUPABASE_ANON_KEY`** are for the **Android (or browser) client** later: they get a user JWT so RLS can scope `portfolio_vault` without embedding the pooler password in the app. Skip those until Wave E. Optional SQL: [supabase/README.md](../supabase/README.md).
+
+Details: [design/2026-11-23-multi-client-e2e-portfolio-design.md](design/2026-11-23-multi-client-e2e-portfolio-design.md).
 
 **Persist (facts):** masters, OHLC / NAV / index history (default **10y**), fundamentals (5 annual + 6 quarterly periods), shareholding, latest Yahoo daily metrics, latest-day technical indicators, sync jobs.
 
